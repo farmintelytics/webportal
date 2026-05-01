@@ -1,56 +1,44 @@
 import React from 'react';
 import { 
   Sprout, 
-  Settings, 
-  Users, 
   ArrowRight, 
   ShieldCheck,
   Zap,
   LayoutGrid,
   Globe,
-  Camera,
   Activity,
-  Fingerprint,
-  Wallet,
-  Truck,
-  AlertTriangle,
-  LayoutDashboard,
-  MessageSquare
+  Users
 } from 'lucide-react';
 
-const ModuleCard = ({ title, id, description, icon, active, onSelect }) => (
+const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (
   <button 
     onClick={() => active && onSelect(id)}
-    className={`group relative p-8 rounded-[2rem] border-2 transition-all duration-500 flex flex-col text-left h-[280px] overflow-hidden ${
+    className={`group relative p-6 rounded-3xl border transition-all duration-500 flex flex-col text-left overflow-hidden ${
       active 
-        ? 'bg-white hover:border-[var(--brand-primary)] shadow-sm hover:shadow-2xl' 
-        : 'bg-gray-50/50 border-gray-100 opacity-60 grayscale cursor-not-allowed'
+        ? 'bg-white hover:border-[var(--brand-primary)] shadow-sm hover:shadow-xl' 
+        : 'bg-gray-50/30 border-gray-100 opacity-60'
     }`}
   >
-    <div className={`p-4 rounded-2xl w-fit mb-6 transition-all duration-500 ${
+    <div className={`p-3 rounded-xl w-fit mb-4 transition-all duration-500 ${
       active 
-        ? 'bg-gray-50 group-hover:bg-[var(--brand-primary)] group-hover:text-white group-hover:scale-110' 
+        ? 'bg-gray-50 group-hover:bg-[var(--brand-primary)] group-hover:text-white' 
         : 'bg-gray-100 text-gray-400'
     }`}>
-      {React.cloneElement(icon, { size: 24 })}
+      {React.cloneElement(icon, { size: 20 })}
     </div>
     
-    <div className="flex-1">
-      <h3 className={`text-xl font-black tracking-tight mb-2 transition-colors duration-500 ${
-        active ? 'text-gray-900 group-hover:text-[var(--brand-primary)]' : 'text-gray-500'
-      }`}>
+    <div>
+      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1">{crop}</div>
+      <h3 className="text-[15px] font-black tracking-tight text-gray-900 leading-tight">
         {title}
       </h3>
-      <p className="text-[12px] font-medium leading-relaxed text-gray-500 line-clamp-3">
-        {description}
-      </p>
     </div>
 
-    <div className="mt-6 flex items-center justify-between">
-       <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${active ? 'text-[var(--brand-primary)]' : 'text-gray-300'}`}>
-         {active ? 'Launch Module' : 'In Development'}
+    <div className="mt-4 flex items-center justify-between">
+       <span className={`text-[9px] font-black uppercase tracking-widest ${active ? 'text-[var(--brand-primary)]' : 'text-gray-300'}`}>
+         {active ? 'Launch' : 'Coming Soon'}
        </span>
-       {active && <ArrowRight size={16} className="text-[var(--brand-primary)] transform group-hover:translate-x-1 transition-transform" />}
+       {active && <ArrowRight size={14} className="text-[var(--brand-primary)] transform group-hover:translate-x-1 transition-transform" />}
     </div>
   </button>
 );
@@ -58,78 +46,66 @@ const ModuleCard = ({ title, id, description, icon, active, onSelect }) => (
 const PortalHub = ({ onSelectModule }) => {
   const sections = [
     {
-      title: 'Operational Core',
+      title: 'Management Solutions',
       modules: [
-        { id: 'biometrics', title: 'Biometric Identity', description: 'Eliminate ghost workers with fingerprint and facial registration.', icon: <Fingerprint />, active: true },
-        { id: 'workforce', title: 'AI Workforce Management', description: 'Task assignment, attendance, and performance leaderboards.', icon: <Users />, active: true },
-        { id: 'operations', title: 'Farm Activity & Logs', description: 'Daily harvesting, planting, and spraying records (geo-referenced).', icon: <ClipboardList />, active: true },
-        { id: 'compliance', title: 'Risk & Compliance', description: 'Real-time fraud alerts and immutable activity ledgers.', icon: <ShieldCheck />, active: false },
+        { id: 'management-ffb', title: 'FFB Intelligence', crop: 'Oil Palm', icon: <Sprout />, active: true },
+        { id: 'management-cashew', title: 'Cashew Hub', crop: 'Cashew', icon: <Activity />, active: false },
+        { id: 'management-sugarcane', title: 'Cane Console', crop: 'SugarCane', icon: <Zap />, active: false },
+        { id: 'management-rice', title: 'Rice Monitor', crop: 'Rice', icon: <LayoutGrid />, active: false },
+        { id: 'management-cocoa', title: 'Cocoa Core', crop: 'Cocoa', icon: <Sprout />, active: false },
       ]
     },
     {
-      title: 'Intelligence & Sensing',
+      title: 'Remote Sensing',
       modules: [
-        { id: 'crop-ai', title: 'Crop & Disease AI', description: 'AI image recognition for pest and nutrient deficiency alerts.', icon: <Sprout />, active: false },
-        { id: 'remote-sensing', title: 'Satellite & GeoAI', description: 'NDVI vegetation indices and GeoAI land classification.', icon: <Globe />, active: true },
-        { id: 'drones', title: 'Drone Monitoring', description: 'Live drone feed integration and field surveillance.', icon: <Camera />, active: false },
-        { id: 'geospatial', title: 'Geofencing Intel', description: 'Farm boundary mapping and breach alerts.', icon: <Zap />, active: true },
-      ]
-    },
-    {
-      title: 'Supply Chain & Finance',
-      modules: [
-        { id: 'payments', title: 'Financial System', description: 'Digital payments, wallets, and automated payroll sync.', icon: <Wallet />, active: false },
-        { id: 'logistics', title: 'Logistics & Tracking', description: 'Track produce movement and reduce transit diversion.', icon: <Truck />, active: false },
-        { id: 'dashboards', title: 'Executive Portals', description: 'Organisation-wide strategic insights and manager views.', icon: <LayoutDashboard />, active: true },
-        { id: 'advisor', title: 'Farm Advisor', description: 'Location-aware weather and pest alerts via SMS/Newsletters.', icon: <MessageSquare />, active: false },
+        { id: 'rs-ffb', title: 'Yield Prediction', crop: 'Oil Palm', icon: <Globe />, active: true },
+        { id: 'rs-cashew', title: 'Canopy Analysis', crop: 'Cashew', icon: <Globe />, active: false },
       ]
     }
   ];
 
   return (
     <div className="min-h-screen bg-[var(--bg)] p-8 lg:p-20 overflow-y-auto">
-      <div className="max-w-[1600px] mx-auto">
-        <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-8 mb-24">
+      <div className="max-w-[1400px] mx-auto">
+        <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-8 mb-20">
           <div className="flex items-center gap-5">
-             <div className="w-14 h-14 bg-[var(--brand-primary)] rounded-[1.25rem] flex items-center justify-center shadow-2xl shadow-[var(--brand-primary)]/30 transform hover:rotate-6 transition-transform">
-                <ShieldCheck className="text-white w-8 h-8" />
+             <div className="w-12 h-12 bg-[var(--brand-primary)] rounded-xl flex items-center justify-center shadow-xl shadow-[var(--brand-primary)]/20">
+                <ShieldCheck className="text-white w-7 h-7" />
              </div>
              <div>
-                <h1 className="text-2xl font-black uppercase tracking-tighter text-gray-900 leading-none">FarmIntelytics</h1>
-                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[var(--brand-secondary)] mt-1.5">Verified · Monitored · Connected</p>
+                <h1 className="text-lg font-black uppercase tracking-tighter text-gray-900 leading-none">FarmIntelytics</h1>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--brand-secondary)] mt-1.5">Verified · Monitored · Connected</p>
              </div>
           </div>
           
           <div className="flex items-center gap-6">
              <div className="text-right">
-                <div className="text-[12px] font-black uppercase tracking-tight">Experience Layer</div>
-                <div className="text-[10px] font-bold text-gray-400">Production v4.2.0</div>
+                <div className="text-[11px] font-black uppercase tracking-tight">Experience Layer</div>
+                <div className="text-[9px] font-bold text-gray-400">Production v4.2.0</div>
              </div>
-             <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-300">
-                <Users size={20} />
+             <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-300">
+                <Users size={18} />
              </div>
           </div>
         </header>
 
-        <div className="mb-24">
-           <div className="text-[12px] font-black uppercase tracking-[0.4em] text-[var(--brand-primary)] mb-6">The Suite</div>
-           <h2 className="text-6xl lg:text-8xl font-black text-gray-900 tracking-tighter leading-[0.9] mb-8">
-             Twelve Modules.<br/>
-             One <span className="text-[var(--brand-primary)]">Unified System.</span>
+        <div className="mb-20">
+           <h2 className="text-5xl lg:text-7xl font-black text-gray-900 tracking-tighter leading-none mb-6">
+             Operational <span className="text-[var(--brand-primary)]">Intelligence Hub.</span>
            </h2>
-           <p className="text-xl text-gray-500 font-medium max-w-3xl leading-relaxed">
-             Each module works standalone, but the real power emerges when they share one identity, one map and one source of truth.
+           <p className="text-lg text-gray-500 font-medium max-w-2xl">
+             Unified launcher for multi-crop management and remote sensing modules. Connect to your enterprise farm ledger.
            </p>
         </div>
 
-        <div className="space-y-32">
+        <div className="space-y-20">
           {sections.map(section => (
-            <div key={section.title} className="space-y-12">
+            <div key={section.title} className="space-y-8">
               <div className="flex items-center gap-4">
-                <h3 className="text-[12px] font-black uppercase tracking-[0.5em] text-gray-400 whitespace-nowrap">{section.title}</h3>
+                <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-gray-400 whitespace-nowrap">{section.title}</h3>
                 <div className="h-px bg-gray-100 flex-1"></div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {section.modules.map(module => (
                   <ModuleCard 
                     key={module.id} 
@@ -142,31 +118,19 @@ const PortalHub = ({ onSelectModule }) => {
           ))}
         </div>
 
-        <footer className="mt-40 pt-16 border-t border-gray-100 flex flex-col lg:flex-row justify-between items-start gap-12 pb-20">
-           <div className="max-w-md">
-              <div className="flex items-center gap-3 mb-6">
-                 <ShieldCheck size={24} className="text-[var(--brand-primary)]" />
-                 <span className="text-lg font-black uppercase tracking-tighter">FarmIntelytics</span>
-              </div>
-              <p className="text-sm text-gray-500 font-medium leading-relaxed mb-8">
-                The operating system for agricultural intelligence, combining biometrics, geospatial data, payments and AI into one verified source of truth.
-              </p>
-              <div className="text-[11px] font-black uppercase tracking-widest text-gray-400">© 2026 FarmIntelytics. All rights reserved.</div>
+        <footer className="mt-40 pt-12 border-t border-gray-100 flex flex-col lg:flex-row justify-between items-center gap-8 pb-20">
+           <div className="flex items-center gap-8 opacity-40">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 leading-none">© 2026 FarmIntelytics. All rights reserved.</div>
            </div>
            
-           <div className="flex flex-col sm:flex-row gap-12 lg:gap-24">
-              <div>
-                 <div className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-6">Operations Hub</div>
-                 <div className="flex flex-col gap-4">
-                    {['Status', 'Documentation', 'Support Hub'].map(i => (
-                      <button key={i} className="text-[12px] font-medium text-gray-500 hover:text-[var(--brand-primary)] text-left transition-colors">{i}</button>
+           <div className="flex gap-12">
+              <div className="flex flex-col gap-1 items-end">
+                 <div className="text-[10px] font-black uppercase tracking-widest text-gray-900 mb-2">Operations Hub</div>
+                 <div className="flex gap-6">
+                    {['Status', 'Documentation', 'Support'].map(i => (
+                      <button key={i} className="text-[11px] font-bold text-gray-400 hover:text-[var(--brand-primary)] transition-colors">{i}</button>
                     ))}
                  </div>
-              </div>
-              <div>
-                 <div className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-6">Connect</div>
-                 <button className="text-[14px] font-black text-[var(--brand-primary)] hover:underline mb-2 block">Request assistance</button>
-                 <button className="text-[12px] font-bold text-gray-500">support@farmintelytics.com</button>
               </div>
            </div>
         </footer>
@@ -174,7 +138,5 @@ const PortalHub = ({ onSelectModule }) => {
     </div>
   );
 };
-
-const ClipboardList = ({ size, className }) => <Sprout size={size} className={className} />; // Placeholder for Activity icon
 
 export default PortalHub;
