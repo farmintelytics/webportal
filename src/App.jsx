@@ -1,96 +1,74 @@
-import React, { useState } from 'react';
-import Sidebar from './components/Sidebar';
-import TopBar from './components/TopBar';
-import Dashboard from './components/Dashboard';
-import Identity from './components/Identity';
-import Workforce from './components/Workforce';
-import Activity from './components/Activity';
-import Geospatial from './components/Geospatial';
-import WorkerAnalytics from './components/WorkerAnalytics';
+import React, { useState, useEffect } from 'react';
+import Login from './views/Login';
+import PortalHub from './views/PortalHub';
+import PortalLayout from './layouts/PortalLayout';
+import Dashboard from './portals/ffb/Dashboard';
+import Identity from './portals/ffb/Identity';
+import Workforce from './portals/ffb/Workforce';
+import Activity from './portals/ffb/Activity';
+import Geospatial from './portals/ffb/Geospatial';
+import WorkerAnalytics from './portals/ffb/WorkerAnalytics';
 import { crops } from './config/crops';
 
 const App = () => {
-  const [currentCrop, setCurrentCrop] = useState(crops[0]);
+  const [view, setView] = useState('login'); // login, hub, portal
+  const [activePortal, setActivePortal] = useState(null); // 'ffb', 'cashew', etc.
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [currentCrop, setCurrentCrop] = useState(crops[0]);
+
+  const handleLogin = () => setView('hub');
+  
+  const handleSelectPortal = (portalId) => {
+    setActivePortal(portalId);
+    setView('portal');
+  };
+
+  const handleBackToHub = () => setView('hub');
 
   const getSectionContent = () => {
-    switch (activeSection) {
-      case 'dashboard':
-        return <Dashboard currentCrop={currentCrop} />;
-      case 'geospatial':
-        return <Geospatial />;
-      case 'workers':
-        return <WorkerAnalytics />;
-      case 'identity':
-        return <Identity />;
-      case 'workforce':
-        return <Workforce />;
-      case 'activity':
-        return <Activity />;
-      default:
-        return (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
-            <div className="w-16 h-16 mb-4 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center">
-              🚧
-            </div>
-            <h2 className="text-lg font-bold text-gray-700 dark:text-gray-300">Section Under Construction</h2>
-            <p className="text-sm">The {activeSection} module is currently being migrated to React.</p>
-          </div>
-        );
+    // Only FFB portal implemented for now
+    if (activePortal === 'ffb') {
+      switch (activeSection) {
+        case 'dashboard':
+          return <Dashboard currentCrop={currentCrop} />;
+        case 'geospatial':
+          return <Geospatial />;
+        case 'workers':
+          return <WorkerAnalytics />;
+        case 'identity':
+          return <Identity />;
+        case 'workforce':
+          return <Workforce />;
+        case 'activity':
+          return <Activity />;
+        default:
+          return <Dashboard currentCrop={currentCrop} />;
+      }
     }
+    
+    // Generic fallback for other portals
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-400 p-20 text-center">
+        <h2 className="text-4xl font-black text-gray-900 mb-4 tracking-tighter capitalize">{activePortal} Intelligence</h2>
+        <p className="text-gray-500 font-medium">This module is currently being optimized for your division.</p>
+      </div>
+    );
   };
 
-  const getSectionTitle = () => {
-    const titles = {
-      dashboard: 'Executive Dashboard',
-      alerts: 'Smart Alerts',
-      identity: 'Biometric Identity',
-      workforce: 'Workforce Management',
-      activity: 'Farm Activity',
-      ffb: 'FFB Counter & Harvest',
-      crop: 'Crop & Disease AI',
-      geo: 'Geospatial & Geofencing',
-      drone: 'Drone Monitoring',
-      payments: 'Payments & Finance',
-      logistics: 'Logistics & Supply Chain',
-    };
-    return titles[activeSection] || 'Platform';
-  };
-
-  const getSectionSub = () => {
-    const subs = {
-      dashboard: 'Portfolio overview · Updated 4 min ago',
-      alerts: '5 unresolved notifications',
-      identity: 'Worker registry and biometric verification',
-      workforce: 'Live operational status and task tracking',
-      activity: 'Approval queue and farm event log',
-      ffb: 'Harvest monitoring and yield counting',
-      crop: 'AI-driven disease detection and crop health',
-      geo: 'GIS layers and geofence monitoring',
-      drone: 'Aerial surveillance and NDVI mapping',
-      payments: 'Financial disbursements and payroll',
-      logistics: 'Supply chain and fleet management',
-    };
-    return subs[activeSection] || 'Real-time agricultural intelligence';
-  };
+  if (view === 'login') return <Login onLogin={handleLogin} />;
+  if (view === 'hub') return <PortalHub onSelectPortal={handleSelectPortal} />;
 
   return (
-    <div className="flex h-screen w-full bg-[#F5F4F0] dark:bg-[#1C1C1A] overflow-hidden font-sans antialiased">
-      <Sidebar 
-        activeSection={activeSection} 
-        setActiveSection={setActiveSection} 
-        currentCrop={currentCrop}
-        setCurrentCrop={setCurrentCrop}
-        crops={crops}
-      />
-      
-      <div className="flex-1 flex flex-col min-w-0">
-        <TopBar title={getSectionTitle()} />
-        <main className="flex-1 overflow-hidden">
-          {getSectionContent()}
-        </main>
-      </div>
-    </div>
+    <PortalLayout 
+      activeSection={activeSection}
+      setActiveSection={setActiveSection}
+      currentCrop={currentCrop}
+      setCurrentCrop={setCurrentCrop}
+      crops={crops}
+      onBackToHub={handleBackToHub}
+    >
+      {getSectionContent()}
+    </PortalLayout>
   );
 };
 
