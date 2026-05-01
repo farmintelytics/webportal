@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import Login from './views/Login';
 import PortalHub from './views/PortalHub';
 import PortalLayout from './layouts/PortalLayout';
-import Dashboard from './portals/ffb/Dashboard';
-import Identity from './portals/ffb/Identity';
-import Workforce from './portals/ffb/Workforce';
-import Activity from './portals/ffb/Activity';
-import Geospatial from './portals/ffb/Geospatial';
-import WorkerAnalytics from './portals/ffb/WorkerAnalytics';
+import Dashboard from './apps/ffb/Dashboard';
+import Identity from './apps/ffb/Identity';
+import Workforce from './apps/ffb/Workforce';
+import Activity from './apps/ffb/Activity';
+import Geospatial from './apps/ffb/Geospatial';
+import WorkerAnalytics from './apps/ffb/WorkerAnalytics';
 import { crops } from './config/crops';
 
 const App = () => {
@@ -26,7 +26,6 @@ const App = () => {
   const handleBackToHub = () => setView('hub');
 
   const getSectionContent = () => {
-    // Only FFB portal implemented for now
     if (activePortal === 'ffb') {
       switch (activeSection) {
         case 'dashboard':
@@ -46,7 +45,6 @@ const App = () => {
       }
     }
     
-    // Generic fallback for other portals
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400 p-20 text-center">
         <h2 className="text-4xl font-black text-gray-900 mb-4 tracking-tighter capitalize">{activePortal} Intelligence</h2>
