@@ -7,7 +7,7 @@ import {
   LayoutGrid,
   Globe,
   Activity,
-  Users,
+  ChevronDown,
   Plane,
   CreditCard,
   ClipboardList,
