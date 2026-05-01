@@ -1,122 +1,74 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState } from 'react';
+import Sidebar from './components/Sidebar';
+import TopBar from './components/TopBar';
+import Dashboard from './components/Dashboard';
 
-function App() {
-  const [count, setCount] = useState(0)
+const App = () => {
+  const [activeSection, setActiveSection] = useState('dashboard');
+
+  const getSectionContent = () => {
+    switch (activeSection) {
+      case 'dashboard':
+        return <Dashboard />;
+      default:
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <div className="w-16 h-16 mb-4 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center">
+              🚧
+            </div>
+            <h2 className="text-lg font-bold text-gray-700 dark:text-gray-300">Section Under Construction</h2>
+            <p className="text-sm">The {activeSection} module is currently being migrated to React.</p>
+          </div>
+        );
+    }
+  };
+
+  const getSectionTitle = () => {
+    const titles = {
+      dashboard: 'Executive Dashboard',
+      alerts: 'Smart Alerts',
+      identity: 'Biometric Identity',
+      workforce: 'Workforce Management',
+      activity: 'Farm Activity',
+      ffb: 'FFB Counter & Harvest',
+      crop: 'Crop & Disease AI',
+      geo: 'Geospatial & Geofencing',
+      drone: 'Drone Monitoring',
+      payments: 'Payments & Finance',
+      logistics: 'Logistics & Supply Chain',
+    };
+    return titles[activeSection] || 'Platform';
+  };
+
+  const getSectionSub = () => {
+    const subs = {
+      dashboard: 'Portfolio overview · Updated 4 min ago',
+      alerts: '5 unresolved notifications',
+      identity: 'Worker registry and biometric verification',
+      workforce: 'Live operational status and task tracking',
+      activity: 'Approval queue and farm event log',
+      ffb: 'Harvest monitoring and yield counting',
+      crop: 'AI-driven disease detection and crop health',
+      geo: 'GIS layers and geofence monitoring',
+      drone: 'Aerial surveillance and NDVI mapping',
+      payments: 'Financial disbursements and payroll',
+      logistics: 'Supply chain and fleet management',
+    };
+    return subs[activeSection] || 'Real-time agricultural intelligence';
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="flex h-screen w-full bg-[#F5F4F0] dark:bg-[#1C1C1A] overflow-hidden font-sans antialiased">
+      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
+      
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar title={getSectionTitle()} subTitle={getSectionSub()} />
+        <main className="flex-1 overflow-hidden">
+          {getSectionContent()}
+        </main>
+      </div>
+    </div>
+  );
+};
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
-}
-
-export default App
+export default App;
