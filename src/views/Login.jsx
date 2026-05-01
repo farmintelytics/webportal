@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { ShieldCheck, ArrowRight, Lock, Mail, Eye, EyeOff } from 'lucide-react';
 
-const Login = ({ onLogin }) => {
+const Login = ({ onLogin, moduleName }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const displayName = moduleName?.replace(/-/g, ' ').toUpperCase() || 'AGRICULTURAL';
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -28,7 +30,7 @@ const Login = ({ onLogin }) => {
           
           <div className="text-center mb-10">
             <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase mb-1">FarmIntelytics</h1>
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Agricultural Intelligence Console</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--brand-primary)]">{displayName} Console</p>
           </div>
 
           <form onSubmit={handleSubmit} className="w-full space-y-6">
