@@ -49,17 +49,17 @@ const PortalHub = ({ onSelectModule }) => {
       title: 'Management Solutions',
       modules: [
         { id: 'management-ffb', title: 'FFB Intelligence', crop: 'Oil Palm', icon: <Sprout />, active: true },
-        { id: 'management-cashew', title: 'Cashew Hub', crop: 'Cashew', icon: <Activity />, active: false },
-        { id: 'management-sugarcane', title: 'Cane Console', crop: 'SugarCane', icon: <Zap />, active: false },
-        { id: 'management-rice', title: 'Rice Monitor', crop: 'Rice', icon: <LayoutGrid />, active: false },
-        { id: 'management-cocoa', title: 'Cocoa Core', crop: 'Cocoa', icon: <Sprout />, active: false },
+        { id: 'management-cashew', title: 'Cashew Hub', crop: 'Cashew', icon: <Activity />, active: true },
+        { id: 'management-sugarcane', title: 'Cane Console', crop: 'SugarCane', icon: <Zap />, active: true },
+        { id: 'management-rice', title: 'Rice Monitor', crop: 'Rice', icon: <LayoutGrid />, active: true },
+        { id: 'management-cocoa', title: 'Cocoa Core', crop: 'Cocoa', icon: <Sprout />, active: true },
       ]
     },
     {
       title: 'Remote Sensing',
       modules: [
         { id: 'rs-ffb', title: 'Yield Prediction', crop: 'Oil Palm', icon: <Globe />, active: true },
-        { id: 'rs-cashew', title: 'Canopy Analysis', crop: 'Cashew', icon: <Globe />, active: false },
+        { id: 'rs-cashew', title: 'Canopy Analysis', crop: 'Cashew', icon: <Globe />, active: true },
       ]
     }
   ];
