@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --brand-primary: #0F4C44;
-  --brand-primary-dark: #0A352F;
-  --brand-primary-light: #EBF2F1;
+  --brand-primary: #16A34A; /* Sharper Green */
+  --brand-primary-dark: #15803D;
+  --brand-primary-light: #F0FDF4;
   --brand-secondary: #D4AF37;
   --brand-accent: #16A34A;
-  --bg: #F8FAFC;
+  --bg: #FFFFFF; /* Pure White */
   --surface: #FFFFFF;
-  --text-main: #1E293B;
-  --text-muted: #64748B;
+  --text-main: #000000; /* Sharp Black */
+  --text-muted: #475569;
 }
 
 @media (prefers-color-scheme: dark) {
