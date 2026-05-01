@@ -95,7 +95,7 @@ const PortalHub = ({ onSelectModule }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] p-8 lg:p-20 overflow-y-auto">
+    <div className="min-h-screen bg-[var(--bg)] p-8 lg:p-20">
       <div className="max-w-[1400px] mx-auto">
         <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-8 mb-20">
           <div className="flex items-center gap-5">

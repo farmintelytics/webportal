@@ -26,7 +26,6 @@
 body {
   @apply bg-[var(--bg)] text-[var(--gray-900)] font-sans;
   margin: 0;
-  overflow: hidden;
 }
 
 /* Custom Scrollbar */
