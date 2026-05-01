@@ -109,23 +109,23 @@ const PortalHub = ({ onSelectModule }) => {
           </div>
           
           <div className="flex items-center gap-6">
-             <div className="text-right">
-                <div className="text-[11px] font-black uppercase tracking-tight">Experience Layer</div>
-                <div className="text-[9px] font-bold text-gray-400">Production v4.2.0</div>
-             </div>
              <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-300">
-                <Users size={18} />
+                <ChevronDown size={18} className="animate-bounce" />
              </div>
           </div>
         </header>
 
-        <div className="mb-20">
+        <div className="mb-32 relative">
            <h2 className="text-5xl lg:text-7xl font-black text-gray-900 tracking-tighter leading-none mb-6">
              Operational <span className="text-[var(--brand-primary)]">Intelligence Hub.</span>
            </h2>
            <p className="text-lg text-gray-500 font-medium max-w-2xl">
              Unified launcher for multi-crop management and remote sensing modules. Connect to your enterprise farm ledger.
            </p>
+           <div className="mt-12 flex items-center gap-2 text-[var(--brand-primary)] font-black text-[12px] uppercase tracking-widest animate-pulse">
+             <span>Scroll to explore</span>
+             <ChevronDown size={16} />
+           </div>
         </div>
 
         <div className="space-y-20">
