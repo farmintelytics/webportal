@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Dashboard from './components/Dashboard';
+import Identity from './components/Identity';
+import Workforce from './components/Workforce';
+import Activity from './components/Activity';
 
 const App = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -10,6 +13,12 @@ const App = () => {
     switch (activeSection) {
       case 'dashboard':
         return <Dashboard />;
+      case 'identity':
+        return <Identity />;
+      case 'workforce':
+        return <Workforce />;
+      case 'activity':
+        return <Activity />;
       default:
         return (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
