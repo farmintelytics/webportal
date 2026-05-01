@@ -121,6 +121,9 @@ const Dashboard = ({ currentCrop }) => {
           </div>
         </div>
       </div>
+      <div className="pt-12 pb-8 border-t border-black/5 text-center">
+        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Powered by Farmintelytics</div>
+      </div>
     </div>
   );
 };

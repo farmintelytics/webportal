@@ -22,19 +22,18 @@ const Sidebar = ({ activeSection, setActiveSection, currentCrop, setCurrentCrop,
     { id: 'workers', label: 'Worker Analytics', icon: <Users size={18} /> },
     { id: 'plots', label: 'Plot Analytics', icon: <BarChart3 size={18} /> },
     { id: 'approvals', label: 'Approval Center', icon: <CheckCircle2 size={18} /> },
-    { id: 'payments', label: 'Payment Planner', icon: <Wallet size={18} /> },
     { id: 'yield', label: 'Yield Intelligence', icon: <Zap size={18} /> },
     { id: 'personnel', label: 'Personnel Board', icon: <ClipboardList size={18} /> },
   ].filter(item => currentCrop.modules.includes(item.id));
 
   return (
     <nav 
-      className="w-64 text-white flex flex-col h-screen overflow-y-auto shrink-0 transition-all duration-300 shadow-2xl z-50"
+      className="w-64 text-white flex flex-col h-screen overflow-y-auto shrink-0 transition-all duration-300 z-50"
       style={{ backgroundColor: 'var(--brand-primary)' }}
     >
       <div className="p-8 flex flex-col items-center gap-2 shrink-0">
-        <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center p-2 backdrop-blur-md border border-white/10 shadow-2xl">
-          <ShieldCheck size={40} className="text-white" />
+        <div className="w-24 h-24 rounded-3xl flex items-center justify-center p-4 backdrop-blur-md border border-white/10 overflow-hidden">
+          <img src="/farmintelytics-logo.png" alt="Logo" className="w-full h-auto" />
         </div>
         <div className="text-center mt-3">
           <div className="font-black text-[16px] uppercase tracking-tighter leading-none">FarmIntelytics</div>
@@ -60,7 +59,7 @@ const Sidebar = ({ activeSection, setActiveSection, currentCrop, setCurrentCrop,
             onClick={() => setActiveSection(item.id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 group ${
               activeSection === item.id 
-                ? 'bg-white text-[var(--brand-primary)] shadow-2xl' 
+                ? 'bg-white text-[var(--brand-primary)]' 
                 : 'text-white/60 hover:bg-white/5 hover:text-white'
             }`}
           >
@@ -75,8 +74,8 @@ const Sidebar = ({ activeSection, setActiveSection, currentCrop, setCurrentCrop,
         ))}
       </div>
 
-      <div className="p-6 border-t border-white/5 space-y-6 shrink-0 bg-black/10">
-        <div className="space-y-3">
+      <div className="p-6 border-t border-white/5 space-y-6 shrink-0 bg-black/10 text-center">
+        <div className="space-y-3 text-left">
            <div className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] px-1">Active Division</div>
            <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
               <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1.5 shadow-lg shadow-black/20">
@@ -89,14 +88,12 @@ const Sidebar = ({ activeSection, setActiveSection, currentCrop, setCurrentCrop,
            </div>
         </div>
 
-        <button className="w-full flex items-center justify-center gap-2 text-[12px] font-black uppercase tracking-widest text-red-300 hover:text-white hover:bg-red-500/20 py-3 rounded-xl transition-all border border-red-500/10">
+        <button className="w-full flex items-center justify-center gap-2 text-[12px] font-black uppercase tracking-widest text-red-300 hover:text-white hover:bg-red-500/20 py-3 rounded-xl transition-all border border-red-500/10 mb-4">
           <LogOut size={16} />
           Sign Out
         </button>
-        
-        <div className="text-center">
-          <div className="text-[9px] text-white/20 font-black uppercase tracking-[0.3em]">v4.2.0 · PRODUCTION</div>
-        </div>
+
+        <div className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">Powered by Farmintelytics</div>
       </div>
     </nav>
   );
