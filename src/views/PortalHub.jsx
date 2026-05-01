@@ -100,15 +100,14 @@ const PortalHub = ({ onSelectModule }) => {
              </div>
           </div>
           
-          <div className="flex items-center gap-10">
-             <div className="hidden xl:flex gap-12">
-                {['Overview', 'Modules', 'Crops', 'Architecture'].map(item => (
-                  <button key={item} className="text-[11px] font-black uppercase tracking-widest text-gray-400 hover:text-[var(--brand-primary)] transition-colors">{item}</button>
-                ))}
+          <div className="flex items-center gap-6">
+             <div className="text-right">
+                <div className="text-[12px] font-black uppercase tracking-tight">Experience Layer</div>
+                <div className="text-[10px] font-bold text-gray-400">Production v4.2.0</div>
              </div>
-             <button className="bg-[var(--brand-primary)] text-white px-8 py-3.5 rounded-2xl text-[12px] font-black uppercase tracking-widest shadow-xl shadow-[var(--brand-primary)]/20 hover:scale-105 active:scale-95 transition-all">
-                Book a Demo
-             </button>
+             <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-300">
+                <Users size={20} />
+             </div>
           </div>
         </header>
 
@@ -155,27 +154,19 @@ const PortalHub = ({ onSelectModule }) => {
               <div className="text-[11px] font-black uppercase tracking-widest text-gray-400">© 2026 FarmIntelytics. All rights reserved.</div>
            </div>
            
-           <div className="grid grid-cols-2 sm:grid-cols-3 gap-16 lg:gap-24">
+           <div className="flex flex-col sm:flex-row gap-12 lg:gap-24">
               <div>
-                 <div className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-6">Platform</div>
+                 <div className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-6">Operations Hub</div>
                  <div className="flex flex-col gap-4">
-                    {['Modules', 'Crops', 'Monitoring', 'Architecture'].map(i => (
+                    {['Status', 'Documentation', 'Support Hub'].map(i => (
                       <button key={i} className="text-[12px] font-medium text-gray-500 hover:text-[var(--brand-primary)] text-left transition-colors">{i}</button>
                     ))}
                  </div>
               </div>
               <div>
-                 <div className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-6">Support</div>
-                 <div className="flex flex-col gap-4">
-                    {['Developer API', 'Contact', 'Status'].map(i => (
-                      <button key={i} className="text-[12px] font-medium text-gray-500 hover:text-[var(--brand-primary)] text-left transition-colors">{i}</button>
-                    ))}
-                 </div>
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                 <div className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-6">Get in Touch</div>
-                 <button className="text-[14px] font-black text-[var(--brand-primary)] hover:underline mb-2 block">Request a demo</button>
-                 <button className="text-[12px] font-bold text-gray-500">hello@farmintelytics.com</button>
+                 <div className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-6">Connect</div>
+                 <button className="text-[14px] font-black text-[var(--brand-primary)] hover:underline mb-2 block">Request assistance</button>
+                 <button className="text-[12px] font-bold text-gray-500">support@farmintelytics.com</button>
               </div>
            </div>
         </footer>
