@@ -5,6 +5,8 @@ import Dashboard from './components/Dashboard';
 import Identity from './components/Identity';
 import Workforce from './components/Workforce';
 import Activity from './components/Activity';
+import Geospatial from './components/Geospatial';
+import WorkerAnalytics from './components/WorkerAnalytics';
 
 const App = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -13,6 +15,10 @@ const App = () => {
     switch (activeSection) {
       case 'dashboard':
         return <Dashboard />;
+      case 'geospatial':
+        return <Geospatial />;
+      case 'workers':
+        return <WorkerAnalytics />;
       case 'identity':
         return <Identity />;
       case 'workforce':
