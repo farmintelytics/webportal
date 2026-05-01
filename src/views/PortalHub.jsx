@@ -11,24 +11,33 @@ import {
   Plane,
   CreditCard,
   ClipboardList,
-  MessageSquare
+  MessageSquare,
+  Wheat,
+  Droplets,
+  Coffee,
+  Leaf,
+  Container,
+  Users,
+  Building2,
+  Landmark,
+  Satellite
 } from 'lucide-react';
 
 const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (
   <button 
     onClick={() => active && onSelect(id)}
-    className={`group relative p-8 rounded-2xl border-2 transition-all duration-500 flex flex-col text-left overflow-hidden ${
+    className={`group relative p-8 rounded-2xl transition-all duration-500 flex flex-col text-left overflow-hidden ${
       active 
-        ? 'bg-white border-black hover:border-[var(--brand-primary)] shadow-md hover:shadow-2xl' 
-        : 'bg-white border-gray-100 opacity-40 cursor-not-allowed'
+        ? 'bg-white hover:bg-gray-50 border border-black/5' 
+        : 'bg-white opacity-40 cursor-not-allowed border border-black/5'
     }`}
   >
     <div className={`p-4 rounded-xl w-fit mb-6 transition-all duration-500 ${
       active 
-        ? 'bg-black text-[var(--brand-primary)] group-hover:bg-[var(--brand-primary)] group-hover:text-white' 
-        : 'bg-gray-100 text-gray-400'
+        ? 'text-[var(--brand-primary)] group-hover:text-[var(--brand-primary-dark)]' 
+        : 'text-gray-400'
     }`}>
-      {React.cloneElement(icon, { size: 28 })}
+      {React.cloneElement(icon, { size: 32 })}
     </div>
     
     <div className="flex-1">
@@ -50,72 +59,70 @@ const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (
 );
 
 const PortalHub = ({ onSelectModule }) => {
-  const managementRef = React.useRef(null);
-  const remoteSensingRef = React.useRef(null);
-  const paymentsRef = React.useRef(null);
-  const fieldOpsRef = React.useRef(null);
+  const [activeTab, setActiveTab] = React.useState('management');
 
   const sections = [
     {
+      id: 'management',
       title: 'Management Solutions',
-      ref: managementRef,
+      description: 'A combination of workforce logistics, biometric identity, and smallholder group planning for large-scale estate and cooperative operations.',
       modules: [
         { id: 'management-ffb',       title: 'FFB Intelligence',  crop: 'Oil Palm',  icon: <Sprout />,     active: true  },
         { id: 'management-cashew',    title: 'Cashew Hub',        crop: 'Cashew',    icon: <Activity />,   active: true  },
         { id: 'management-sugarcane', title: 'Cane Console',      crop: 'SugarCane', icon: <Zap />,        active: true  },
-        { id: 'management-rice',      title: 'Rice Monitor',      crop: 'Rice',      icon: <LayoutGrid />, active: true  },
-        { id: 'management-cocoa',     title: 'Cocoa Core',        crop: 'Cocoa',     icon: <Sprout />,     active: true  },
-        { id: 'management-rubber',    title: 'Rubber Hub',        crop: 'Rubber',    icon: <Sprout />,     active: false },
-        { id: 'management-cassava',   title: 'Cassava Core',      crop: 'Cassava',   icon: <Sprout />,     active: false },
-        { id: 'management-maize',     title: 'Maize Hub',         crop: 'Maize',     icon: <LayoutGrid />, active: false },
+        { id: 'management-rice',      title: 'Rice Monitor',      crop: 'Rice',      icon: <Leaf />,       active: true  },
+        { id: 'management-cocoa',     title: 'Cocoa Core',        crop: 'Cocoa',     icon: <Coffee />,     active: true  },
+        { id: 'management-rubber',    title: 'Rubber Hub',        crop: 'Rubber',    icon: <Droplets />,   active: true  },
+        { id: 'management-cassava',   title: 'Cassava Core',      crop: 'Cassava',   icon: <Container />,  active: true  },
+        { id: 'management-maize',     title: 'Maize Hub',         crop: 'Maize',     icon: <Wheat />,      active: true  },
+        { id: 'group-management',     title: 'Groups Management', crop: 'Smallholder', icon: <Users />,    active: true  },
       ]
     },
     {
-      title: 'Remote Sensing & GeoAI',
-      ref: remoteSensingRef,
+      id: 'monitoring',
+      title: 'Monitoring',
+      description: 'A combination of multispectral satellite imagery, radar sensor fusion, and group-level field surveillance for high-precision operational monitoring.',
       modules: [
-        { id: 'rs-ffb',       title: 'Yield Prediction',    crop: 'Oil Palm', icon: <Globe />, active: true  },
-        { id: 'rs-cashew',    title: 'Canopy Analysis',     crop: 'Cashew',   icon: <Globe />, active: true  },
-        { id: 'rs-sugarcane', title: 'Growth Monitoring',   crop: 'SugarCane',icon: <Globe />, active: false },
-        { id: 'rs-rice',      title: 'Paddy Field Mapping', crop: 'Rice',     icon: <Globe />, active: false },
+        { id: 'rs-ffb',       title: 'Oil Palm',    crop: 'Monitoring', icon: <Globe />, active: true  },
+        { id: 'rs-cashew',    title: 'Cashew',      crop: 'Monitoring', icon: <Globe />, active: true  },
+        { id: 'rs-sugarcane', title: 'SugarCane',    crop: 'Monitoring', icon: <Globe />, active: true  },
+        { id: 'rs-rice',      title: 'Rice',         crop: 'Monitoring', icon: <Globe />, active: true  },
+        { id: 'rs-cocoa',     title: 'Cocoa',        crop: 'Monitoring', icon: <Globe />, active: true  },
+        { id: 'rs-rubber',    title: 'Rubber',       crop: 'Monitoring', icon: <Globe />, active: true  },
+        { id: 'rs-cassava',   title: 'Cassava',      crop: 'Monitoring', icon: <Globe />, active: true  },
+        { id: 'rs-maize',     title: 'Maize',        crop: 'Monitoring', icon: <Globe />, active: true  },
+        { id: 'rs-drone',     title: 'Drone Intel',  crop: 'Monitoring', icon: <Plane />, active: true  },
+        { id: 'group-monitoring', title: 'Group Monitoring', crop: 'Smallholder', icon: <Satellite />, active: true  },
       ]
     },
     {
-      title: 'Drone Monitoring',
+      id: 'payments',
+      title: 'Finance & Payments',
+      description: 'A combination of immutable farm ledgers and secure multi-crop disbursement systems for automated financial reconciliation.',
       modules: [
-        { id: 'drone-ffb',    title: 'Field Inspection',   crop: 'Oil Palm', icon: <Plane />, active: false },
-        { id: 'drone-cashew', title: 'Orchard Survey',     crop: 'Cashew',   icon: <Plane />, active: false },
+        { id: 'finance-hub', title: 'Central Finance Hub', crop: 'Multi-Crop', icon: <CreditCard />, active: true  },
       ]
     },
     {
-      title: 'Payments & Finance',
-      ref: paymentsRef,
-      modules: [
-        { id: 'payments-ffb',   title: 'FFB Payments',      crop: 'Oil Palm',  icon: <CreditCard />, active: false },
-        { id: 'payments-multi', title: 'Multi-Crop Finance', crop: 'All Crops', icon: <CreditCard />, active: false },
-      ]
-    },
-    {
+      id: 'field-advisory',
       title: 'Field Operations & Advisory',
-      ref: fieldOpsRef,
+      description: 'A combination of geo-referenced field logs and location-aware agronomic insights for data-driven operational decision making.',
       modules: [
-        { id: 'activity-ffb', title: 'Activity & Logs', crop: 'All Crops', icon: <ClipboardList />, active: false },
-        { id: 'advisor',      title: 'Farm Advisor',    crop: 'All Crops', icon: <MessageSquare />, active: false },
+        { id: 'activity-ffb', title: 'Activity & Logs', crop: 'All Crops', icon: <ClipboardList />, active: true  },
+        { id: 'advisor',      title: 'Farm Advisor',    crop: 'All Crops', icon: <MessageSquare />, active: true  },
       ]
     },
   ];
 
-  const scrollToSection = (ref) => {
-    ref.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const currentSection = sections.find(s => s.id === activeTab) || sections[0];
 
   return (
     <div className="min-h-screen bg-[var(--bg)] p-8 lg:p-20">
       <div className="max-w-[1400px] mx-auto">
         <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-8 mb-20">
           <div className="flex items-center gap-5">
-             <div className="w-12 h-12 bg-[#000] rounded-xl flex items-center justify-center shadow-xl shadow-black/10">
-                <ShieldCheck className="text-[var(--brand-primary)] w-7 h-7" />
+             <div className="h-28 overflow-hidden">
+                <img src="/farmintelytics-logo.png" alt="Logo" className="h-full w-auto object-contain" />
              </div>
              <div>
                 <h1 className="text-2xl font-black uppercase tracking-tighter text-black leading-none">FarmIntelytics</h1>
@@ -135,69 +142,62 @@ const PortalHub = ({ onSelectModule }) => {
              Operational <span className="text-[var(--brand-primary)]">Intelligence Hub.</span>
            </h2>
            <p className="text-xl text-black/70 font-bold max-w-3xl leading-relaxed">
-             Unified launcher for multi-crop management and remote sensing modules. Connect to your enterprise farm ledger.
+             A unified enterprise gateway for large-scale agricultural management and precision remote sensing. Orchestrate your entire multi-crop operation, from real-time satellite monitoring and climate intelligence to automated workforce logistics and secure financial disbursement—all synced to your central farm ledger.
            </p>
         </div>
 
-        {/* Sharp Navigation Bar */}
-        <div className="flex flex-wrap items-center gap-12 mb-16 border-b-2 border-black pb-8">
-          <button 
-            onClick={() => scrollToSection(managementRef)}
-            className="text-[14px] font-black uppercase tracking-widest text-black hover:text-[var(--brand-primary)] transition-colors border-b-4 border-transparent hover:border-[var(--brand-primary)] pb-2"
-          >
-            Management
-          </button>
-          <button 
-            onClick={() => scrollToSection(remoteSensingRef)}
-            className="text-[14px] font-black uppercase tracking-widest text-black hover:text-[var(--brand-primary)] transition-colors border-b-4 border-transparent hover:border-[var(--brand-primary)] pb-2"
-          >
-            Remote Sensing & GeoAI
-          </button>
-          <button 
-            onClick={() => scrollToSection(paymentsRef)}
-            className="text-[14px] font-black uppercase tracking-widest text-black hover:text-[var(--brand-primary)] transition-colors border-b-4 border-transparent hover:border-[var(--brand-primary)] pb-2"
-          >
-            Payments
-          </button>
-          <button 
-            onClick={() => scrollToSection(fieldOpsRef)}
-            className="text-[14px] font-black uppercase tracking-widest text-black hover:text-[var(--brand-primary)] transition-colors border-b-4 border-transparent hover:border-[var(--brand-primary)] pb-2"
-          >
-            Field Advisory
-          </button>
-        </div>
-
-        <div className="space-y-32">
-          {sections.map(section => (
-            <div key={section.title} ref={section.ref} className="space-y-12 scroll-mt-20">
-              <div className="flex items-center gap-6">
-                <h3 className="text-[14px] font-black uppercase tracking-[0.4em] text-black whitespace-nowrap">{section.title}</h3>
-                <div className="h-0.5 bg-black flex-1"></div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
-                {section.modules.map(module => (
-                  <ModuleCard 
-                    key={module.id} 
-                    {...module} 
-                    onSelect={onSelectModule}
-                  />
-                ))}
-              </div>
-            </div>
+        {/* Sharp Tab Navigation Bar - Borders Removed */}
+        <div className="flex flex-wrap items-center gap-12 mb-10">
+          {[
+            { id: 'management', label: 'Management' },
+            { id: 'monitoring', label: 'Monitoring' },
+            { id: 'payments', label: 'Payments' },
+            { id: 'field-advisory', label: 'Field Advisory' }
+          ].map(tab => (
+            <button 
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`text-[15px] font-black uppercase tracking-widest transition-all pb-2 border-b-4 ${
+                activeTab === tab.id 
+                  ? 'text-[var(--brand-primary)] border-[var(--brand-primary)]' 
+                  : 'text-black border-transparent hover:text-[var(--brand-primary)]'
+              }`}
+            >
+              {tab.label}
+            </button>
           ))}
         </div>
 
-        <footer className="mt-48 pt-16 border-t-4 border-black flex flex-col lg:flex-row justify-between items-center gap-12 pb-24">
-           <div className="flex items-center gap-12">
-              <div className="text-[12px] font-black uppercase tracking-widest text-black leading-none">© 2026 FarmIntelytics. All rights reserved.</div>
-           </div>
+        <div className="space-y-12">
+          <div className="max-w-2xl">
+            <h3 className="text-[14px] font-black uppercase tracking-[0.4em] text-black whitespace-nowrap mb-4">{currentSection.title}</h3>
+            <p className="text-[13px] text-black/50 font-bold leading-relaxed uppercase tracking-wider">
+              {currentSection.description}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {currentSection.modules.map(module => (
+              <ModuleCard 
+                key={module.id} 
+                {...module} 
+                onSelect={onSelectModule}
+              />
+            ))}
+          </div>
+        </div>
+
+        <footer className="mt-48 pt-16 flex flex-col lg:flex-row justify-between items-center gap-12 pb-24 border-t-2 border-gray-50">
+            <div className="flex items-center gap-12">
+               <div className="text-[12px] font-black uppercase tracking-widest text-black leading-none">© 2026 FarmIntelytics. All rights reserved.</div>
+               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Powered by Farmintelytics</div>
+            </div>
            
            <div className="flex gap-16">
               <div className="flex flex-col gap-2 items-end">
                  <div className="text-[12px] font-black uppercase tracking-widest text-[var(--brand-primary)] mb-2">Operations Center</div>
                  <div className="flex gap-8">
                     {['Status', 'Docs', 'Support'].map(i => (
-                      <button key={i} className="text-[13px] font-black text-black hover:text-[var(--brand-primary)] transition-colors border-b-2 border-transparent hover:border-black pb-1">{i}</button>
+                      <button key={i} className="text-[13px] font-black text-black hover:text-[var(--brand-primary)] transition-colors pb-1">{i}</button>
                     ))}
                  </div>
               </div>
@@ -207,5 +207,4 @@ const PortalHub = ({ onSelectModule }) => {
     </div>
   );
 };
-
 export default PortalHub;
