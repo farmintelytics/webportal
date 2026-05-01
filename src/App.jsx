@@ -16,20 +16,26 @@ import CashewDashboard from './apps/management/cashew/Dashboard';
 import SugarcaneDashboard from './apps/management/sugarcane/Dashboard';
 import RiceDashboard from './apps/management/rice/Dashboard';
 import CocoaDashboard from './apps/management/cocoa/Dashboard';
+import RubberDashboard from './apps/management/rubber/Dashboard';
+import CassavaDashboard from './apps/management/cassava/Dashboard';
+import MaizeDashboard from './apps/management/maize/Dashboard';
 
-// === Remote Sensing ===
-import CashewCanopy from './apps/remote-sensing/cashew/Dashboard';
+// === Monitoring Portals ===
+import MonitoringPortal from './apps/monitoring/MonitoringPortal';
+
+// === Groups & Smallholder Management ===
+import GroupsDashboard from './apps/cooperative/Dashboard';
 
 import { crops } from './config/crops';
 
 // Placeholder for modules in development
 const ComingSoon = ({ title, description }) => (
-  <div className="flex flex-col items-center justify-center h-full p-20 text-center">
-    <div className="w-16 h-16 rounded-3xl bg-[#1B2A4A]/5 flex items-center justify-center mx-auto mb-6">
-      <span className="text-3xl">🚧</span>
+  <div className="flex flex-col items-center justify-center h-full p-20 text-center bg-white">
+    <div className="w-20 h-20 rounded-[2.5rem] bg-black text-white flex items-center justify-center mx-auto mb-8 shadow-2xl">
+      <Zap size={32} className="text-[var(--brand-primary)]" />
     </div>
-    <h2 className="text-3xl font-black text-[#1B2A4A] mb-3 tracking-tighter">{title}</h2>
-    <p className="text-gray-500 font-medium max-w-md">{description}</p>
+    <h2 className="text-4xl font-black text-black mb-4 tracking-tighter uppercase">{title}</h2>
+    <p className="text-black/60 font-bold max-w-md uppercase text-[11px] tracking-[0.2em]">{description}</p>
   </div>
 );
 
@@ -57,22 +63,45 @@ const App = () => {
       }
     }
 
+    // Monitoring Portals (Standard Remote Sensing Web Portal Style)
+    if (selectedModule?.startsWith('rs-')) {
+      const cropMap = {
+        'rs-ffb': 'Oil Palm',
+        'rs-cashew': 'Cashew',
+        'rs-sugarcane': 'SugarCane',
+        'rs-rice': 'Rice',
+        'rs-cocoa': 'Cocoa',
+        'rs-rubber': 'Rubber',
+        'rs-cassava': 'Cassava',
+        'rs-maize': 'Maize',
+        'rs-drone': 'Drone Intelligence'
+      };
+      const sensorMap = {
+        'rs-sugarcane': 'Sentinel-1 (SAR)',
+        'rs-drone': 'UAV High-Res Imagery',
+      };
+      return <MonitoringPortal cropName={cropMap[selectedModule] || "Crop"} sensor={sensorMap[selectedModule] || 'Sentinel-2 (Optical)'} onBack={handleBackToHub} />;
+    }
+
     // Single-dashboard portals
     const routes = {
       'management-cashew':    <CashewDashboard />,
       'management-sugarcane': <SugarcaneDashboard />,
       'management-rice':      <RiceDashboard />,
       'management-cocoa':     <CocoaDashboard />,
-      'rs-ffb':               <ComingSoon title="FFB Yield Prediction" description="NDVI-driven yield forecasting for Oil Palm estates via Sentinel-2 analysis." />,
-      'rs-cashew':            <CashewCanopy />,
-      'rs-sugarcane':         <ComingSoon title="Cane Growth Monitoring" description="CCS estimation and harvest readiness prediction from SAR imagery." />,
-      'rs-rice':              <ComingSoon title="Paddy Field Mapping" description="Flood irrigation mapping and harvest date prediction via satellite phenology." />,
-      'drone-ffb':            <ComingSoon title="Oil Palm Drone Inspection" description="Live drone feed and high-resolution field surveillance." />,
-      'drone-cashew':         <ComingSoon title="Cashew Orchard Survey" description="Tree count, canopy gap analysis and disease spot detection." />,
-      'payments-ffb':         <ComingSoon title="FFB Payment System" description="Automated payroll from verified work logs. Mobile money & bank integration." />,
-      'payments-multi':       <ComingSoon title="Multi-Crop Payment Hub" description="Cross-crop worker payments, farmer disbursement and cooperative programs." />,
-      'activity-ffb':         <ComingSoon title="Farm Activity & Operations" description="Geo-referenced daily field logs — harvesting, planting, spraying." />,
+      'management-rubber':    <RubberDashboard />,
+      'management-cassava':   <CassavaDashboard />,
+      'management-maize':     <MaizeDashboard />,
+      
+      'drone-ffb':            <ComingSoon title="Drone Inspection" description="Live drone feed and high-resolution field surveillance." />,
+      'drone-cashew':         <ComingSoon title="Orchard Survey" description="Tree count, canopy gap analysis and disease spot detection." />,
+      'finance-hub':          <ComingSoon title="Central Finance Hub" description="Unified multi-crop financial dashboard. Filter by crop, region, or cooperative for global payroll and disbursement." />,
+      'activity-ffb':         <ComingSoon title="Operations Log" description="Geo-referenced daily field logs — harvesting, planting, spraying." />,
       'advisor':              <ComingSoon title="Farm Advisor" description="Location-aware alerts, SMS weather/pest updates and crop-stage reminders." />,
+
+      // Groups & Smallholder Management
+      'group-management':     <GroupsDashboard mode="group-management" onBack={handleBackToHub} />,
+      'group-monitoring':     <MonitoringPortal cropName="Smallholder" sensor="Satellite Fusion" onBack={handleBackToHub} />,
     };
 
     return routes[selectedModule] || (
@@ -81,7 +110,45 @@ const App = () => {
   };
 
   if (view === 'hub')   return <PortalHub onSelectModule={handleSelectModule} />;
-  if (view === 'login') return <Login onLogin={handleLogin} moduleName={selectedModule} onBack={handleBackToHub} />;
+  if (view === 'login') {
+    const cleanNameMap = {
+      'rs-ffb': 'Oil Palm Monitoring',
+      'rs-cashew': 'Cashew Monitoring',
+      'rs-sugarcane': 'SugarCane Monitoring',
+      'rs-rice': 'Rice Monitoring',
+      'rs-cocoa': 'Cocoa Monitoring',
+      'rs-rubber': 'Rubber Monitoring',
+      'rs-cassava': 'Cassava Monitoring',
+      'rs-maize': 'Maize Monitoring',
+      'rs-drone': 'Drone Intelligence',
+      'finance-hub': 'Central Finance Hub',
+      'management-ffb': 'Oil Palm Management',
+      'management-cashew': 'Cashew Management',
+      'management-sugarcane': 'SugarCane Management',
+      'management-rice': 'Rice Management',
+      'management-cocoa': 'Cocoa Management',
+      'management-rubber': 'Rubber Management',
+      'management-cassava': 'Cassava Management',
+      'management-maize': 'Maize Management',
+      'group-management': 'Groups Management',
+      'group-monitoring': 'Group Monitoring',
+      'activity-ffb': 'Operations Logs',
+      'advisor': 'Farm Advisor'
+    };
+    return <Login onLogin={handleLogin} moduleName={cleanNameMap[selectedModule] || selectedModule} onBack={handleBackToHub} />;
+  }
+
+  const sectionContent = getSectionContent();
+
+  // If it's a Monitoring Portal, render it standalone (no duplicate sidebars)
+  if (selectedModule?.startsWith('rs-') || selectedModule === 'group-monitoring') {
+    return React.cloneElement(sectionContent, { onBack: handleBackToHub });
+  }
+
+  // If it's a Groups module, render it standalone
+  if (selectedModule === 'group-management') {
+    return sectionContent;
+  }
 
   return (
     <PortalLayout
@@ -92,7 +159,7 @@ const App = () => {
       crops={crops}
       onBackToHub={handleBackToHub}
     >
-      {getSectionContent()}
+      {sectionContent}
     </PortalLayout>
   );
 };
