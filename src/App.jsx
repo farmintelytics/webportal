@@ -7,14 +7,16 @@ import Workforce from './components/Workforce';
 import Activity from './components/Activity';
 import Geospatial from './components/Geospatial';
 import WorkerAnalytics from './components/WorkerAnalytics';
+import { crops } from './config/crops';
 
 const App = () => {
+  const [currentCrop, setCurrentCrop] = useState(crops[0]);
   const [activeSection, setActiveSection] = useState('dashboard');
 
   const getSectionContent = () => {
     switch (activeSection) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard currentCrop={currentCrop} />;
       case 'geospatial':
         return <Geospatial />;
       case 'workers':
@@ -74,10 +76,16 @@ const App = () => {
 
   return (
     <div className="flex h-screen w-full bg-[#F5F4F0] dark:bg-[#1C1C1A] overflow-hidden font-sans antialiased">
-      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
+      <Sidebar 
+        activeSection={activeSection} 
+        setActiveSection={setActiveSection} 
+        currentCrop={currentCrop}
+        setCurrentCrop={setCurrentCrop}
+        crops={crops}
+      />
       
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar title={getSectionTitle()} subTitle={getSectionSub()} />
+        <TopBar title={getSectionTitle()} />
         <main className="flex-1 overflow-hidden">
           {getSectionContent()}
         </main>

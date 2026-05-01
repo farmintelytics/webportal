@@ -19,13 +19,15 @@ const KPICard = ({ label, value, unit, subLabel, color }) => (
   </div>
 );
 
-const Dashboard = () => {
+const Dashboard = ({ currentCrop }) => {
+  const isOilPalm = currentCrop?.id === 'oil-palm';
+  
   return (
     <div className="p-8 space-y-8 overflow-y-auto h-full max-w-[1600px] mx-auto">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 dark:text-gray-100 tracking-tighter">Operations Dashboard</h1>
-          <p className="text-[13px] text-gray-500 mt-1 font-medium">Executive insight into estate-wide harvesting and yield performance</p>
+          <h1 className="text-3xl font-black text-gray-900 dark:text-gray-100 tracking-tighter">{currentCrop.branding} Dashboard</h1>
+          <p className="text-[13px] text-gray-500 mt-1 font-medium">Executive insight into {currentCrop.name} harvesting and yield performance</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
@@ -64,8 +66,19 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KPICard label="FFB Bunches (AI)" value="76" subLabel="Harvested bunches captured" color="bg-green-600" />
-        <KPICard label="Loose Fruit Weight" value="0" unit="KG" subLabel="Verified collection weight" color="bg-orange-500" />
+        <KPICard 
+          label={isOilPalm ? "FFB Bunches (AI)" : `${currentCrop.name} Yield`} 
+          value={isOilPalm ? "76" : "2.4t"} 
+          subLabel={isOilPalm ? "Harvested bunches captured" : `Verified ${currentCrop.name} weight`}
+          color={`bg-[${currentCrop.primaryColor}]`} 
+        />
+        <KPICard 
+          label={isOilPalm ? "Loose Fruit Weight" : "Quality Index"} 
+          value={isOilPalm ? "0" : "98.2"} 
+          unit={isOilPalm ? "KG" : "%"} 
+          subLabel="Verified collection weight" 
+          color="bg-orange-500" 
+        />
         <KPICard label="Harvested Plots" value="2" subLabel="Locations with active harvesting" color="bg-emerald-700" />
         <KPICard label="Total Plots" value="1,133" subLabel="Plantation coverage" color="bg-orange-600" />
       </div>
@@ -73,12 +86,12 @@ const Dashboard = () => {
       <div className="bg-white dark:bg-white/5 p-8 rounded-2xl border border-black/5 dark:border-white/5 shadow-sm">
         <div className="flex justify-between items-center mb-10">
           <div>
-            <h3 className="text-lg font-black text-gray-900 dark:text-gray-100 tracking-tight">Bunches Histogram</h3>
-            <p className="text-[12px] text-gray-500 font-medium">Direct timeseries of harvested bunches</p>
+            <h3 className="text-lg font-black text-gray-900 dark:text-gray-100 tracking-tight">{isOilPalm ? "Bunches Histogram" : `${currentCrop.name} Output Timeline`}</h3>
+            <p className="text-[12px] text-gray-500 font-medium">Direct timeseries of {currentCrop.name.toLowerCase()} production</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-600"></span>
-            <span className="text-[11px] font-bold text-gray-500">Bunches Harvested</span>
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: currentCrop.primaryColor }}></span>
+            <span className="text-[11px] font-bold text-gray-500">{currentCrop.name} Collected</span>
           </div>
         </div>
 
@@ -86,11 +99,11 @@ const Dashboard = () => {
           {/* Simulated chart bars */}
           <div className="absolute inset-0 flex items-end justify-around px-20">
              <div className="flex flex-col items-center gap-3 group">
-                <div className="w-4 bg-green-600 rounded-t-sm transition-all duration-500 group-hover:bg-green-500 shadow-lg shadow-green-500/20" style={{ height: '320px' }}></div>
+                <div className="w-4 rounded-t-sm transition-all duration-500 shadow-lg" style={{ height: '320px', backgroundColor: currentCrop.primaryColor }}></div>
                 <span className="text-[11px] font-bold text-gray-400">Apr 23</span>
              </div>
              <div className="flex flex-col items-center gap-3 group">
-                <div className="w-4 bg-green-600 rounded-t-sm transition-all duration-500 group-hover:bg-green-500 shadow-lg shadow-green-500/20" style={{ height: '220px' }}></div>
+                <div className="w-4 rounded-t-sm transition-all duration-500 shadow-lg" style={{ height: '220px', backgroundColor: currentCrop.primaryColor }}></div>
                 <span className="text-[11px] font-bold text-gray-400">Apr 24</span>
              </div>
           </div>
