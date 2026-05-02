@@ -1,42 +1,71 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap');
 
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Clean, Simplified Design Tokens */
 :root {
-  --brand-primary: #16A34A; /* Sharper Green */
+  --brand-primary: #16A34A;
   --brand-primary-dark: #15803D;
-  --brand-primary-light: #F0FDF4;
-  --brand-secondary: #D4AF37;
-  --brand-accent: #16A34A;
-  --bg: #FFFFFF; /* Pure White */
-  --surface: #FFFFFF;
-  --text-main: #000000; /* Sharp Black */
-  --text-muted: #475569;
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-light: #e2e8f0;
 }
 
 body {
-  @apply bg-[var(--bg)] text-[var(--text-main)];
-  font-family: 'Roboto', sans-serif;
   margin: 0;
+  padding: 0;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography Overrides for a Professional Feel */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+/* Remove all glow/animations that feel 'Cyber' */
+.shadow-xl {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05) !important;
+}
+
+.shadow-lg {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+}
+
+.animate-pulse {
+  animation: none !important;
+}
+
+.backdrop-blur {
+  backdrop-filter: none !important;
+}
+
+/* Flatter Button States */
+button {
+  transition: all 0.2s ease;
+}
+
+button:active {
+  transform: translateY(1px);
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 6px;
 }
-
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-main);
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.14);
-  border-radius: 2px;
+  background: #cbd5e1;
+  border-radius: 10px;
 }
 
 .glass {

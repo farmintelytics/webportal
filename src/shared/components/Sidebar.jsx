@@ -1,99 +1,67 @@
 import React from 'react';
 import { 
-  LayoutDashboard, 
-  Map as MapIcon, 
-  Users, 
-  BarChart3, 
-  CheckCircle2, 
-  Wallet, 
-  Zap, 
-  ClipboardList,
   LogOut,
-  Moon,
-  Sun,
-  Grid,
-  ShieldCheck
+  Grid
 } from 'lucide-react';
 
-const Sidebar = ({ activeSection, setActiveSection, currentCrop, setCurrentCrop, crops, onBackToHub }) => {
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-    { id: 'geospatial', label: 'Geospatial Intel', icon: <MapIcon size={18} /> },
-    { id: 'workers', label: 'Worker Analytics', icon: <Users size={18} /> },
-    { id: 'plots', label: 'Plot Analytics', icon: <BarChart3 size={18} /> },
-    { id: 'approvals', label: 'Approval Center', icon: <CheckCircle2 size={18} /> },
-    { id: 'yield', label: 'Yield Intelligence', icon: <Zap size={18} /> },
-    { id: 'personnel', label: 'Personnel Board', icon: <ClipboardList size={18} /> },
-  ].filter(item => currentCrop.modules.includes(item.id));
+const Sidebar = ({ activeSection, setActiveSection, currentCrop, onSignOut }) => {
+  const menuItems = currentCrop.menu || [];
+  const primaryColor = currentCrop.primaryColor || '#16A34A';
 
   return (
-    <nav 
-      className="w-64 text-white flex flex-col h-screen overflow-y-auto shrink-0 transition-all duration-300 z-50"
-      style={{ backgroundColor: 'var(--brand-primary)' }}
-    >
+    <nav className="w-64 bg-white border-r border-gray-100 flex flex-col h-screen shrink-0 z-50">
       <div className="p-8 flex flex-col items-center gap-2 shrink-0">
-        <div className="w-24 h-24 rounded-3xl flex items-center justify-center p-4 backdrop-blur-md border border-white/10 overflow-hidden">
+        <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center p-3 border border-gray-100">
           <img src="/farmintelytics-logo.png" alt="Logo" className="w-full h-auto" />
         </div>
         <div className="text-center mt-3">
-          <div className="font-black text-[16px] uppercase tracking-tighter leading-none">FarmIntelytics</div>
-          <div className="text-[10px] opacity-40 font-black uppercase tracking-[0.2em] mt-1">Intelligence Layer</div>
+          <div className="font-black text-[15px] uppercase tracking-tighter text-gray-900">FarmIntelytics</div>
+          <div className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">Management Node</div>
         </div>
       </div>
 
-      <div className="px-4 mb-8">
-        <button 
-          onClick={onBackToHub}
-          className="w-full flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all group border border-white/5"
-        >
-          <Grid size={18} className="text-white/60 group-hover:text-white group-hover:rotate-90 transition-all duration-500" />
-          <span className="text-[13px] font-black uppercase tracking-widest text-white/80 group-hover:text-white">Portal Hub</span>
-        </button>
-      </div>
-
-      <div className="flex-1 px-3 space-y-1">
-        <label className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] px-4 mb-2 block">Management</label>
+      <div className="flex-1 px-4 space-y-1 mt-4">
+        <label className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] px-4 mb-3 block">Navigation</label>
         {menuItems.map(item => (
           <button
             key={item.id}
             onClick={() => setActiveSection(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 group ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
               activeSection === item.id 
-                ? 'bg-white text-[var(--brand-primary)]' 
-                : 'text-white/60 hover:bg-white/5 hover:text-white'
+                ? 'text-white' 
+                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
             }`}
+            style={{ 
+              backgroundColor: activeSection === item.id ? primaryColor : 'transparent',
+              boxShadow: activeSection === item.id ? `0 4px 12px -4px ${primaryColor}44` : 'none'
+            }}
           >
-            <span className={`transition-transform duration-300 ${activeSection === item.id ? 'scale-110' : 'group-hover:scale-110'}`}>
-              {item.icon}
-            </span>
-            <span className="text-[13px] font-black tracking-tight">{item.label}</span>
-            {activeSection === item.id && (
-              <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[var(--brand-primary)]"></div>
-            )}
+            <div className={activeSection === item.id ? 'text-white' : 'text-gray-400 group-hover:text-gray-900'}>
+               {item.icon}
+            </div>
+            <span className="text-[13px] font-bold">{item.label}</span>
           </button>
         ))}
       </div>
 
-      <div className="p-6 border-t border-white/5 space-y-6 shrink-0 bg-black/10 text-center">
-        <div className="space-y-3 text-left">
-           <div className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] px-1">Active Division</div>
-           <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
-              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1.5 shadow-lg shadow-black/20">
-                 <img src={currentCrop.logo} alt="Crop" className="w-full h-auto" />
-              </div>
-              <div className="flex-1 min-w-0">
-                 <div className="text-[12px] font-black truncate">{currentCrop.name}</div>
-                 <div className="text-[10px] text-white/40 font-bold">FFB Management</div>
-              </div>
-           </div>
+      <div className="p-6 border-t border-gray-100 bg-gray-50/50">
+        <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-100 mb-6">
+          <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center p-2 border border-gray-50">
+            <img src={currentCrop.logo} alt="Crop" className="w-full h-auto" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[12px] font-black text-gray-900 truncate uppercase tracking-tighter">{currentCrop.name}</div>
+            <div className="text-[9px] text-gray-400 font-bold uppercase">Active Division</div>
+          </div>
         </div>
 
-        <button className="w-full flex items-center justify-center gap-2 text-[12px] font-black uppercase tracking-widest text-red-300 hover:text-white hover:bg-red-500/20 py-3 rounded-xl transition-all border border-red-500/10 mb-4">
-          <LogOut size={16} />
+        <button 
+          onClick={onSignOut}
+          className="w-full flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest text-red-500 hover:text-white hover:bg-red-500 py-3 rounded-xl transition-all border border-red-100"
+        >
+          <LogOut size={14} />
           Sign Out
         </button>
-
-        <div className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">Powered by Farmintelytics</div>
       </div>
     </nav>
   );
