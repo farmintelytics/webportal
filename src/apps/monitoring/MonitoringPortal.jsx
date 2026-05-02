@@ -1,41 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Globe, 
   Layers, 
-  ChevronDown, 
-  RotateCcw, 
-  TrendingUp, 
-  TrendingDown, 
   Satellite, 
-  Eye, 
-  AlertTriangle, 
-  Zap,
-  CloudRain,
-  Thermometer,
-  Wind,
-  Maximize2,
-  MousePointer2,
-  Map as MapIcon,
-  Activity,
+  Map as MapIcon, 
+  Activity, 
+  Zap, 
+  Droplets, 
+  Sun, 
+  Trees, 
+  ArrowLeft,
+  LogOut,
+  CheckCircle2,
+  BarChart4,
+  TrendingUp,
+  LayoutDashboard,
   Calendar,
-  Filter,
+  Maximize2,
   Search,
-  Download,
-  Share2
+  Filter,
+  Shield,
+  User,
+  Bell,
+  X,
+  Info,
+  Navigation,
+  RefreshCw,
+  FileText,
+  History,
+  Settings2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  ArrowRight,
+  SlidersHorizontal,
+  MapPin,
+  LineChart,
+  Waves,
+  Thermometer,
+  CloudRain,
+  Leaf
 } from 'lucide-react';
-
-import { MapContainer, TileLayer, Polygon, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, Polygon, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Line } from 'react-chartjs-2';
+import { 
+  SimpleCard, 
+  MetricTile, 
+  WorkerActivityTable 
+} from '../../shared/components/SharedComponents';
+import { Line, Bar, Radar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
+  RadialLinearScale,
   Title,
   Tooltip,
   Legend as ChartLegend,
+  Filler
 } from 'chart.js';
 
 ChartJS.register(
@@ -43,314 +68,356 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
+  RadialLinearScale,
   Title,
   Tooltip,
-  ChartLegend
+  ChartLegend,
+  Filler
 );
 
-const SidebarItem = ({ icon, label, active, onClick }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-      active 
-        ? 'bg-[var(--brand-primary)] text-white' 
-        : 'text-black hover:bg-gray-100'
-    }`}
-  >
-    {React.cloneElement(icon, { size: 18 })}
-    <span className="text-[11px] font-black uppercase tracking-widest">{label}</span>
-  </button>
-);
+// ── Literature-Based Crop Configurations ──────────────────────────────────────
+const CROP_RS_CONFIG = {
+  'Rice': {
+    primaryColor: 'emerald',
+    theme: 'Flooded / Water-Dependent',
+    indices: [
+      { id: 'NDWI', label: 'Water Index (NDWI)', legend: 'Dry - Flooded', color: 'from-blue-100 to-blue-700', active: true, opacity: 70 },
+      { id: 'SAR', label: 'SAR (Flood Detection)', legend: 'Low - High Backscatter', color: 'from-gray-300 to-indigo-900', active: false, opacity: 60 },
+      { id: 'NDVI', label: 'Vegetation (NDVI)', legend: 'Stressed - Healthy', color: 'from-red-400 via-yellow-300 to-emerald-600', active: false, opacity: 80 },
+      { id: 'LSWI', label: 'Moisture (LSWI)', legend: 'Deficit - Adequate', color: 'from-orange-100 to-blue-500', active: false, opacity: 80 },
+    ],
+    kpis: [
+      { label: 'Mean NDWI', value: '0.68', unit: 'FLOOD', icon: <Waves /> },
+      { label: 'Irrigation Sync', value: '94', unit: '%', icon: <Droplets /> },
+      { label: 'SAR Backscatter', value: '-12', unit: 'dB', icon: <Activity /> },
+    ],
+    layman: {
+      health: 'Flooding is optimal. No water stress detected.',
+      stress: 'Water levels dropping. Recommend irrigation check.',
+      yield: 'Cumulative NDWI predicts yield within target range.'
+    },
+    drillDownType: 'Hydrology Anomaly'
+  },
+  'Maize': {
+    primaryColor: 'yellow',
+    theme: 'Nutrient / Nitrogen Focused',
+    indices: [
+      { id: 'GCVI', label: 'Nitrogen (GCVI)', legend: 'Deficient - Optimal', color: 'from-yellow-100 to-emerald-800', active: true, opacity: 80 },
+      { id: 'NDRE', label: 'Chlorophyll (NDRE)', legend: 'Low - High Chlorophyll', color: 'from-gray-50 to-cyan-600', active: false, opacity: 80 },
+      { id: 'NDVI', label: 'Biomass (NDVI)', legend: 'Stressed - Healthy', color: 'from-red-400 via-yellow-300 to-emerald-600', active: false, opacity: 80 },
+      { id: 'VHI', label: 'Stress (VHI)', legend: 'Heat/Drought Risk', color: 'from-red-600 via-yellow-400 to-green-400', active: false, opacity: 70 },
+    ],
+    kpis: [
+      { label: 'Nitrogen (GCVI)', value: '0.52', unit: 'INDEX', icon: <Zap /> },
+      { label: 'VHI Stress', value: '82', unit: 'SCORE', icon: <Thermometer /> },
+      { label: 'Soil Temp', value: '28', unit: '°C', icon: <Sun /> },
+    ],
+    layman: {
+      health: 'Nitrogen levels are optimal for current growth stage.',
+      stress: 'Possible Nitrogen deficiency detected. Check leaf tips.',
+      yield: 'High tasselling NDVI correlates with above-average harvest.'
+    },
+    drillDownType: 'Nitrogen Profile'
+  },
+  'Cashew': {
+    primaryColor: 'orange',
+    theme: 'Phenology / Flushing Monitor',
+    indices: [
+      { id: 'NDVI_FLUSH', label: 'Leaf Flush (NDVI)', legend: 'Dormant - Flushing', color: 'from-amber-100 to-emerald-900', active: true, opacity: 80 },
+      { id: 'EVI', label: 'Canopy Density (EVI)', legend: 'Thin - Dense', color: 'from-orange-50 to-green-700', active: false, opacity: 80 },
+      { id: 'LST', label: 'Thermal Stress (LST)', legend: 'Cool - Hot Surface', color: 'from-blue-200 via-yellow-200 to-red-600', active: false, opacity: 60 },
+    ],
+    kpis: [
+      { label: 'Flushing Status', value: 'ACTIVE', unit: 'STAGE', icon: <Leaf /> },
+      { label: 'Canopy Coverage', value: '78', unit: '%', icon: <Trees /> },
+      { label: 'Peak EVI', value: '0.45', unit: 'INDEX', icon: <BarChart4 /> },
+    ],
+    layman: {
+      health: 'Seasonal flushing is on track. High nut potential.',
+      stress: 'Delayed flushing detected. Possible water or root stress.',
+      yield: 'Flush amplitude predicts 1.2 t/ha harvest potential.'
+    },
+    drillDownType: 'Canopy Health'
+  },
+  'Cocoa': {
+    primaryColor: 'amber',
+    theme: 'Shaded Perennial / Canopy Health',
+    indices: [
+      { id: 'NDRE', label: 'Chlorophyll (NDRE)', legend: 'Early Stress Detect', color: 'from-gray-100 to-teal-600', active: true, opacity: 80 },
+      { id: 'EVI', label: 'Canopy Density (EVI)', legend: 'Thin - Dense', color: 'from-amber-50 to-emerald-900', active: false, opacity: 80 },
+      { id: 'TWI', label: 'Wetness Index (TWI)', legend: 'Well Drained - Moist', color: 'from-stone-200 to-sky-600', active: false, opacity: 60 },
+    ],
+    kpis: [
+      { label: 'Shade Quality', value: 'OPTIMAL', unit: 'DENSITY', icon: <Sun /> },
+      { label: 'Pod Filling Index', value: '0.64', unit: 'NDRE', icon: <Zap /> },
+      { label: 'Rainfall Received', value: '420', unit: 'mm/3mo', icon: <CloudRain /> },
+    ],
+    layman: {
+      health: 'Canopy chlorophyll is stable. Good pod development.',
+      stress: 'Chlorophyll decline detected. Inspect for Black Pod.',
+      yield: 'Canopy activity predicts 450 kg/ha bean production.'
+    },
+    drillDownType: 'Physiological Status'
+  }
+};
 
-const AnalysisCard = ({ title, children, icon }) => (
-  <div className="bg-white/80 backdrop-blur-md rounded-2xl p-5 border border-black/5 shadow-sm">
-    <div className="flex items-center gap-2 mb-4">
-      {icon && React.cloneElement(icon, { size: 16, className: 'text-[var(--brand-primary)]' })}
-      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-black">{title}</h4>
-    </div>
-    {children}
-  </div>
-);
+const MonitoringPortal = ({ cropName, onSignOut }) => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showLayerList, setShowLayerList] = useState(true);
+  const [dateRange, setDateRange] = useState('Last 6 Months');
+  const [userName] = useState('Admin Manager');
+  const [selectedPlot, setSelectedPlot] = useState(null);
 
-const MonitoringPortal = ({ cropName = "Oil Palm", sensor = "Sentinel-2", onBack }) => {
-  const [activeLayer, setActiveLayer] = useState('Satellite');
-  const [activeTab, setActiveTab] = useState('Insights');
-  const [selectedMonth, setSelectedMonth] = useState(3); // APR
+  // Derive config based on current crop
+  const config = useMemo(() => CROP_RS_CONFIG[cropName] || CROP_RS_CONFIG['Maize'], [cropName]);
+  
+  const [layers, setLayers] = useState([
+    { id: 'google', label: 'Google Satellite', active: true, opacity: 100, legend: 'Natural Color', color: 'from-gray-500 to-gray-900', url: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}' },
+    ...config.indices
+  ]);
 
-  const months = ['FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL'];
-
-  // Map configuration
-  const center = [6.5244, 3.3792]; 
-  const zoom = 14;
-
-  const mapLayers = {
-    'Satellite': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    'Terrain': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', 
-    'NDVI': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 
-  };
-
-  // Simulated farm blocks for GIS feel
-  const blocks = [
-    { id: 'BLK-A1', coords: [[6.53, 3.37], [6.535, 3.37], [6.535, 3.38], [6.53, 3.38]], health: 0.85, status: 'Healthy' },
-    { id: 'BLK-B2', coords: [[6.52, 3.375], [6.525, 3.375], [6.525, 3.385], [6.52, 3.385]], health: 0.42, status: 'Stressed' },
-    { id: 'BLK-C3', coords: [[6.51, 3.38], [6.515, 3.38], [6.515, 3.39], [6.51, 3.39]], health: 0.71, status: 'Stable' },
+  const plots = [
+    { id: `B-${cropName.substring(0,3).toUpperCase()}-01`, area: '4.2 HA', health: '98%', status: 'Healthy', ndvi: 0.72, layman: config.layman.health, advice: 'No action needed.', history: [0.3, 0.45, 0.58, 0.72, 0.75, 0.72] },
+    { id: `B-${cropName.substring(0,3).toUpperCase()}-04`, area: '2.8 HA', health: '35%', status: 'Stressed', ndvi: 0.35, layman: config.layman.stress, advice: 'Inspect and apply remediation.', history: [0.3, 0.32, 0.40, 0.38, 0.35, 0.33] },
   ];
 
-  const chartData = {
-    labels: ['Pass 1', 'Pass 2', 'Pass 3', 'Pass 4', 'Pass 5', 'Pass 6'],
-    datasets: [{
-      label: 'NDVI Index',
-      data: [0.42, 0.58, 0.65, 0.82, 0.78, 0.85],
-      borderColor: '#16A34A',
-      backgroundColor: 'rgba(22, 163, 74, 0.2)',
-      tension: 0.4,
-      pointRadius: 4,
-      pointBackgroundColor: '#000',
-      borderWidth: 3,
-    }]
-  };
+  const columns = [
+    { key: 'id', label: 'Plot ID' },
+    { key: 'area', label: 'Area' },
+    { key: 'health', label: 'Health Score', render: (val) => <span className={`font-black ${parseInt(val) < 40 ? 'text-red-500' : 'text-emerald-500'}`}>{val}</span> },
+    { key: 'status', label: 'Status', render: (val) => <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${val === 'Stressed' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>{val}</span> },
+    { key: 'layman', label: 'Field Summary' },
+    { key: 'action', label: 'Drill Down', render: (_, row) => <button onClick={() => { setSelectedPlot(row); setActiveTab('geospatial'); }} className="text-sky-600 font-black uppercase text-[10px] hover:underline">View History</button> }
+  ];
 
-  const chartOptions = {
-    responsive: true,
-    plugins: { legend: { display: false }, tooltip: { enabled: true } },
-    scales: { 
-      y: { min: 0, max: 1, grid: { display: false }, ticks: { font: { weight: 'bold', size: 10 } } },
-      x: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 10 } } }
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'geospatial':
+        return (
+          <div className="flex-1 flex flex-col relative animate-in fade-in duration-500">
+             <div className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 z-[1010]">
+                <div className="flex items-center gap-6 flex-1 max-w-4xl">
+                   <div className="relative flex-1">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                      <input type="text" placeholder={`Locate ${cropName} Plot...`} className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 pl-12 pr-4 text-[13px] font-bold outline-none focus:border-emerald-500 transition-all" />
+                   </div>
+                </div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 italic">Scientific Standard: Sentinel-2 Multispectral</div>
+             </div>
+
+             <div className="flex-1 bg-gray-200 relative overflow-hidden">
+                <MapContainer center={[6.5244, 3.3792]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                   {layers.filter(l => l.active).map(layer => (
+                     <TileLayer key={layer.id} url={layer.url || "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"} opacity={layer.opacity / 100} />
+                   ))}
+                   {plots.map(plot => (
+                     <Polygon key={plot.id} positions={[[6.5244, 3.3792], [6.5264, 3.3792], [6.5264, 3.3812], [6.5244, 3.3812]]} pathOptions={{ color: '#10b981', fillOpacity: 0.2 }} eventHandlers={{ click: () => setSelectedPlot(plot) }} />
+                   ))}
+                   <ZoomControl position="bottomleft" />
+                </MapContainer>
+                
+                <div className="absolute top-8 right-8 bottom-8 w-64 z-[1000] flex flex-col gap-4 pointer-events-none">
+                   <div className="bg-white border border-gray-100 shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-[2.5rem] flex flex-col pointer-events-auto overflow-hidden">
+                      <div className="p-5 flex items-center justify-between border-b border-gray-50">
+                         <div className="flex items-center gap-2">
+                            <Layers size={16} className="text-gray-900" />
+                            <span className="text-[11px] font-black uppercase tracking-widest leading-none">Remote Sensing Legend</span>
+                         </div>
+                         <button onClick={() => setShowLayerList(!showLayerList)} className="p-2 hover:bg-gray-50 rounded-full transition-all"><Settings2 size={16} className="text-gray-400" /></button>
+                      </div>
+                      {showLayerList && (
+                        <div className="flex-1 overflow-y-auto p-5 space-y-6 animate-in slide-in-from-right-4 duration-300">
+                           {layers.map(layer => (
+                             <div key={layer.id} className="space-y-3">
+                                <button onClick={() => setLayers(layers.map(l => l.id === layer.id ? { ...l, active: !l.active } : l))} className="flex items-center gap-3 group text-left">
+                                   <div className={`w-4 h-4 rounded border-2 transition-all shrink-0 flex items-center justify-center ${layer.active ? 'bg-gray-900 border-gray-900' : 'border-gray-200'}`}>{layer.active && <CheckCircle2 size={10} className="text-white" />}</div>
+                                   <span className={`text-[10px] font-black uppercase tracking-widest leading-tight ${layer.active ? 'text-gray-900' : 'text-gray-300'}`}>{layer.label}</span>
+                                </button>
+                                {layer.active && (
+                                  <div className="pl-7 space-y-3">
+                                     <div className="space-y-1.5">
+                                        <div className="flex justify-between items-center text-[8px] font-black text-gray-400 uppercase tracking-widest"><span>{layer.legend}</span><span>{layer.opacity}%</span></div>
+                                        <div className={`h-1.5 w-full rounded-full bg-gradient-to-r ${layer.color}`}></div>
+                                     </div>
+                                     <input type="range" min="0" max="100" value={layer.opacity} onChange={(e) => setLayers(layers.map(l => l.id === layer.id ? { ...l, opacity: e.target.value } : l))} className="w-full h-1 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-gray-900" />
+                                  </div>
+                                )}
+                             </div>
+                           ))}
+                        </div>
+                      )}
+                   </div>
+
+                   {selectedPlot && (
+                     <div className="bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-2xl animate-in slide-in-from-right-10 duration-500 pointer-events-auto flex flex-col gap-6">
+                        <div className="flex justify-between items-start">
+                           <div>
+                              <div className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.3em] mb-1 leading-none italic">{config.drillDownType}</div>
+                              <h3 className="text-2xl font-black uppercase italic tracking-tighter leading-none">{selectedPlot.id}</h3>
+                           </div>
+                           <button onClick={() => setSelectedPlot(null)} className="p-2 hover:bg-gray-50 rounded-full transition-all text-gray-300"><X size={18} /></button>
+                        </div>
+                        <div className="bg-gray-900 p-5 rounded-3xl text-white">
+                           <div className="text-[9px] font-black text-gray-400 uppercase mb-2 italic">Layman Summary</div>
+                           <p className="text-[13px] font-bold italic leading-tight">"{selectedPlot.layman}"</p>
+                        </div>
+                        <div className="space-y-3">
+                           <div className="flex items-center justify-between px-1">
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none italic">Temporal Trajectory</span>
+                              <TrendingUp size={12} className="text-emerald-500" />
+                           </div>
+                           <div className="h-32 bg-gray-50 rounded-2xl p-2">
+                              <Line 
+                                data={{
+                                  labels: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN'],
+                                  datasets: [{ fill: true, data: selectedPlot.history, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.4, pointRadius: 0 }]
+                                }} 
+                                options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }}
+                              />
+                           </div>
+                        </div>
+                        <div className="flex items-center gap-3 pt-4 border-t border-gray-50">
+                           <Zap size={14} className="text-emerald-500" />
+                           <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 italic leading-tight">{selectedPlot.advice}</span>
+                        </div>
+                     </div>
+                   )}
+                </div>
+             </div>
+          </div>
+        );
+      case 'plots':
+        return (
+          <div className="p-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-y-auto h-full">
+             <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-6">
+                <div>
+                   <h2 className="text-4xl font-black text-gray-900 tracking-tighter italic uppercase">{cropName} Analytical Ledger</h2>
+                   <p className="text-[14px] text-gray-400 font-medium mt-1">Literature-validated remote sensing outputs aggregated per farm block</p>
+                </div>
+                <div className="flex gap-4">
+                   <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+                      <Search size={16} className="text-gray-400" />
+                      <input type="text" placeholder="Search Plot ID..." className="outline-none text-[12px] font-bold w-48" />
+                   </div>
+                </div>
+             </div>
+             <SimpleCard title="Verified Farm Data" icon={<Shield size={20} />}>
+                <WorkerActivityTable data={plots} columns={columns} />
+             </SimpleCard>
+          </div>
+        );
+      default:
+        return (
+          <div className="p-10 space-y-10 animate-in fade-in duration-500 overflow-y-auto h-full">
+            <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+               <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400"><Calendar size={20} /></div>
+                  <div>
+                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none italic">Crop Theme: {config.theme}</div>
+                     <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="text-lg font-black italic uppercase outline-none bg-transparent cursor-pointer mt-1">
+                        <option>Current Season Analytics</option>
+                        <option>Historical Time-Series</option>
+                     </select>
+                  </div>
+               </div>
+               <div className="flex gap-4">
+                  <button className="px-6 py-2.5 bg-gray-900 text-white text-[11px] font-black uppercase tracking-widest rounded-xl shadow-lg">Generate Report</button>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+               {config.kpis.map((kpi, i) => (
+                 <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center gap-6 group hover:shadow-2xl transition-all">
+                    <div className="w-14 h-14 bg-gray-900 rounded-2xl flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                       {React.cloneElement(kpi.icon, { size: 24 })}
+                    </div>
+                    <div>
+                       <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 italic">{kpi.label}</div>
+                       <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-black italic tracking-tighter uppercase">{kpi.value}</span>
+                          <span className="text-[12px] font-black text-gray-300">{kpi.unit}</span>
+                       </div>
+                    </div>
+                 </div>
+               ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+               <SimpleCard title={`${cropName} Growth Trajectory`} icon={<TrendingUp size={20} />}>
+                  <div className="h-[300px] mt-6">
+                     <Line data={{
+                        labels: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN'],
+                        datasets: [
+                          { label: 'Mean NDVI', data: [0.4, 0.45, 0.6, 0.74, 0.72, 0.68], borderColor: '#10b981', tension: 0.4, fill: true, backgroundColor: 'rgba(16, 185, 129, 0.05)' },
+                          { label: 'Nutrient/Water Proxy', data: [0.35, 0.38, 0.42, 0.55, 0.52, 0.48], borderColor: '#3b82f6', tension: 0.4, borderDash: [5, 5] }
+                        ]
+                     }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10, weight: 'bold' } } } } }} />
+                  </div>
+               </SimpleCard>
+
+               <SimpleCard title="Physiological Health Matrix" icon={<Activity size={20} />}>
+                  <div className="h-[300px] mt-6 flex items-center justify-center">
+                     <Radar 
+                        data={{
+                          labels: ['NDVI', 'NDRE', 'LSWI', 'LST', 'VHI', 'EVI'],
+                          datasets: [{
+                            label: 'Active Blocks Mean',
+                            data: [85, 74, 62, 45, 90, 80],
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            borderColor: '#10b981',
+                            pointBackgroundColor: '#10b981',
+                          }]
+                        }}
+                        options={{
+                          scales: { r: { angleLines: { display: false }, suggestedMin: 0, suggestedMax: 100, ticks: { display: false } } },
+                          plugins: { legend: { display: false } }
+                        }}
+                     />
+                  </div>
+               </SimpleCard>
+            </div>
+          </div>
+        );
     }
   };
 
   return (
-    <div className="h-screen flex bg-white text-black overflow-hidden font-sans border-t-8 border-black">
-      {/* Left Navigation Sidebar */}
-      <aside className="w-72 border-r-2 border-black p-6 flex flex-col gap-8 bg-white z-20">
-        <div className="mb-2">
-           <button 
-             onClick={onBack}
-             className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-black/40 hover:text-[var(--brand-primary)] transition-colors mb-6 group"
-           >
-             <RotateCcw size={12} className="group-hover:-rotate-90 transition-transform" />
-             Return to Hub
-           </button>
-          <div className="text-[10px] font-black text-[var(--brand-primary)] uppercase tracking-[0.3em] mb-1">Geospatial Intelligence</div>
-          <h1 className="text-2xl font-black tracking-tighter leading-none">{cropName} Monitoring</h1>
-        </div>
-
-        <div className="flex-1 space-y-2 overflow-y-auto">
-          <div className="text-[9px] font-black uppercase tracking-[0.3em] text-black/30 mb-4 px-2">Satellite Map Views</div>
-          <SidebarItem icon={<Globe />} label="Satellite View" active={activeLayer === 'Satellite'} onClick={() => setActiveLayer('Satellite')} />
-          <SidebarItem icon={<MapIcon />} label="Terrain / Ops" active={activeLayer === 'Terrain'} onClick={() => setActiveLayer('Terrain')} />
-          
-          <div className="pt-8 space-y-2">
-            <div className="text-[9px] font-black uppercase tracking-[0.3em] text-black/30 mb-4 px-2">Vegetation Indices</div>
-            <SidebarItem icon={<Activity />} label="NDVI Index" active={activeLayer === 'NDVI'} onClick={() => setActiveLayer('NDVI')} />
-            <SidebarItem icon={<Zap />} label="SAR Radar" />
-            <SidebarItem icon={<CloudRain />} label="Soil Moisture" />
-          </div>
-        </div>
-
-        <div className="pt-6 border-t-2 border-black/5">
-          <AnalysisCard title="Legend" icon={<Layers />}>
-            <div className="space-y-2.5">
-              {[
-                { label: 'High Yield', color: 'bg-emerald-500' },
-                { label: 'Healthy', color: 'bg-green-400' },
-                { label: 'Under-performing', color: 'bg-amber-400' },
-                { label: 'Cleared/Stressed', color: 'bg-red-500' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-3">
-                  <div className={`w-3 h-1 rounded-full ${item.color}`}></div>
-                  <span className="text-[9px] font-black text-black/60 uppercase tracking-widest">{item.label}</span>
-                </div>
-              ))}
+    <div className="h-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden font-sans antialiased">
+      <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 z-[1100] shadow-sm">
+         <div className="flex items-center gap-8">
+            <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center p-2 shadow-lg ring-4 ring-gray-50"><Satellite className="text-white" size={20} /></div>
+            <div>
+               <h1 className="text-lg font-black tracking-tighter leading-none uppercase italic">{cropName} <span className="text-gray-400 font-medium ml-1">Monitoring & RS</span></h1>
+               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 mt-1 leading-none italic uppercase">Theme: {config.theme}</p>
             </div>
-          </AnalysisCard>
-        </div>
-      </aside>
-
-      {/* Main Map View Port */}
-      <main className="flex-1 relative bg-slate-900 overflow-hidden">
-        <div className="absolute top-8 left-8 right-8 z-[1000] flex justify-between items-start pointer-events-none">
-          <div className="flex gap-4 pointer-events-auto">
-             <div className="bg-black text-white px-6 py-3 rounded-2xl flex items-center gap-5">
-                <Satellite size={22} className="text-[var(--brand-primary)]" />
-                <div>
-                   <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40">Satellite Mission</div>
-                   <div className="text-xs font-black">{sensor} · 10m Ground Res</div>
-                </div>
-             </div>
-             <div className="bg-white text-black px-6 py-3 rounded-2xl flex items-center gap-5 border-2 border-black">
-                <Globe size={22} className="text-black" />
-                <div>
-                   <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40">Ortho-rectified</div>
-                   <div className="text-xs font-black">UTM Zone 31N · WGS84</div>
-                </div>
-             </div>
-          </div>
-
-          <div className="flex flex-col gap-2 pointer-events-auto">
-             <button className="bg-black text-white p-3 rounded-xl hover:bg-[var(--brand-primary)] transition-all"><Maximize2 size={20} /></button>
-             <button className="bg-black text-white p-3 rounded-xl hover:bg-[var(--brand-primary)] transition-all"><MousePointer2 size={20} /></button>
-             <button className="bg-black text-white p-3 rounded-xl hover:bg-[var(--brand-primary)] transition-all"><Share2 size={20} /></button>
-          </div>
-        </div>
-
-        {/* REAL LEAFLET MAP WITH POLYGONS & POPUPS */}
-        <div className="absolute inset-0 z-0">
-           <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-             <TileLayer url={mapLayers[activeLayer] || mapLayers.Satellite} attribution='&copy; Esri' />
-             
-             {blocks.map(block => (
-               <Polygon 
-                 key={block.id}
-                 positions={block.coords}
-                 pathOptions={{ 
-                   color: block.health > 0.7 ? '#10B981' : block.health > 0.5 ? '#F59E0B' : '#EF4444',
-                   fillColor: block.health > 0.7 ? '#10B981' : block.health > 0.5 ? '#F59E0B' : '#EF4444',
-                   fillOpacity: 0.3,
-                   weight: 2
-                 }}
-               >
-                 <Popup className="agri-popup">
-                   <div className="p-2">
-                     <div className="text-[10px] font-black uppercase text-gray-400 mb-1">Asset ID</div>
-                     <div className="text-sm font-black text-black mb-3">{block.id} · {cropName}</div>
-                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-[9px] font-bold text-gray-400 uppercase">NDVI</div>
-                          <div className="text-xs font-black">{block.health}</div>
-                        </div>
-                        <div>
-                          <div className="text-[9px] font-bold text-gray-400 uppercase">Status</div>
-                          <div className={`text-xs font-black ${block.health > 0.7 ? 'text-emerald-500' : 'text-red-500'}`}>{block.status}</div>
-                        </div>
-                     </div>
-                     <button className="mt-4 w-full bg-black text-white py-2 rounded-lg text-[9px] font-black uppercase tracking-widest">Open Analytics</button>
-                   </div>
-                 </Popup>
-               </Polygon>
-             ))}
-
-             {activeLayer === 'NDVI' && (
-               <div className="absolute inset-0 bg-green-500/10 pointer-events-none z-[400] mix-blend-overlay"></div>
-             )}
-           </MapContainer>
-        </div>
-
-        {/* Bottom Time-Series Slider (Interactive) */}
-        <div className="absolute bottom-8 left-8 right-8 z-[1000] flex items-center gap-8 bg-black/95 backdrop-blur-2xl p-7 rounded-[2.5rem] border border-white/10">
-           <div className="flex items-center gap-5 border-r border-white/10 pr-8">
-              <button className="p-2.5 bg-white/10 rounded-xl text-white hover:bg-[var(--brand-primary)]"><RotateCcw size={18} /></button>
-              <div>
-                <div className="text-white font-black text-xs tracking-tighter uppercase mb-0.5">Temporal View</div>
-                <div className="text-[10px] font-black text-[var(--brand-primary)] uppercase tracking-widest">{months[selectedMonth]} 2026 Analysis</div>
-              </div>
-           </div>
-           <div className="flex-1 flex items-center gap-6">
-              {months.map((m, i) => (
-                <button 
-                  key={m} 
-                  onClick={() => setSelectedMonth(i)}
-                  className={`flex-1 group relative py-4`}
-                >
-                  <div className={`h-2 w-full rounded-full transition-all duration-500 ${i <= selectedMonth ? 'bg-[var(--brand-primary)]' : 'bg-white/10'}`}></div>
-                  <div className={`absolute -top-6 left-0 text-[10px] font-black transition-colors ${i === selectedMonth ? 'text-[var(--brand-primary)]' : 'text-white/40'}`}>{m}</div>
-                  {i === selectedMonth && (
-                    <div className="absolute top-2 left-0 w-6 h-6 bg-white rounded-full border-4 border-[var(--brand-primary)] shadow-xl shadow-[var(--brand-primary)]/40 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-[var(--brand-primary)] rounded-full animate-ping"></div>
-                    </div>
-                  )}
-                </button>
-              ))}
-           </div>
-        </div>
-      </main>
-
-      {/* Right Intelligence Sidebar */}
-      <aside className="w-80 border-l-2 border-black p-6 flex flex-col gap-6 bg-white overflow-y-auto z-20">
-        <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl mb-2">
-           {['Insights', 'Climate'].map(t => (
-             <button 
-               key={t}
-               onClick={() => setActiveTab(t)}
-               className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === t ? 'bg-black text-white shadow-xl' : 'text-black/40 hover:text-black'}`}
-             >
-               {t}
-             </button>
-           ))}
-        </div>
-
-        {activeTab === 'Insights' ? (
-          <>
-            <AnalysisCard title="Predicted Yield" icon={<TrendingUp />}>
-              <div className="text-4xl font-black tracking-tighter mb-1">{(4820 * (0.8 + selectedMonth * 0.1)).toFixed(0)} <span className="text-sm font-bold text-black/30">MT</span></div>
-              <div className="flex items-center gap-2 text-emerald-500 text-[11px] font-black">
-                <TrendingUp size={14} />
-                <span>SEASONAL HARVEST EST.</span>
-              </div>
-            </AnalysisCard>
-
-            <AnalysisCard title="NDVI Trend Analysis" icon={<Activity />}>
-              <div className="h-40">
-                 <Line data={chartData} options={chartOptions} />
-              </div>
-            </AnalysisCard>
-
-            <AnalysisCard title="Alert History" icon={<AlertTriangle />}>
-              <div className="space-y-3.5">
-                {[
-                  { b: 'Sector 4', r: 'Biomass Loss', c: 'text-red-600' },
-                  { b: 'Sector 9', r: 'Soil Dryness', c: 'text-amber-600' },
-                ].map(item => (
-                  <div key={item.b} className="flex justify-between items-center border-b-2 border-gray-50 pb-2.5">
-                    <span className="text-[11px] font-black text-black/80">{item.b}</span>
-                    <span className={`text-[10px] font-black uppercase tracking-tighter ${item.c}`}>{item.r}</span>
-                  </div>
-                ))}
-              </div>
-            </AnalysisCard>
-          </>
-        ) : (
-          <>
-            <AnalysisCard title="Micro-Climate" icon={<CloudRain />}>
-               <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <div className="text-4xl font-black tracking-tighter">31°C</div>
-                    <div className="text-[11px] font-black text-black/30 uppercase tracking-widest mt-1">Relative Humidity 68%</div>
-                  </div>
-                  <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center">
-                    <CloudRain size={28} className="text-blue-500" />
-                  </div>
-               </div>
-            </AnalysisCard>
-
-            <AnalysisCard title="Soil Moisture" icon={<Activity />}>
-               <div className="space-y-5">
-                  {[
-                    { d: 'MAY 02', v: 38 },
-                    { d: 'MAY 03', v: 34 },
-                  ].map(day => (
-                    <div key={day.d}>
-                      <div className="flex justify-between text-[11px] font-black mb-1.5 uppercase tracking-tighter">
-                        <span>{day.d}</span>
-                        <span className={day.v < 40 ? 'text-amber-600' : 'text-[var(--brand-primary)]'}>{day.v}% Vol</span>
-                      </div>
-                      <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full ${day.v < 40 ? 'bg-amber-500' : 'bg-[var(--brand-primary)]'}`} style={{ width: `${day.v}%` }}></div>
-                      </div>
-                    </div>
-                  ))}
-               </div>
-            </AnalysisCard>
-          </>
-        )}
-
-        <button className="mt-auto w-full bg-black text-white font-black uppercase tracking-[0.2em] py-4 rounded-2xl hover:bg-[var(--brand-primary)] transition-all border-2 border-black mb-4">
-          <span>Export GeoJSON</span>
-        </button>
-        <div className="text-center">
-          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Powered by Farmintelytics</div>
-        </div>
-      </aside>
+         </div>
+         <div className="flex items-center gap-4">
+            <div className="text-right">
+               <div className="text-[11px] font-black text-gray-900 leading-none italic uppercase">{userName}</div>
+               <div className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mt-1 italic">Enterprise Auditor</div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden ring-2 ring-emerald-50"><User size={20} className="text-gray-400" /></div>
+         </div>
+      </header>
+      <div className="flex-1 flex overflow-hidden">
+         <aside className="w-80 bg-white border-r border-gray-100 flex flex-col z-[1050] shadow-2xl">
+            <div className="flex-1 overflow-y-auto p-6 space-y-2">
+               <div className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] px-4 mb-4 leading-none italic">Intelligence Nodes</div>
+               {[
+                 { id: 'overview', label: 'Dashboard Hub', icon: <LayoutDashboard /> },
+                 { id: 'geospatial', label: 'Geospatial Intel', icon: <MapIcon /> },
+                 { id: 'plots', label: 'Plots Analytics', icon: <BarChart4 /> },
+               ].map(tab => (
+                 <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all ${activeTab === tab.id ? 'bg-gray-900 text-white shadow-xl translate-x-2' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-900'}`}>{React.cloneElement(tab.icon, { size: 18 })}<span className="text-[12px] font-black uppercase tracking-widest">{tab.label}</span></button>
+               ))}
+            </div>
+            <div className="p-6 bg-gray-50/50 border-t border-gray-100">
+               <button onClick={onSignOut} className="w-full bg-red-500 text-white font-black uppercase tracking-widest py-5 rounded-2xl text-[11px] flex items-center justify-center gap-3 hover:bg-red-600 transition-all shadow-xl shadow-red-100"><LogOut size={16} /> Sign Out</button>
+            </div>
+         </aside>
+         <main className="flex-1 flex flex-col relative overflow-hidden bg-gray-50">{renderContent()}</main>
+      </div>
     </div>
   );
 };
