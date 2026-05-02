@@ -20,13 +20,19 @@ import RubberDashboard from './apps/management/rubber/Dashboard';
 import CassavaDashboard from './apps/management/cassava/Dashboard';
 import MaizeDashboard from './apps/management/maize/Dashboard';
 
-// === Monitoring Portals ===
+// === Field Advisory & Agronomy ===
+import ClimateIntelligence from './apps/advisor/ClimateIntelligence';
 import MonitoringPortal from './apps/monitoring/MonitoringPortal';
+import SustainabilityPortal from './apps/sustainability/SustainabilityPortal';
 
-// === Groups & Smallholder Management ===
+// === Cooperative & Group Management ===
 import GroupsDashboard from './apps/cooperative/Dashboard';
 
-import { crops } from './config/crops';
+// === Finance & Payments ===
+import FinanceDashboard from './apps/finance/Dashboard';
+
+import { crops } from './config/crops.jsx';
+import { Zap } from 'lucide-react';
 
 // Placeholder for modules in development
 const ComingSoon = ({ title, description }) => (
@@ -45,23 +51,17 @@ const App = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [currentCrop, setCurrentCrop] = useState(crops[0]);
 
-  const handleSelectModule = (moduleId) => { setSelectedModule(moduleId); setView('login'); };
+  const handleSelectModule = (moduleId) => { 
+    setSelectedModule(moduleId); 
+    const crop = crops.find(c => c.id === moduleId);
+    if (crop) setCurrentCrop(crop);
+    setView('login'); 
+  };
   const handleLogin = () => setView('portal');
+  const handleSignOut = () => { setView('login'); setActiveSection('dashboard'); };
   const handleBackToHub = () => { setView('hub'); setActiveSection('dashboard'); };
 
   const getSectionContent = () => {
-    // FFB sub-navigation (multi-page portal)
-    if (selectedModule === 'management-ffb') {
-      switch (activeSection) {
-        case 'dashboard':  return <FFBDashboard currentCrop={currentCrop} />;
-        case 'geospatial': return <Geospatial />;
-        case 'workers':    return <WorkerAnalytics />;
-        case 'identity':   return <Identity />;
-        case 'workforce':  return <Workforce />;
-        case 'activity':   return <Activity />;
-        default:           return <FFBDashboard currentCrop={currentCrop} />;
-      }
-    }
 
     // Monitoring Portals (Standard Remote Sensing Web Portal Style)
     if (selectedModule?.startsWith('rs-')) {
@@ -76,32 +76,49 @@ const App = () => {
         'rs-maize': 'Maize',
         'rs-drone': 'Drone Intelligence'
       };
-      const sensorMap = {
-        'rs-sugarcane': 'Sentinel-1 (SAR)',
-        'rs-drone': 'UAV High-Res Imagery',
-      };
-      return <MonitoringPortal cropName={cropMap[selectedModule] || "Crop"} sensor={sensorMap[selectedModule] || 'Sentinel-2 (Optical)'} onBack={handleBackToHub} />;
+      
+      return <MonitoringPortal 
+        cropName={cropMap[selectedModule] || "Crop"} 
+        onSignOut={handleSignOut}
+        onBack={handleBackToHub} 
+      />;
     }
 
     // Single-dashboard portals
     const routes = {
-      'management-cashew':    <CashewDashboard />,
-      'management-sugarcane': <SugarcaneDashboard />,
-      'management-rice':      <RiceDashboard />,
-      'management-cocoa':     <CocoaDashboard />,
-      'management-rubber':    <RubberDashboard />,
-      'management-cassava':   <CassavaDashboard />,
-      'management-maize':     <MaizeDashboard />,
+      'management-ffb':       <FFBDashboard activeSection={activeSection} />,
+      'management-cashew':    <CashewDashboard activeSection={activeSection} />,
+      'management-sugarcane': <SugarcaneDashboard activeSection={activeSection} />,
+      'management-rice':      <RiceDashboard activeSection={activeSection} />,
+      'management-cocoa':     <CocoaDashboard activeSection={activeSection} />,
+      'management-rubber':    <RubberDashboard activeSection={activeSection} />,
+      'management-cassava':   <CassavaDashboard activeSection={activeSection} />,
+      'management-maize':     <MaizeDashboard activeSection={activeSection} />,
       
-      'drone-ffb':            <ComingSoon title="Drone Inspection" description="Live drone feed and high-resolution field surveillance." />,
-      'drone-cashew':         <ComingSoon title="Orchard Survey" description="Tree count, canopy gap analysis and disease spot detection." />,
-      'finance-hub':          <ComingSoon title="Central Finance Hub" description="Unified multi-crop financial dashboard. Filter by crop, region, or cooperative for global payroll and disbursement." />,
+      'rs-ffb':               <MonitoringPortal cropName="Oil Palm" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-cashew':            <MonitoringPortal cropName="Cashew" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-rubber':            <MonitoringPortal cropName="Rubber" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-sugarcane':         <MonitoringPortal cropName="SugarCane" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-rice':              <MonitoringPortal cropName="Rice" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-cocoa':             <MonitoringPortal cropName="Cocoa" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-cassava':           <MonitoringPortal cropName="Cassava" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-maize':             <MonitoringPortal cropName="Maize" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      
+      'drone-ffb':            <ComingSoon title="Drone Inspection" description="Live drone feed and high-resolution field surveillance." onSignOut={handleSignOut} />,
+      'drone-cashew':         <ComingSoon title="Orchard Survey" description="Tree count, canopy gap analysis and disease spot detection." onSignOut={handleSignOut} />,
+      
+      'carbon-ffb':           <SustainabilityPortal title="Estate Carbon" type="Industrial" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'carbon-groups':        <SustainabilityPortal title="Group Carbon" type="Smallholder" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'forestry-intel':       <SustainabilityPortal title="Forestry Intel" type="High Density" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'carbon-estimator':     <SustainabilityPortal title="Carbon Estimator" type="Analytical" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+
+      'finance-hub':          <FinanceDashboard onSignOut={handleSignOut} />,
       'activity-ffb':         <ComingSoon title="Operations Log" description="Geo-referenced daily field logs — harvesting, planting, spraying." />,
-      'advisor':              <ComingSoon title="Farm Advisor" description="Location-aware alerts, SMS weather/pest updates and crop-stage reminders." />,
+      'advisor':              <ClimateIntelligence onSignOut={handleSignOut} onBack={handleBackToHub} />,
 
       // Groups & Smallholder Management
-      'group-management':     <GroupsDashboard mode="group-management" onBack={handleBackToHub} />,
-      'group-monitoring':     <MonitoringPortal cropName="Smallholder" sensor="Satellite Fusion" onBack={handleBackToHub} />,
+      'group-management':     <GroupsDashboard mode="group-management" onSignOut={handleSignOut} />,
+      'group-monitoring':     <MonitoringPortal cropName="Smallholder" onSignOut={handleSignOut} onBack={handleBackToHub} />,
     };
 
     return routes[selectedModule] || (
@@ -140,9 +157,13 @@ const App = () => {
 
   const sectionContent = getSectionContent();
 
-  // If it's a Monitoring Portal, render it standalone (no duplicate sidebars)
-  if (selectedModule?.startsWith('rs-') || selectedModule === 'group-monitoring') {
-    return React.cloneElement(sectionContent, { onBack: handleBackToHub });
+  // If it's a Monitoring Portal or Sustainability/Advisor, render it standalone
+  const standaloneModules = ['rs-', 'group-monitoring', 'carbon-', 'forestry-', 'advisor'];
+  if (standaloneModules.some(m => selectedModule?.startsWith(m))) {
+    return React.cloneElement(sectionContent, { 
+      onBack: handleBackToHub,
+      onSignOut: handleSignOut 
+    });
   }
 
   // If it's a Groups module, render it standalone
@@ -158,6 +179,7 @@ const App = () => {
       setCurrentCrop={setCurrentCrop}
       crops={crops}
       onBackToHub={handleBackToHub}
+      onSignOut={handleSignOut}
     >
       {sectionContent}
     </PortalLayout>
