@@ -1,133 +1,235 @@
 import React, { useState } from 'react';
-import { ChevronDown, Calendar, RotateCcw, TrendingUp, TrendingDown, Award, Layers, BarChart3 } from 'lucide-react';
+import { 
+  Calendar, 
+  Map as MapIcon, 
+  Users, 
+  Box, 
+  BarChart3, 
+  Activity,
+  User,
+  Trees,
+  TrendingUp,
+  AlertCircle,
+  ClipboardList,
+  Target,
+  Search,
+  Filter,
+  BarChart4,
+  Layers,
+  Satellite,
+  Camera,
+  Navigation,
+  CheckCircle2,
+  Leaf,
+  Globe,
+  Droplets,
+  Wind
+} from 'lucide-react';
+import { 
+  SimpleCard, 
+  MetricTile, 
+  WorkerActivityTable, 
+  GeospatialPreview, 
+  FilterBar,
+  EvidenceThumbnail,
+  LocationBadge
+} from '../../../shared/components/SharedComponents';
 
-const KPICard = ({ label, value, unit, subLabel, trend, color }) => (
-  <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm hover:shadow-md transition-all group">
-    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{label}</div>
-    <div className="flex items-baseline gap-2 mb-1">
-      <div className="text-4xl font-black text-gray-900 tracking-tighter">{value}</div>
-      {unit && <div className="text-sm font-bold text-gray-400">{unit}</div>}
-    </div>
-    <div className="text-[11px] text-gray-500 font-medium">{subLabel}</div>
-    <div className={`mt-4 h-1.5 w-8 rounded-full ${color}`}></div>
-    {trend && (
-      <div className={`mt-2 flex items-center gap-1 text-[11px] font-bold ${trend > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-        {trend > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-        {Math.abs(trend)}% vs last cycle
-      </div>
-    )}
-  </div>
-);
+const CashewDashboard = ({ activeSection }) => {
+  const [activeLayer, setActiveLayer] = useState('carbon');
 
-const GradeBar = ({ grade, pct, color }) => (
-  <div className="flex items-center gap-4">
-    <div className="text-[11px] font-black text-gray-600 w-12">{grade}</div>
-    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-      <div className={`h-full rounded-full transition-all duration-1000 ${color}`} style={{ width: `${pct}%` }}></div>
-    </div>
-    <div className="text-[11px] font-black text-gray-400 w-10 text-right">{pct}%</div>
-  </div>
-);
+  const workerData = [
+    { id: 'W-092', name: 'Samuel Obi', task: 'Pruning', plot: 'Block A-12', output: '42 Trees', status: 'In Progress', location: { lat: 6.5244, lng: 3.3792 }, evidence: '' },
+    { id: 'W-045', name: 'Grace John', task: 'Harvesting', plot: 'Block B-04', output: '1.2 MT RCN', status: 'Completed', location: { lat: 6.5201, lng: 3.3812 }, evidence: '' },
+  ];
 
-const CashewDashboard = () => (
-  <div className="p-8 space-y-8 overflow-y-auto h-full max-w-[1600px] mx-auto">
-    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-      <div>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tighter">Cashew Intelligence Hub</h1>
-        <p className="text-[13px] text-gray-500 mt-1 font-medium">Farm-to-factory tracking · Kernel yield · Grade analytics</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <button className="flex items-center gap-2 bg-white border border-black/5 px-4 py-2 rounded-xl text-[12px] font-bold shadow-sm">All Farms <ChevronDown size={14} className="text-gray-400" /></button>
-        <button className="flex items-center gap-2 bg-white border border-black/5 px-4 py-2 rounded-xl text-[12px] font-bold shadow-sm"><RotateCcw size={14} /> Reset</button>
-      </div>
-    </div>
+  const carbonData = [
+    { id: 'FOR-01', area: 'Forestry Reserve', type: 'High Density', carbonStock: '124,200 tCO2e', health: '98%', status: 'Verified' },
+    { id: 'GRP-04', area: 'Smallholder Group D', type: 'Agroforestry', carbonStock: '42,800 tCO2e', health: '92%', status: 'Active' },
+    { id: 'EST-09', area: 'Main Estate Cluster', type: 'Industrial', carbonStock: '185,400 tCO2e', health: '95%', status: 'Verified' },
+  ];
 
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <KPICard label="Kernel Out-Turn Ratio" value="22.4" unit="%" subLabel="Target: 20–25%" trend={3.2} color="bg-amber-500" />
-      <KPICard label="Raw Cashew Collected" value="48.6" unit="MT" subLabel="Current season" trend={8.1} color="bg-orange-600" />
-      <KPICard label="Traceability Rate" value="94.2" unit="%" subLabel="Farm-to-export verified" trend={1.4} color="bg-emerald-500" />
-      <KPICard label="Premium Grade (W180)" value="31.8" unit="%" subLabel="Of total kernel output" trend={-2.1} color="bg-red-400" />
-    </div>
+  const columns = [
+    { key: 'evidence', label: 'Evidence', render: (val) => <EvidenceThumbnail src={val} /> },
+    { key: 'id', label: 'ID' },
+    { key: 'name', label: 'Worker Name' },
+    { key: 'task', label: 'Specific Task' },
+    { key: 'plot', label: 'Assigned Plot' },
+    { key: 'output', label: 'Work Output', render: (val) => <span className="text-[13px] font-black text-gray-900 italic">{val}</span> },
+    { key: 'location', label: 'Field Location', render: (val) => <LocationBadge lat={val.lat} lng={val.lng} /> },
+    { key: 'status', label: 'Status' },
+  ];
 
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <div className="bg-white p-8 rounded-2xl border border-black/5 shadow-sm">
-        <h3 className="text-lg font-black text-gray-900 mb-2 tracking-tight">Grade Distribution</h3>
-        <p className="text-[12px] text-gray-500 font-medium mb-8">Kernel quality breakdown by international grade classification</p>
-        <div className="space-y-5">
-          <GradeBar grade="W180" pct={31.8} color="bg-amber-500" />
-          <GradeBar grade="W240" pct={28.4} color="bg-orange-400" />
-          <GradeBar grade="W320" pct={21.1} color="bg-yellow-400" />
-          <GradeBar grade="SW" pct={9.3} color="bg-gray-400" />
-          <GradeBar grade="Splits" pct={9.4} color="bg-red-300" />
-        </div>
-      </div>
+  const carbonColumns = [
+    { key: 'area', label: 'Carbon Project Area' },
+    { key: 'type', label: 'Classification' },
+    { key: 'carbonStock', label: 'Est. Carbon Stock', render: (val) => <span className="text-[13px] font-black text-emerald-600">{val}</span> },
+    { key: 'health', label: 'Biomass Health', render: (val) => <span className="text-emerald-500 font-bold">{val}</span> },
+    { key: 'status', label: 'MRV Status' },
+  ];
 
-      <div className="bg-white p-8 rounded-2xl border border-black/5 shadow-sm">
-        <h3 className="text-lg font-black text-gray-900 mb-2 tracking-tight">Processing Stages</h3>
-        <p className="text-[12px] text-gray-500 font-medium mb-8">Current batch status across post-harvest workflow</p>
-        <div className="space-y-4">
-          {[
-            { stage: 'Reception & Weighing', qty: '12.4 MT', status: 'Active', color: 'bg-emerald-500' },
-            { stage: 'Steaming', qty: '8.1 MT', status: 'In Progress', color: 'bg-blue-500' },
-            { stage: 'Shelling', qty: '6.8 MT', status: 'In Progress', color: 'bg-blue-500' },
-            { stage: 'Peeling & Grading', qty: '5.2 MT', status: 'Queued', color: 'bg-amber-500' },
-            { stage: 'Roasting & Packing', qty: '3.1 MT', status: 'Queued', color: 'bg-gray-300' },
-          ].map(row => (
-            <div key={row.stage} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${row.color}`}></div>
-                <span className="text-[12px] font-bold">{row.stage}</span>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-[12px] font-black text-gray-700">{row.qty}</span>
-                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${
-                  row.status === 'Active' ? 'bg-emerald-50 text-emerald-600' :
-                  row.status === 'In Progress' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'
-                }`}>{row.status}</span>
-              </div>
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'sustainability':
+        return (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <MetricTile label="Total Carbon Stock" value="352k" unit="tCO2e" color="bg-emerald-600" />
+                <MetricTile label="Forestry Biomass" value="124" unit="kT" color="bg-emerald-600" />
+                <MetricTile label="Net Sequestration" value="14.2" unit="%" color="bg-emerald-600" />
+                <MetricTile label="MRV Compliance" value="100" unit="%" color="bg-emerald-500" />
+             </div>
+
+             <div className="flex flex-col lg:flex-row gap-8">
+                <div className="lg:w-2/3 space-y-6">
+                   <SimpleCard title="Carbon Monitoring & Estimation" icon={<Globe size={20} />}>
+                      <div className="h-[400px] relative">
+                         <GeospatialPreview title="Biomass & Carbon Layer" points={[]} full={true} />
+                         <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-emerald-100 shadow-sm z-10">
+                            <div className="text-[10px] font-black text-gray-400 uppercase mb-3">Analysis Layers</div>
+                            <div className="space-y-2">
+                               {['Forestry Density', 'Group Carbon Stock', 'Estate Emission'].map(l => (
+                                 <div key={l} className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                    <span className="text-[11px] font-bold text-gray-700">{l}</span>
+                                 </div>
+                               ))}
+                            </div>
+                         </div>
+                      </div>
+                   </SimpleCard>
+                   <SimpleCard title="Carbon Project Ledger" subtitle="Verified Forestry, Groups, and Estates calculations" icon={<BarChart4 size={20} />}>
+                      <WorkerActivityTable data={carbonData} columns={carbonColumns} />
+                   </SimpleCard>
+                </div>
+                <div className="lg:w-1/3 space-y-6">
+                   <SimpleCard title="Forestry Health" icon={<Trees size={20} />}>
+                      <div className="p-8 text-center bg-emerald-50/50 rounded-3xl border border-emerald-100">
+                         <div className="text-5xl font-black text-emerald-600 mb-2">98.4<span className="text-xl">%</span></div>
+                         <div className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Canopy Integrity Index</div>
+                      </div>
+                   </SimpleCard>
+                   <SimpleCard title="Environmental KPIs" icon={<Wind size={20} />}>
+                      <div className="space-y-6">
+                         {[
+                           { l: 'Methane Recovery', v: '92%', c: 'bg-emerald-500' },
+                           { l: 'Water Usage Eff.', v: '84%', c: 'bg-blue-500' },
+                           { l: 'Soil Organic Carbon', v: '4.2%', c: 'bg-amber-600' },
+                         ].map(item => (
+                           <div key={item.l}>
+                              <div className="flex justify-between text-[11px] font-bold mb-2 uppercase">
+                                 <span className="text-gray-400">{item.l}</span>
+                                 <span>{item.v}</span>
+                              </div>
+                              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                 <div className={`h-full ${item.c}`} style={{ width: item.v }}></div>
+                              </div>
+                           </div>
+                         ))}
+                      </div>
+                   </SimpleCard>
+                </div>
+             </div>
+          </div>
+        );
+      case 'geospatial':
+        return (
+          <div className="flex flex-col lg:flex-row gap-8 h-[calc(100vh-220px)] animate-in fade-in slide-in-from-bottom-4">
+             <div className="lg:w-3/4 h-full relative">
+                <GeospatialPreview title="Cashew Estate Intel Map" points={[]} full={true} />
+             </div>
+             <div className="lg:w-1/4 flex flex-col gap-6 overflow-y-auto pr-2">
+                <SimpleCard title="Map Layer Selector" icon={<Layers size={18} />}>
+                   <div className="space-y-2">
+                      {[
+                        { id: 'satellite', label: 'High-Res Satellite', icon: <Satellite size={14}/> },
+                        { id: 'plots', label: 'Plot Boundaries', icon: <MapIcon size={14}/> },
+                        { id: 'health', label: 'NDVI Health Map', icon: <Activity size={14}/> },
+                        { id: 'workers', label: 'Live Worker GPS', icon: <Users size={14}/> },
+                      ].map(layer => (
+                        <button 
+                          key={layer.id} 
+                          onClick={() => setActiveLayer(layer.id)}
+                          className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
+                            activeLayer === layer.id ? 'bg-orange-50 border-orange-200 text-orange-900' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'
+                          }`}
+                        >
+                           <div className="flex items-center gap-3">
+                              {layer.icon}
+                              <span className="text-[12px] font-bold">{layer.label}</span>
+                           </div>
+                           {activeLayer === layer.id && <CheckCircle2 size={14} className="text-orange-600" />}
+                        </button>
+                      ))}
+                   </div>
+                </SimpleCard>
+             </div>
+          </div>
+        );
+      case 'workers':
+        return (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+             <FilterBar filters={[{ label: 'Task Category' }, { label: 'Plot Zone' }]} />
+             <SimpleCard title="Worker Management Ledger" icon={<Users size={20} />}>
+                <WorkerActivityTable data={workerData} columns={columns} />
+             </SimpleCard>
+          </div>
+        );
+      default:
+        return (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <MetricTile label="Total RCN Harvested" value="48.6" unit="MT" color="bg-orange-600" />
+              <MetricTile label="Trees Managed" value="12,482" unit="TREES" color="bg-orange-600" />
+              <MetricTile label="Active Workforce" value="42" unit="PERS" color="bg-orange-600" />
+              <MetricTile label="Estate Health" value="94" unit="%" color="bg-emerald-500" />
             </div>
-          ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               <SimpleCard title="Sustainability Impact" icon={<Leaf size={20} />}>
+                  <div className="flex items-center justify-between mb-6">
+                     <div>
+                        <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Carbon Sequestered</div>
+                        <div className="text-3xl font-black text-emerald-600">352,400 <span className="text-sm font-bold text-gray-300">tCO2e</span></div>
+                     </div>
+                     <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center">
+                        <Globe className="text-emerald-500" size={32} />
+                     </div>
+                  </div>
+                  <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden">
+                     <div className="h-full bg-emerald-500 w-[72%]"></div>
+                  </div>
+                  <div className="mt-3 text-[10px] font-bold text-gray-400 uppercase">Target: 500k tCO2e by 2027</div>
+               </SimpleCard>
+               <SimpleCard title="Recent Field Logs" icon={<ClipboardList size={20} />}>
+                  <div className="space-y-4">
+                    {workerData.slice(0, 4).map((w, i) => (
+                      <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                         <div className="flex items-center gap-4">
+                            <div className="w-1.5 h-1.5 rounded-full bg-orange-600"></div>
+                            <span className="text-[12px] font-bold text-gray-800">{w.name} · {w.plot}</span>
+                         </div>
+                         <span className="text-[10px] font-black text-gray-400 uppercase">{w.task}</span>
+                      </div>
+                    ))}
+                  </div>
+               </SimpleCard>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="p-8 space-y-8 max-w-[1700px] mx-auto">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tighter capitalize">{(activeSection || 'dashboard').replace(/-/g, ' ')}</h1>
+          <p className="text-[14px] text-gray-500 mt-1 font-medium italic">Cashew Estate Management Node · Rivers Cluster</p>
         </div>
       </div>
+      {renderContent()}
     </div>
-
-    <div className="bg-white p-8 rounded-2xl border border-black/5 shadow-sm">
-      <h3 className="text-lg font-black text-gray-900 mb-2 tracking-tight">Farm Traceability Ledger</h3>
-      <p className="text-[12px] text-gray-500 font-medium mb-8">End-to-end batch traceability from registered farm plots to export grading</p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-gray-100">
-              {['Batch ID', 'Farm / Plot', 'Harvest Date', 'Weight (MT)', 'Grade', 'Status'].map(h => (
-                <th key={h} className="text-[10px] font-black uppercase tracking-widest text-gray-400 pb-4 pr-6">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="space-y-2">
-            {[
-              { batch: 'CW-2026-041', farm: 'Ogba North / P-12', date: 'Apr 28', weight: 4.2, grade: 'W180', status: 'Exported' },
-              { batch: 'CW-2026-042', farm: 'Ogba South / P-07', date: 'Apr 30', weight: 3.8, grade: 'W240', status: 'Processing' },
-              { batch: 'CW-2026-043', farm: 'Okitipupa / P-02', date: 'May 01', weight: 4.6, grade: 'Pending', status: 'Reception' },
-            ].map(row => (
-              <tr key={row.batch} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                <td className="py-4 pr-6 text-[12px] font-black text-[#D35400]">{row.batch}</td>
-                <td className="py-4 pr-6 text-[12px] font-bold text-gray-600">{row.farm}</td>
-                <td className="py-4 pr-6 text-[12px] font-bold text-gray-500">{row.date}</td>
-                <td className="py-4 pr-6 text-[12px] font-black">{row.weight}</td>
-                <td className="py-4 pr-6 text-[12px] font-bold">{row.grade}</td>
-                <td className="py-4 pr-6">
-                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${
-                    row.status === 'Exported' ? 'bg-emerald-50 text-emerald-600' :
-                    row.status === 'Processing' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
-                  }`}>{row.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
+  );
+};
 
 export default CashewDashboard;
