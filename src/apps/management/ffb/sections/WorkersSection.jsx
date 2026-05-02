@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users } from 'lucide-react';
-import { SimpleCard, FilterBar, WorkerActivityTable } from '../../../shared/components/SharedComponents';
+import { SimpleCard, FilterBar, WorkerActivityTable } from '../../../../shared/components/SharedComponents';
 
 const WorkersSection = ({ harvesterData, columns }) => {
    return (

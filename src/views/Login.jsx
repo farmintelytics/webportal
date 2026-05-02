@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Lock, Mail, Eye, EyeOff, ShieldCheck, Globe, Zap, CreditCard, Landmark, Coins, Plane, Radar, Satellite, Users, Layers, UserCheck } from 'lucide-react';
+import { ArrowRight, Lock, Mail, Eye, EyeOff, ShieldCheck, Globe, Zap, CreditCard, Landmark, Coins, Plane, Radar, Satellite, Users, Layers, UserCheck, Grid } from 'lucide-react';
 
 const Login = ({ onLogin, moduleName, onBack }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -116,8 +116,11 @@ const Login = ({ onLogin, moduleName, onBack }) => {
       <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-24 bg-white">
         <div className="w-full max-w-[420px]">
           {onBack && (
-            <button onClick={onBack} className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-gray-400 hover:text-[var(--brand-primary)] transition-colors mb-12">
-              ← Back to Hub
+            <button 
+              onClick={onBack} 
+              className="flex items-center gap-3 bg-gray-50 text-gray-500 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-100 hover:text-gray-900 transition-all border border-black/5 mb-12 shadow-sm"
+            >
+              <Grid size={16} /> Back to Hub
             </button>
           )}
 

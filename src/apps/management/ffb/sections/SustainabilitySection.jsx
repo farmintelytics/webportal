@@ -1,6 +1,6 @@
 import React from 'react';
 import { Globe, BarChart4, Wind, Activity } from 'lucide-react';
-import { MetricTile, SimpleCard, GeospatialPreview, WorkerActivityTable } from '../../../shared/components/SharedComponents';
+import { MetricTile, SimpleCard, GeospatialPreview, WorkerActivityTable } from '../../../../shared/components/SharedComponents';
 
 const SustainabilitySection = ({ carbonData, carbonColumns }) => {
    return (

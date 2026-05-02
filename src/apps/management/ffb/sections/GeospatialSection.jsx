@@ -1,6 +1,6 @@
 import React from 'react';
 import { Satellite, Map as MapIcon, Zap, CheckCircle2, Layers } from 'lucide-react';
-import { SimpleCard, GeospatialPreview } from '../../../shared/components/SharedComponents';
+import { SimpleCard, GeospatialPreview } from '../../../../shared/components/SharedComponents';
 
 const GeospatialSection = ({ activeLayer, setActiveLayer }) => {
    return (

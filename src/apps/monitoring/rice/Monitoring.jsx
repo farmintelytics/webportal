@@ -6,7 +6,10 @@ import {
    User,
    LayoutDashboard,
    Map as MapIcon,
-   BarChart4
+   BarChart4,
+   Waves,
+   Activity,
+   Droplets
 } from 'lucide-react';
 import { MapContainer, TileLayer, ZoomControl, Polygon, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';

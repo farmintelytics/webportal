@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layers, X, Satellite, Map as MapIcon, Activity, CheckCircle2 } from 'lucide-react';
-import { GeospatialPreview } from '../../../shared/components/SharedComponents';
+import { GeospatialPreview } from '../../../../shared/components/SharedComponents';
 
 const GeospatialSection = ({ activeLayer, setActiveLayer }) => {
   return (

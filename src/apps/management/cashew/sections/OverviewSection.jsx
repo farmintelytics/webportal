@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, Trees, Users, Shield, Leaf, Globe, ClipboardList } from 'lucide-react';
-import { MetricTile, SimpleCard } from '../../../shared/components/SharedComponents';
+import { MetricTile, SimpleCard } from '../../../../shared/components/SharedComponents';
 
 const OverviewSection = ({ workerData }) => {
   return (

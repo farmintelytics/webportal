@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, Shield } from 'lucide-react';
-import { SimpleCard, WorkerActivityTable } from '../../../shared/components/SharedComponents';
+import { SimpleCard, WorkerActivityTable } from '../../../../shared/components/SharedComponents';
 
 const PlotsSection = ({ plots, columns }) => {
    return (

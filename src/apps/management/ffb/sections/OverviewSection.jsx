@@ -1,6 +1,6 @@
 import React from 'react';
 import { Leaf, Activity } from 'lucide-react';
-import { MetricTile, SimpleCard } from '../../../shared/components/SharedComponents';
+import { MetricTile, SimpleCard } from '../../../../shared/components/SharedComponents';
 
 const OverviewSection = () => {
    return (

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Calendar, TrendingUp, Activity } from 'lucide-react';
 import { Line, Radar } from 'react-chartjs-2';
-import { SimpleCard } from '../../../shared/components/SharedComponents';
+import { SimpleCard } from '../../../../shared/components/SharedComponents';
 
 const OverviewSection = ({ dateRange, setDateRange, config }) => {
    return (
