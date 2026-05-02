@@ -5,11 +5,6 @@ import PortalLayout from './layouts/PortalLayout';
 
 // === FFB Management ===
 import FFBDashboard from './apps/management/ffb/Dashboard';
-import Identity from './apps/management/ffb/Identity';
-import Workforce from './apps/management/ffb/Workforce';
-import Activity from './apps/management/ffb/Activity';
-import Geospatial from './apps/management/ffb/Geospatial';
-import WorkerAnalytics from './apps/management/ffb/WorkerAnalytics';
 
 // === Crop Management Portals ===
 import CashewDashboard from './apps/management/cashew/Dashboard';
