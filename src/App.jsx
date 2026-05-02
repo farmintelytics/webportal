@@ -55,7 +55,7 @@ const App = () => {
     setSelectedModule(moduleId); 
     const crop = crops.find(c => c.id === moduleId);
     if (crop) setCurrentCrop(crop);
-    setView('portal'); 
+    setView('login'); 
   };
   const handleLogin = () => setView('portal');
   const handleSignOut = () => { setView('login'); setActiveSection('dashboard'); };
