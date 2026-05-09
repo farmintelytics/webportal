@@ -25,7 +25,7 @@ const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (
     onClick={() => active && onSelect(id)}
     className={`group relative p-8 rounded-2xl transition-all duration-300 flex flex-col text-left border border-gray-100 ${
       active 
-        ? 'bg-white hover:bg-gray-50 hover:shadow-xl hover:-translate-y-1' 
+        ? 'bg-white hover:bg-gray-50 hover:shadow-md hover:-translate-y-0.5' 
         : 'bg-white opacity-40 cursor-not-allowed'
     }`}
   >
@@ -63,29 +63,29 @@ const PortalHub = ({ onSelectModule }) => {
       description: 'Workforce logistics, biometrics, and smallholder group planning for large-scale estate and cooperative operations.',
       modules: [
         { id: 'management-ffb',       title: 'FFB Intelligence',  crop: 'Oil Palm',  icon: <Sprout />,     active: true  },
-        { id: 'management-cashew',    title: 'Cashew Hub',        crop: 'Cashew',    icon: <Activity />,   active: true  },
-        { id: 'management-sugarcane', title: 'Cane Console',      crop: 'SugarCane', icon: <Zap />,        active: true  },
+        { id: 'management-maize',     title: 'Maize Hub',         crop: 'Maize',     icon: <Wheat />,      active: true  },
+        { id: 'management-cassava',   title: 'Cassava Core',      crop: 'Cassava',   icon: <Container />,  active: true  },
         { id: 'management-rice',      title: 'Rice Monitor',      crop: 'Rice',      icon: <Leaf />,       active: true  },
         { id: 'management-cocoa',     title: 'Cocoa Core',        crop: 'Cocoa',     icon: <Coffee />,     active: true  },
+        { id: 'management-sugarcane', title: 'Cane Console',      crop: 'SugarCane', icon: <Zap />,        active: true  },
+        { id: 'management-cashew',    title: 'Cashew Hub',        crop: 'Cashew',    icon: <Activity />,   active: true  },
         { id: 'management-rubber',    title: 'Rubber Hub',        crop: 'Rubber',    icon: <Droplets />,   active: true  },
-        { id: 'management-cassava',   title: 'Cassava Core',      crop: 'Cassava',   icon: <Container />,  active: true  },
-        { id: 'management-maize',     title: 'Maize Hub',         crop: 'Maize',     icon: <Wheat />,      active: true  },
         { id: 'group-management',     title: 'Groups Hub',        crop: 'Smallholder', icon: <Users />,    active: true  },
       ]
     },
     {
       id: 'monitoring',
-      title: 'Monitoring & RS',
+      title: 'Geospatial Intelligence',
       description: 'Multispectral satellite imagery and drone-level field surveillance for high-precision monitoring.',
       modules: [
-        { id: 'rs-ffb',       title: 'Oil Palm',    crop: 'Satellite', icon: <Globe />, active: true  },
-        { id: 'rs-cashew',    title: 'Cashew',      crop: 'Satellite', icon: <Globe />, active: true  },
-        { id: 'rs-rubber',    title: 'Rubber',      crop: 'Satellite', icon: <Globe />, active: true  },
-        { id: 'rs-sugarcane', title: 'SugarCane',   crop: 'Satellite', icon: <Globe />, active: true  },
-        { id: 'rs-rice',      title: 'Rice Monitor', crop: 'Satellite', icon: <Globe />, active: true  },
-        { id: 'rs-cocoa',     title: 'Cocoa Core',  crop: 'Satellite', icon: <Globe />, active: true  },
-        { id: 'rs-cassava',   title: 'Cassava',     crop: 'Satellite', icon: <Globe />, active: true  },
-        { id: 'rs-maize',     title: 'Maize Hub',    crop: 'Satellite', icon: <Globe />, active: true  },
+        { id: 'rs-ffb',       title: 'Oil Palm',    crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
+        { id: 'rs-maize',     title: 'Maize Hub',    crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
+        { id: 'rs-cassava',   title: 'Cassava',     crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
+        { id: 'rs-rice',      title: 'Rice Monitor', crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
+        { id: 'rs-cocoa',     title: 'Cocoa Core',  crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
+        { id: 'rs-sugarcane', title: 'SugarCane',   crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
+        { id: 'rs-cashew',    title: 'Cashew',      crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
+        { id: 'rs-rubber',    title: 'Rubber',      crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
         { id: 'rs-drone',     title: 'Drone Intel',  crop: 'Aerial',    icon: <Plane />, active: true  },
         { id: 'group-monitoring', title: 'Smallholder', crop: 'Fusion',    icon: <Satellite />, active: true  },
       ]

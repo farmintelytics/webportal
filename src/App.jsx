@@ -20,6 +20,14 @@ import ClimateIntelligence from './apps/advisor/ClimateIntelligence';
 import MonitoringPortal from './apps/monitoring/MonitoringPortal';
 import SustainabilityPortal from './apps/sustainability/SustainabilityPortal';
 
+// === Specialized Monitoring Apps ===
+import RiceMonitoring from './apps/monitoring/rice/Monitoring';
+import MaizeMonitoring from './apps/monitoring/maize/Monitoring';
+import CocoaMonitoring from './apps/monitoring/cocoa/Monitoring';
+import FFBMonitoring from './apps/monitoring/ffb/Monitoring';
+import CassavaMonitoring from './apps/monitoring/cassava/Monitoring';
+import SugarcaneMonitoring from './apps/monitoring/sugarcane/Monitoring';
+
 // === Cooperative & Group Management ===
 import GroupsDashboard from './apps/cooperative/Dashboard';
 
@@ -60,22 +68,32 @@ const App = () => {
 
     // Monitoring Portals (Standard Remote Sensing Web Portal Style)
     if (selectedModule?.startsWith('rs-')) {
+      const rsApps = {
+        'rs-ffb':               <FFBMonitoring />,
+        'rs-sugarcane':         <SugarcaneMonitoring />,
+        'rs-rice':              <RiceMonitoring />,
+        'rs-cocoa':             <CocoaMonitoring />,
+        'rs-cassava':           <CassavaMonitoring />,
+        'rs-maize':             <MaizeMonitoring />,
+      };
+
+      if (rsApps[selectedModule]) {
+        return React.cloneElement(rsApps[selectedModule], {
+          onSignOut: handleSignOut,
+          onBack: handleBackToHub
+        });
+      }
+
       const cropMap = {
-        'rs-ffb': 'Oil Palm',
         'rs-cashew': 'Cashew',
-        'rs-sugarcane': 'SugarCane',
-        'rs-rice': 'Rice',
-        'rs-cocoa': 'Cocoa',
         'rs-rubber': 'Rubber',
-        'rs-cassava': 'Cassava',
-        'rs-maize': 'Maize',
         'rs-drone': 'Drone Intelligence'
       };
-      
-      return <MonitoringPortal 
-        cropName={cropMap[selectedModule] || "Crop"} 
+
+      return <MonitoringPortal
+        cropName={cropMap[selectedModule] || "Crop"}
         onSignOut={handleSignOut}
-        onBack={handleBackToHub} 
+        onBack={handleBackToHub}
       />;
     }
 
@@ -90,14 +108,14 @@ const App = () => {
       'management-cassava':   <CassavaDashboard activeSection={activeSection} />,
       'management-maize':     <MaizeDashboard activeSection={activeSection} />,
       
-      'rs-ffb':               <MonitoringPortal cropName="Oil Palm" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-ffb':               <FFBMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
       'rs-cashew':            <MonitoringPortal cropName="Cashew" onSignOut={handleSignOut} onBack={handleBackToHub} />,
       'rs-rubber':            <MonitoringPortal cropName="Rubber" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-sugarcane':         <MonitoringPortal cropName="SugarCane" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-rice':              <MonitoringPortal cropName="Rice" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-cocoa':             <MonitoringPortal cropName="Cocoa" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-cassava':           <MonitoringPortal cropName="Cassava" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-maize':             <MonitoringPortal cropName="Maize" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-sugarcane':         <SugarcaneMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-rice':              <RiceMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-cocoa':             <CocoaMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-cassava':           <CassavaMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'rs-maize':             <MaizeMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
       
       'drone-ffb':            <ComingSoon title="Drone Inspection" description="Live drone feed and high-resolution field surveillance." onSignOut={handleSignOut} />,
       'drone-cashew':         <ComingSoon title="Orchard Survey" description="Tree count, canopy gap analysis and disease spot detection." onSignOut={handleSignOut} />,

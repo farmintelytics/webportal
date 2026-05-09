@@ -152,13 +152,13 @@ const GroupsMonitoring = ({ onBack }) => {
    };
 
    return (
-      <div className="h-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden font-sans antialiased">
+      <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900 font-sans antialiased">
          <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-10 z-[1100] shadow-sm">
             <div className="flex items-center gap-8">
-               <button onClick={onBack} className="p-2 hover:bg-gray-50 rounded-xl transition-all text-gray-400 hover:text-gray-900"><ChevronLeft size={24} /></button>
+               <div className="p-2"></div>
                <div className="w-11 h-11 bg-gray-900 rounded-xl flex items-center justify-center p-2 shadow-lg ring-4 ring-gray-50"><Satellite className="text-white" size={24} /></div>
                <div>
-                  <h1 className="text-lg font-black tracking-tighter leading-none uppercase italic">Smallholder <span className="text-gray-400 font-medium ml-1">Monitoring & RS</span></h1>
+                  <h1 className="text-lg font-black tracking-tighter leading-none uppercase italic">Smallholder <span className="text-gray-400 font-medium ml-1">Geospatial Intelligence</span></h1>
                   <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-600 mt-1 leading-none italic uppercase">Theme: {CONFIG.theme}</p>
                </div>
             </div>
@@ -175,7 +175,7 @@ const GroupsMonitoring = ({ onBack }) => {
             </div>
          </header>
          <div className="flex-1 flex overflow-hidden">
-            <aside className="w-72 bg-white border-r border-gray-100 flex flex-col z-[1050]">
+            <aside className="sticky top-0 h-screen w-72 bg-white border-r border-gray-100 flex flex-col z-[1050]">
                <div className="flex-1 overflow-y-auto p-6 space-y-1.5">
                   <div className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.3em] px-4 mb-4 leading-none italic">Analytical Center</div>
                   {[
@@ -187,11 +187,10 @@ const GroupsMonitoring = ({ onBack }) => {
                   ))}
                </div>
                <div className="p-6 bg-gray-50/50 border-t border-gray-100 space-y-2">
-                                    <button onClick={onBack} className="w-full bg-white text-gray-700 border border-gray-200 font-bold uppercase tracking-widest py-4 rounded-2xl text-[11px] flex items-center justify-center gap-3 hover:bg-gray-100 transition-all shadow-sm"><Grid size={16} /> Back to Hub</button>
-
+                  <button onClick={onSignOut} className="w-full bg-red-600 text-white font-bold uppercase tracking-widest py-4 rounded-2xl text-[11px] flex items-center justify-center gap-3 hover:bg-red-700 transition-all shadow-lg shadow-red-100"><LogOut size={16} /> Sign Out</button>
                </div>
             </aside>
-            <main className="flex-1 flex flex-col relative overflow-hidden bg-gray-50">{renderContent()}</main>
+            <main className="flex-1 flex flex-col relative bg-gray-50">{renderContent()}</main>
          </div>
       </div>
    );

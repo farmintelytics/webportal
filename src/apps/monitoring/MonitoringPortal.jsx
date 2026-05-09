@@ -162,7 +162,7 @@ const CROP_RS_CONFIG = {
   }
 };
 
-const MonitoringPortal = ({ cropName, onSignOut }) => {
+const MonitoringPortal = ({ cropName, onSignOut, onBack }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showLayerList, setShowLayerList] = useState(true);
   const [dateRange, setDateRange] = useState('Last 6 Months');
@@ -383,13 +383,22 @@ const MonitoringPortal = ({ cropName, onSignOut }) => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden font-sans antialiased">
+    <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900 font-sans antialiased">
       <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 z-[1100] shadow-sm">
-         <div className="flex items-center gap-8">
-            <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center p-2 shadow-lg ring-4 ring-gray-50"><Satellite className="text-white" size={20} /></div>
-            <div>
-               <h1 className="text-lg font-black tracking-tighter leading-none uppercase italic">{cropName} <span className="text-gray-400 font-medium ml-1">Monitoring & RS</span></h1>
-               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 mt-1 leading-none italic uppercase">Theme: {config.theme}</p>
+         <div className="flex items-center gap-10">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 leading-none">Intelligence Platform</span>
+              <span className="text-[14px] font-black tracking-tight mt-1">FarmIntelytics</span>
+            </div>
+
+            <div className="w-px h-8 bg-gray-100"></div>
+
+            <div className="flex items-center gap-4">
+               <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center p-2 shadow-lg ring-4 ring-gray-50"><Satellite className="text-white" size={20} /></div>
+               <div>
+                  <h1 className="text-lg font-black tracking-tighter leading-none uppercase italic">{cropName} <span className="text-gray-400 font-medium ml-1">Geospatial Intelligence</span></h1>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 mt-1 leading-none italic uppercase">Theme: {config.theme}</p>
+               </div>
             </div>
          </div>
          <div className="flex items-center gap-4">
@@ -401,7 +410,7 @@ const MonitoringPortal = ({ cropName, onSignOut }) => {
          </div>
       </header>
       <div className="flex-1 flex overflow-hidden">
-         <aside className="w-80 bg-white border-r border-gray-100 flex flex-col z-[1050] shadow-2xl">
+         <aside className="sticky top-0 h-screen w-80 bg-white border-r border-gray-100 flex flex-col z-[1050] shadow-2xl">
             <div className="flex-1 overflow-y-auto p-6 space-y-2">
                <div className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] px-4 mb-4 leading-none italic">Intelligence Nodes</div>
                {[
@@ -416,7 +425,7 @@ const MonitoringPortal = ({ cropName, onSignOut }) => {
                <button onClick={onSignOut} className="w-full bg-red-500 text-white font-black uppercase tracking-widest py-5 rounded-2xl text-[11px] flex items-center justify-center gap-3 hover:bg-red-600 transition-all shadow-xl shadow-red-100"><LogOut size={16} /> Sign Out</button>
             </div>
          </aside>
-         <main className="flex-1 flex flex-col relative overflow-hidden bg-gray-50">{renderContent()}</main>
+         <main className="flex-1 flex flex-col relative bg-gray-50">{renderContent()}</main>
       </div>
     </div>
   );
