@@ -267,6 +267,53 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
   const [activeTab, setActiveTab] = useState('monitor');
   const [selectedTimelineIndex, setSelectedTimelineIndex] = useState(2);
+  const [isCompareMode, setIsCompareMode] = useState(false);
+  const [compareTimelineIndex, setCompareTimelineIndex] = useState(3);
+  const [activeDateSlot, setActiveDateSlot] = useState('A');
+  const [splitPosition, setSplitPosition] = useState(50);
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+
+  // Handle Split Dragging
+  const handleSplitDragStart = (e) => {
+    e.preventDefault();
+    setIsDraggingSplit(true);
+  };
+
+  useEffect(() => {
+    if (!isDraggingSplit) return;
+
+    const handleMove = (e) => {
+      const mapContainer = document.querySelector('.map-wrapper-pane');
+      if (!mapContainer) return;
+
+      const rect = mapContainer.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const relativeX = clientX - rect.left;
+      let percentage = (relativeX / rect.width) * 100;
+      
+      if (percentage < 0) percentage = 0;
+      if (percentage > 100) percentage = 100;
+      
+      setSplitPosition(percentage);
+    };
+
+    const handleDragEnd = () => {
+      setIsDraggingSplit(false);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleDragEnd);
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchend', handleDragEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleDragEnd);
+    };
+  }, [isDraggingSplit]);
+
   const [selectedBasemap, setSelectedBasemap] = useState('sentinel-2');
   const [selectedIndex, setSelectedIndex] = useState('CVI');
   const [mapOpacity, setMapOpacity] = useState(80);
