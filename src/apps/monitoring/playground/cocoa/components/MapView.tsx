@@ -221,7 +221,7 @@ export function MapView({ selected, onSelect }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search farms, plots, blocks…"
-            className="w-full h-10 pl-9 pr-9 text-sm bg-card/95 backdrop-blur border border-border rounded-lg shadow-md focus:outline-none focus:border-primary"
+            className="w-full h-10 pl-9 pr-9 text-sm bg-white border border-border rounded-lg shadow-md focus:outline-none focus:border-primary"
           />
           {search && (
             <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 size-6 rounded hover:bg-secondary flex items-center justify-center">
@@ -249,7 +249,7 @@ export function MapView({ selected, onSelect }: Props) {
       {!panelOpen && (
         <button
           onClick={() => setPanelOpen(true)}
-          className="absolute top-3 right-3 z-[400] size-11 rounded-lg bg-card/95 backdrop-blur border border-border shadow-md flex items-center justify-center hover:bg-card transition"
+          className="absolute top-3 right-3 z-[400] size-11 rounded-lg bg-white border border-border shadow-md flex items-center justify-center hover:bg-card transition"
           title="Layers"
         >
           <Layers className="size-5 text-foreground" />
@@ -258,7 +258,7 @@ export function MapView({ selected, onSelect }: Props) {
 
       {/* Layer drawer */}
       {panelOpen && (
-        <div className="absolute top-3 right-3 z-[400] w-80 max-h-[calc(100%-1.5rem)] flex flex-col bg-card/95 backdrop-blur border border-border rounded-lg shadow-xl">
+        <div className="absolute top-3 right-3 z-[400] w-80 max-h-[calc(100%-1.5rem)] flex flex-col bg-white border border-border rounded-lg shadow-xl">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <Layers className="size-4 text-primary" />
@@ -335,7 +335,7 @@ export function MapView({ selected, onSelect }: Props) {
       )}
 
       {/* Time slider */}
-      <div className="absolute bottom-3 left-3 right-3 md:left-1/2 md:-translate-x-1/2 md:right-auto md:w-[480px] z-[400] bg-card/95 backdrop-blur border border-border rounded-lg shadow-md px-4 py-3">
+      <div className="absolute bottom-3 left-3 right-3 md:left-1/2 md:-translate-x-1/2 md:right-auto md:w-[480px] z-[400] bg-white border border-border rounded-lg shadow-md px-4 py-3">
         <div className="flex items-center gap-3">
           <Calendar className="size-4 text-primary shrink-0" />
           <div className="flex-1">

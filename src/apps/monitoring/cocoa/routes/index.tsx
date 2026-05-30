@@ -38,7 +38,7 @@ export function MapHome() {
       )}
 
       {block && (
-        <div className="absolute bottom-20 md:bottom-3 left-3 z-[400] w-80 bg-card/95 backdrop-blur border border-border rounded-lg shadow-xl">
+        <div className="absolute bottom-20 md:bottom-3 left-3 z-[400] w-80 bg-white border border-border rounded-lg shadow-xl">
           <div className="flex items-start justify-between px-4 py-3 border-b border-border">
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Selected Block</div>

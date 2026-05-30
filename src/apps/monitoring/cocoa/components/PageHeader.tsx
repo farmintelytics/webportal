@@ -7,7 +7,7 @@ interface Props {
 
 export function PageHeader({ title, subtitle, eyebrow, actions }: Props) {
   return (
-    <div className="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-10">
+    <div className="border-b border-border bg-white sticky top-0 z-10">
       <div className="px-6 lg:px-10 py-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           {eyebrow && (

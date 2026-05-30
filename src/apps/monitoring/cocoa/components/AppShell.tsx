@@ -59,7 +59,7 @@ export function AppShell() {
       </aside>
 
       <main className="flex-1 min-w-0 flex flex-col">
-        <div className="h-12 border-b border-border bg-card/80 backdrop-blur flex items-center gap-3 px-4 lg:px-6 sticky top-0 z-30">
+        <div className="h-12 border-b border-border bg-white flex items-center gap-3 px-4 lg:px-6 sticky top-0 z-30">
           <div className="flex items-center gap-2 flex-1 max-w-md">
             <div className="relative w-full">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />

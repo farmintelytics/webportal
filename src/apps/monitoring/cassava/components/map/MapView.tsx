@@ -79,7 +79,7 @@ export function MapView() {
 
       {/* Imagery Explorer (Top) */}
       <div className="absolute top-4 left-4 z-[400] flex items-center gap-2 pointer-events-none">
-        <div className="bg-card/95 backdrop-blur border border-border rounded-xl shadow-lg px-4 py-3 w-[440px] pointer-events-auto flex flex-col gap-3">
+        <div className="bg-white border border-border rounded-xl shadow-lg px-4 py-3 w-[440px] pointer-events-auto flex flex-col gap-3">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -159,7 +159,7 @@ export function MapView() {
 
 
       {/* Legend */}
-      <div className="absolute bottom-24 left-4 z-[400] bg-card/95 backdrop-blur rounded-lg shadow-card p-3 text-xs space-y-1.5">
+      <div className="absolute bottom-24 left-4 z-[400] bg-white rounded-lg shadow-card p-3 text-xs space-y-1.5">
         <div className="font-semibold mb-1">Plot Status</div>
         {Object.entries(statusColors).map(([k, v]) => (
           <div key={k} className="flex items-center gap-2">

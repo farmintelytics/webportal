@@ -96,7 +96,7 @@ export function MapView() {
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-24 left-4 z-[400] bg-card/95 backdrop-blur rounded-lg shadow-card p-3 text-xs space-y-1.5">
+      <div className="absolute bottom-24 left-4 z-[400] bg-white rounded-lg shadow-card p-3 text-xs space-y-1.5">
         <div className="font-semibold mb-1">Plot Status</div>
         {Object.entries(statusColors).map(([k, v]) => (
           <div key={k} className="flex items-center gap-2">

@@ -13,7 +13,7 @@ const seasons: Record<number, string> = {
 export function TimeSlider() {
   const [idx, setIdx] = useState(dates.length - 1);
   return (
-    <Card className="px-4 py-3 shadow-card backdrop-blur bg-card/95">
+    <Card className="px-4 py-3 shadow-card backdrop-blur bg-white">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-muted-foreground">Acquisition Date</span>
         <span className="font-mono text-sm font-semibold">{dates[idx]}</span>
