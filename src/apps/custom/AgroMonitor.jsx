@@ -1632,13 +1632,27 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   useEffect(() => {
     if (!isPlaying) return;
     const id = setInterval(() => {
-      setSelectedTimelineIndex(prev => {
-        if (prev >= TIMELINE_DATA.length - 1) { setIsPlaying(false); return prev; }
-        return prev + 1;
-      });
+      if (isCompareMode) {
+        if (activeDateSlot === 'A') {
+          setSelectedTimelineIndex(prev => {
+            if (prev >= TIMELINE_DATA.length - 1) { setIsPlaying(false); return prev; }
+            return prev + 1;
+          });
+        } else {
+          setCompareTimelineIndex(prev => {
+            if (prev >= TIMELINE_DATA.length - 1) { setIsPlaying(false); return prev; }
+            return prev + 1;
+          });
+        }
+      } else {
+        setSelectedTimelineIndex(prev => {
+          if (prev >= TIMELINE_DATA.length - 1) { setIsPlaying(false); return prev; }
+          return prev + 1;
+        });
+      }
     }, 1400);
     return () => clearInterval(id);
-  }, [isPlaying]);
+  }, [isPlaying, isCompareMode, activeDateSlot, TIMELINE_DATA.length]);
 
   // Stop playing when leaving map view
   useEffect(() => {
