@@ -1186,26 +1186,55 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               onClick={togglePlay}
               title={isPlaying ? 'Pause' : 'Play'}
               className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-white shadow-sm transition-all hover:scale-105 active:scale-95"
-              style={{ backgroundColor: '#16A34A' }}
+              style={{ backgroundColor: isCompareMode ? (activeDateSlot === 'A' ? '#16A34A' : '#2563EB') : '#16A34A' }}
             >
               {isPlaying ? <Pause size={14} /> : <Play size={15} />}
             </button>
             <div className="flex-1 relative">
               <input type="range" min="0" max={TIMELINE_DATA.length - 1}
-                value={selectedTimelineIndex}
-                onChange={e => setSelectedTimelineIndex(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                value={isCompareMode ? (activeDateSlot === 'A' ? selectedTimelineIndex : compareTimelineIndex) : selectedTimelineIndex}
+                onChange={e => {
+                  const val = parseInt(e.target.value);
+                  if (isCompareMode) {
+                    if (activeDateSlot === 'A') setSelectedTimelineIndex(val);
+                    else setCompareTimelineIndex(val);
+                  } else {
+                    setSelectedTimelineIndex(val);
+                  }
+                }}
+                className={`w-full h-2 bg-gray-100 rounded-full appearance-none cursor-pointer ${
+                  isCompareMode && activeDateSlot === 'B' ? 'accent-blue-600' : 'accent-green-600'
+                }`} />
               <div className="flex justify-between px-0.5 mt-1">
-                {TIMELINE_DATA.map((t, i) => (
-                  <span key={i} className={`text-[9px] font-semibold transition-colors ${i === selectedTimelineIndex ? 'text-green-600 font-bold' : 'text-gray-400'}`}>
-                    {t.label.split(',')[0]}
-                  </span>
-                ))}
+                {TIMELINE_DATA.map((t, i) => {
+                  const isActive = isCompareMode 
+                    ? (activeDateSlot === 'A' ? i === selectedTimelineIndex : i === compareTimelineIndex)
+                    : i === selectedTimelineIndex;
+                  return (
+                    <span key={i} className={`text-[9px] font-semibold transition-colors ${
+                      isActive 
+                        ? (isCompareMode && activeDateSlot === 'B' ? 'text-blue-600 font-bold' : 'text-green-600 font-bold') 
+                        : 'text-gray-400'
+                    }`}>
+                      {t.label.split(',')[0]}
+                    </span>
+                  );
+                })}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs font-semibold text-gray-500">{currentTimeline.satellite}</span>
-              <span className="text-xs font-bold bg-green-50 text-green-700 px-3 py-1 rounded-full border border-green-100">{indexValue}</span>
+              <span className="text-xs font-semibold text-gray-500">
+                {isCompareMode 
+                  ? (activeDateSlot === 'A' ? currentTimelineA?.satellite : currentTimelineB?.satellite) 
+                  : currentTimeline.satellite}
+              </span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                isCompareMode && activeDateSlot === 'B' 
+                  ? 'bg-blue-50 text-blue-700 border-blue-100' 
+                  : 'bg-green-50 text-green-700 border-green-100'
+              }`}>
+                {indexValue}
+              </span>
             </div>
           </div>
         )}
