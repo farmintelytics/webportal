@@ -66,7 +66,7 @@ import {
   Gauge,
   ListFilter
 } from 'lucide-react';
-import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap, Pane } from 'react-leaflet';
 const ResizeMap = ({ trigger }) => {
   const map = useMap();
   useEffect(() => {
@@ -82,6 +82,76 @@ const ResizeMap = ({ trigger }) => {
     };
   }, [trigger, map]);
   return null;
+};
+
+const MapPaneClipSetter = ({ leftPaneName, rightPaneName, splitPosition, isCompareMode }) => {
+  const map = useMap();
+  useEffect(() => {
+    const updateClips = () => {
+      const leftPane = map.getPane(leftPaneName);
+      const rightPane = map.getPane(rightPaneName);
+      
+      if (!isCompareMode) {
+        if (leftPane) leftPane.style.clipPath = 'none';
+        if (rightPane) rightPane.style.clipPath = 'none';
+        return;
+      }
+      
+      if (leftPane) {
+        leftPane.style.clipPath = `inset(0 ${100 - splitPosition}% 0 0)`;
+      }
+      if (rightPane) {
+        rightPane.style.clipPath = `inset(0 0 0 ${splitPosition}%)`;
+      }
+    };
+
+    updateClips();
+    const t = setTimeout(updateClips, 50);
+    return () => clearTimeout(t);
+  }, [map, leftPaneName, rightPaneName, splitPosition, isCompareMode]);
+  return null;
+};
+
+const SwipeSliderOverlay = ({ isCompareMode, splitPosition, currentTimelineA, currentTimelineB, handleSplitDragStart }) => {
+  if (!isCompareMode) return null;
+  return (
+    <>
+      {/* Split Divider Line */}
+      <div
+        className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_rgba(0,0,0,0.5)] pointer-events-none"
+        style={{ left: `${splitPosition}%`, zIndex: 30000 }}
+      />
+      
+      {/* Drag Handle */}
+      <div
+        onMouseDown={handleSplitDragStart}
+        onTouchStart={handleSplitDragStart}
+        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-white border-2 border-green-600 shadow-2xl flex items-center justify-center cursor-ew-resize select-none transition-transform hover:scale-110 active:scale-95"
+        style={{ left: `${splitPosition}%`, zIndex: 30001 }}
+      >
+        <span className="text-green-600 font-extrabold text-lg select-none">↔</span>
+      </div>
+
+      {/* Floating Date Badges */}
+      {/* Left Badge: Date A (Green) */}
+      <div
+        className="absolute top-4 bg-white/90 backdrop-blur-sm border-l-4 border-green-600 px-3 py-1.5 rounded-r-xl shadow-lg flex flex-col pointer-events-none animate-in slide-in-from-left duration-205"
+        style={{ left: '172px', zIndex: 20000 }}
+      >
+        <span className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Date A (Left)</span>
+        <span className="text-xs font-extrabold text-gray-800">{currentTimelineA?.label}</span>
+      </div>
+
+      {/* Right Badge: Date B (Blue) */}
+      <div
+        className="absolute top-4 bg-white/90 backdrop-blur-sm border-r-4 border-blue-600 px-3 py-1.5 rounded-l-xl shadow-lg flex flex-col pointer-events-none text-right animate-in slide-in-from-right duration-205"
+        style={{ right: '152px', zIndex: 20000 }}
+      >
+        <span className="text-[9px] font-bold text-blue-700 uppercase tracking-wider">Date B (Right)</span>
+        <span className="text-xs font-extrabold text-gray-800">{currentTimelineB?.label}</span>
+      </div>
+    </>
+  );
 };
 import 'leaflet/dist/leaflet.css';
 import { Line, Bar, Radar, Doughnut } from 'react-chartjs-2';
