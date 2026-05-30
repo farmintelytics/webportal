@@ -148,7 +148,7 @@ function AIAssistantPage() {
   return (
     <AppShell>
       <div className="flex flex-col h-[calc(100vh-3.5rem)]">
-        <header className="border-b px-6 py-4 flex items-center justify-between bg-card/30 backdrop-blur">
+        <header className="border-b px-6 py-4 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-primary/60 grid place-items-center text-primary-foreground">
               <Sparkles className="h-5 w-5" />
@@ -242,7 +242,7 @@ function AIAssistantPage() {
         </div>
 
         {/* Input */}
-        <div className="border-t bg-card/40 px-6 py-4">
+        <div className="border-t bg-white px-6 py-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();

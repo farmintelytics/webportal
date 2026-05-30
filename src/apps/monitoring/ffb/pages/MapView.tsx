@@ -151,7 +151,7 @@ export function MapView() {
       <div className="absolute top-4 left-4 right-4 z-[500] flex items-start justify-between pointer-events-none">
         <div className="flex flex-col gap-3 pointer-events-auto">
           {/* Time Filter (Top) */}
-          <div className="bg-card/95 backdrop-blur border border-border rounded-xl shadow-md px-4 py-2.5 w-[420px]">
+          <div className="bg-white border border-border rounded-xl shadow-md px-4 py-2.5 w-[420px]">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Calendar className="h-3.5 w-3.5 text-primary"/>
@@ -338,7 +338,7 @@ export function MapView() {
 function KpiPill({ label, value, tone }: { label: string; value: string; tone?: "warn" | "success" }) {
   return (
     <div className={cn(
-      "rounded-full border border-border bg-card/95 px-3 py-1.5 text-xs shadow-sm backdrop-blur",
+      "rounded-full border border-border bg-white px-3 py-1.5 text-xs shadow-sm",
       tone === "warn" && "text-destructive font-bold",
       tone === "success" && "text-primary font-bold"
     )}>

@@ -14,7 +14,7 @@ function stageColor(s: Block["growthStage"]) {
 
 export function BlockDetail({ block, onClose }: { block: Block; onClose: () => void }) {
   return (
-    <div className="absolute left-4 bottom-4 top-4 z-[1000] w-80 overflow-y-auto rounded-lg border border-border bg-card/95 p-4 shadow-[var(--shadow-elegant)] backdrop-blur">
+    <div className="absolute left-4 bottom-4 top-4 z-[1000] w-80 overflow-y-auto rounded-lg border border-border bg-white p-4 shadow-[var(--shadow-elegant)] backdrop-blur">
       <div className="mb-3 flex items-start justify-between">
         <div>
           <p className="text-xs text-muted-foreground">{block.id}</p>

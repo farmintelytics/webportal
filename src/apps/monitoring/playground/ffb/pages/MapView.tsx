@@ -150,11 +150,11 @@ export function MapView() {
 
       {/* Top status pill */}
       <div className="absolute top-4 left-4 flex gap-2">
-        <div className="bg-card/95 backdrop-blur border border-border rounded-md px-3 py-2 text-xs flex items-center gap-2 shadow-sm">
+        <div className="bg-white border border-border rounded-md px-3 py-2 text-xs flex items-center gap-2 shadow-sm">
           <MapPin className="h-3.5 w-3.5 text-primary" />
           <span className="font-medium">6.5°N, 5.5°E · Edo / Cross River</span>
         </div>
-        <div className="bg-card/95 backdrop-blur border border-border rounded-md px-3 py-2 text-xs shadow-sm">
+        <div className="bg-white border border-border rounded-md px-3 py-2 text-xs shadow-sm">
           <span className="text-muted-foreground">Blocks:</span> <span className="font-semibold">{stats.total}</span>
           <span className="mx-2 text-border">|</span>
           <span className="text-muted-foreground">Healthy:</span> <span className="font-semibold text-[var(--color-canopy)]">{stats.healthy}</span>
@@ -299,7 +299,7 @@ export function MapView() {
       )}
 
       {/* Time slider */}
-      <div className="absolute bottom-4 left-4 right-4 bg-card/95 backdrop-blur border border-border rounded-lg shadow-md px-4 py-3">
+      <div className="absolute bottom-4 left-4 right-4 bg-white border border-border rounded-lg shadow-md px-4 py-3">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-primary"/>

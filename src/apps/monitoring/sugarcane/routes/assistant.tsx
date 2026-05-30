@@ -152,7 +152,7 @@ function AssistantPage() {
           </div>
 
           {/* Composer */}
-          <div className="border-t border-border bg-card/50 p-3 backdrop-blur">
+          <div className="border-t border-border bg-white p-3">
             <div className="mx-auto flex max-w-3xl items-end gap-2">
               <Textarea
                 value={input}

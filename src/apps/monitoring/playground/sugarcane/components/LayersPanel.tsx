@@ -34,7 +34,7 @@ export function LayersPanel({
       )}
       <div
         className={cn(
-          "absolute right-0 top-0 z-[1000] h-full w-80 border-l border-border bg-card/95 shadow-xl backdrop-blur transition-transform",
+          "absolute right-0 top-0 z-[1000] h-full w-80 border-l border-border bg-white shadow-xl backdrop-blur transition-transform",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >

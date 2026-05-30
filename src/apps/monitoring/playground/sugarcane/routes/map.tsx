@@ -49,7 +49,7 @@ function MapPage() {
         </div>
 
         {/* Basemap switcher */}
-        <div className="absolute bottom-6 left-4 z-[1000] flex overflow-hidden rounded-full border border-border bg-card/95 p-1 shadow-[var(--shadow-elegant)] backdrop-blur">
+        <div className="absolute bottom-6 left-4 z-[1000] flex overflow-hidden rounded-full border border-border bg-white p-1 shadow-[var(--shadow-elegant)] backdrop-blur">
           {basemaps.map((b) => {
             const active = basemap === b.id;
             return (
@@ -77,7 +77,7 @@ function MapPage() {
 
 function KpiPill({ label, value, icon, tone }: { label: string; value: string; icon?: React.ReactNode; tone?: "warn" }) {
   return (
-    <div className={`rounded-full border border-border bg-card/95 px-3 py-1.5 text-xs shadow-sm backdrop-blur ${tone === "warn" ? "text-orange-700" : "text-foreground"}`}>
+    <div className={`rounded-full border border-border bg-white px-3 py-1.5 text-xs shadow-sm backdrop-blur ${tone === "warn" ? "text-orange-700" : "text-foreground"}`}>
       <span className="flex items-center gap-1.5">
         {icon}
         <span className="text-muted-foreground">{label}</span>

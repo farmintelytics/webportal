@@ -2,7 +2,7 @@ import { Search, Bell, Calendar, Filter, LogOut } from "lucide-react";
 
 export function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <header className="flex items-center justify-between gap-4 px-6 lg:px-8 py-4 border-b border-border bg-background/70 backdrop-blur sticky top-0 z-20">
+    <header className="flex items-center justify-between gap-4 px-6 lg:px-8 py-4 border-b border-border bg-white sticky top-0 z-20">
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold text-foreground truncate">{title}</h1>
         {subtitle && <p className="text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>}

@@ -104,8 +104,8 @@ function MapHome() {
         {/* Floating layers panel — right side */}
         <div className={`absolute top-4 right-4 z-[1000] transition-all ${open ? "w-80" : "w-12"}`}>
           {open ? (
-            <div className="bg-card/95 backdrop-blur border border-border rounded-xl shadow-glow max-h-[calc(100vh-220px)] overflow-y-auto">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-card/95 backdrop-blur">
+            <div className="bg-white border border-border rounded-xl shadow-glow max-h-[calc(100vh-220px)] overflow-y-auto">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-white">
                 <div className="flex items-center gap-2">
                   <Satellite className="size-4 text-primary"/>
                   <h3 className="font-display font-semibold text-sm">Satellite Layers</h3>
@@ -190,7 +190,7 @@ function MapHome() {
           ) : (
             <button
               onClick={() => setOpen(true)}
-              className="size-12 grid place-items-center bg-card/95 backdrop-blur border border-border rounded-xl shadow-glow hover:bg-accent"
+              className="size-12 grid place-items-center bg-white border border-border rounded-xl shadow-glow hover:bg-accent"
               title="Open layers"
             >
               <Layers className="size-5 text-primary"/>
@@ -206,7 +206,7 @@ function MapHome() {
 
 function PlotPanel({ plot, onClose }: { plot: Plot; onClose: () => void }) {
   return (
-    <div className="absolute top-4 left-4 w-80 max-h-[calc(100%-2rem)] overflow-y-auto bg-card/95 backdrop-blur border border-border rounded-xl shadow-glow p-4 z-[1000]">
+    <div className="absolute top-4 left-4 w-80 max-h-[calc(100%-2rem)] overflow-y-auto bg-white border border-border rounded-xl shadow-glow p-4 z-[1000]">
       <div className="flex items-start justify-between">
         <div>
           <div className="text-xs text-muted-foreground">{plot.id}</div>

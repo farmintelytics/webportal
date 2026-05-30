@@ -74,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 border-b bg-card/40 backdrop-blur flex items-center px-4 md:px-6 gap-3 sticky top-0 z-20">
+        <header className="h-14 border-b bg-white flex items-center px-4 md:px-6 gap-3 sticky top-0 z-20">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
