@@ -1239,11 +1239,70 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           </div>
         )}
 
-        <div className="flex divide-x divide-gray-100 bg-gray-50/30" style={{ maxHeight: '320px' }}>
+        <div className="flex divide-x divide-gray-100 bg-gray-50/30" style={{ maxHeight: '360px' }}>
           {/* Mini Calendar (Enlarged) */}
           {!hideCalendarAndSlider && showCalendarTool && (
-            <div className="p-4 shrink-0 w-[440px] bg-white flex flex-col justify-between">
+            <div className="p-4 shrink-0 w-[440px] bg-white flex flex-col justify-between overflow-y-auto">
               <div>
+                {/* Compare Mode Toggle Header */}
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+                  <span className="text-xs font-bold text-gray-700">Split Comparison Mode</span>
+                  <button
+                    onClick={() => {
+                      const nextVal = !isCompareMode;
+                      setIsCompareMode(nextVal);
+                      if (nextVal) {
+                        if (compareTimelineIndex === selectedTimelineIndex) {
+                          setCompareTimelineIndex((selectedTimelineIndex + 1) % TIMELINE_DATA.length);
+                        }
+                        setActiveDateSlot('B');
+                      } else {
+                        setActiveDateSlot('A');
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${
+                      isCompareMode
+                        ? 'bg-green-55 text-green-700 border-green-200 shadow-sm font-extrabold'
+                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    {isCompareMode ? 'ACTIVE' : 'INACTIVE'}
+                  </button>
+                </div>
+
+                {/* Date Slots Selection inside Calendar */}
+                {isCompareMode && (
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <button
+                      onClick={() => setActiveDateSlot('A')}
+                      className={`flex flex-col p-1.5 rounded-lg border text-left transition-all ${
+                        activeDateSlot === 'A'
+                          ? 'border-green-600 bg-green-50/30 shadow-sm'
+                          : 'border-gray-150 bg-gray-50 hover:bg-gray-100/50'
+                      }`}
+                    >
+                      <span className="text-[8px] font-bold text-green-700 uppercase tracking-wide">Date A (Left Pane)</span>
+                      <span className="text-xs font-extrabold text-gray-800 truncate">
+                        {currentTimelineA ? currentTimelineA.label.split(',')[0] : 'Not Selected'}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveDateSlot('B')}
+                      className={`flex flex-col p-1.5 rounded-lg border text-left transition-all ${
+                        activeDateSlot === 'B'
+                          ? 'border-blue-600 bg-blue-50/30 shadow-sm'
+                          : 'border-gray-150 bg-gray-55 hover:bg-gray-100/50'
+                      }`}
+                    >
+                      <span className="text-[8px] font-bold text-blue-700 uppercase tracking-wide">Date B (Right Pane)</span>
+                      <span className="text-xs font-extrabold text-gray-800 truncate">
+                        {currentTimelineB ? currentTimelineB.label.split(',')[0] : 'Not Selected'}
+                      </span>
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between mb-3">
                   <button onClick={prevCalMonth} className="p-1 hover:bg-gray-100 rounded-lg transition-all text-gray-500 hover:text-gray-900 border border-gray-100 shadow-sm">
                     <ChevronLeft size={16} />
@@ -1255,6 +1314,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <ChevronRight size={16} />
                   </button>
                 </div>
+                
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', alignContent: 'start' }}>
                   {['S','M','T','W','T','F','S'].map((d, i) => (
                     <span key={i} className="text-[10px] font-bold text-gray-400 h-6 flex items-center justify-center">{d}</span>
@@ -1265,14 +1325,38 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     const matchIdx = TIMELINE_DATA.findIndex(t => t.date === dateStr);
                     const isHL = matchIdx !== -1;
-                    const isSel = matchIdx === selectedTimelineIndex;
+                    const isSelA = matchIdx === selectedTimelineIndex;
+                    const isSelB = isCompareMode && (matchIdx === compareTimelineIndex);
+                    
+                    let btnStyle = {};
+                    let btnClass = '';
+                    
+                    if (isSelA && isSelB) {
+                      btnStyle = { background: 'linear-gradient(135deg, #16A34A 50%, #2563EB 50%)', color: '#FFFFFF' };
+                    } else if (isSelA) {
+                      btnStyle = { backgroundColor: '#16A34A', color: '#FFFFFF' };
+                    } else if (isSelB) {
+                      btnStyle = { backgroundColor: '#2563EB', color: '#FFFFFF' };
+                    } else if (isHL) {
+                      btnClass = 'text-green-700 bg-green-50 hover:bg-green-100 font-bold border border-green-100';
+                    } else {
+                      btnClass = 'text-gray-300 cursor-default';
+                    }
+
                     return (
                       <button key={i} disabled={!isHL}
-                        onClick={() => isHL && setSelectedTimelineIndex(matchIdx)}
-                        className={`h-7 w-full rounded-lg text-xs font-bold flex items-center justify-center transition-all ${
-                          isSel ? 'text-white' : isHL ? 'text-green-700 bg-green-50 hover:bg-green-155 font-bold border border-green-100' : 'text-gray-300 cursor-default'
-                        }`}
-                        style={{ backgroundColor: isSel ? '#16A34A' : undefined }}>
+                        onClick={() => {
+                          if (isHL) {
+                            if (isCompareMode) {
+                              if (activeDateSlot === 'A') setSelectedTimelineIndex(matchIdx);
+                              else setCompareTimelineIndex(matchIdx);
+                            } else {
+                              setSelectedTimelineIndex(matchIdx);
+                            }
+                          }
+                        }}
+                        className={`h-7 w-full rounded-lg text-xs font-bold flex items-center justify-center transition-all ${btnClass}`}
+                        style={btnStyle}>
                         {day}
                       </button>
                     );
@@ -1284,15 +1368,50 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               </div>
 
               {/* Selected Pass Status Bar */}
-              {currentTimeline && (
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-gray-600 animate-in fade-in duration-200">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[9px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 uppercase">
-                      {currentTimeline.satellite}
-                    </span>
-                    <span className="text-gray-450 font-semibold text-[10px]">{currentTimeline.quality}</span>
-                  </div>
+              {isCompareMode ? (
+                <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-2 text-[10px] font-semibold text-gray-600 animate-in fade-in duration-200">
+                  {currentTimelineA && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-green-600" />
+                        <span className="font-bold text-green-700">Date A:</span>
+                        <span className="text-gray-700">{currentTimelineA.label.split(',')[0]}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[8px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded uppercase border border-green-150">
+                          {currentTimelineA.satellite}
+                        </span>
+                        <span className="text-gray-450 text-[9px]">{currentTimelineA.quality}</span>
+                      </div>
+                    </div>
+                  )}
+                  {currentTimelineB && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-600" />
+                        <span className="font-bold text-blue-700">Date B:</span>
+                        <span className="text-gray-700">{currentTimelineB.label.split(',')[0]}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[8px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded uppercase border border-blue-150">
+                          {currentTimelineB.satellite}
+                        </span>
+                        <span className="text-gray-450 text-[9px]">{currentTimelineB.quality}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              ) : (
+                currentTimeline && (
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-gray-600 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 uppercase">
+                        {currentTimeline.satellite}
+                      </span>
+                      <span className="text-gray-450 font-semibold text-[10px]">{currentTimeline.quality}</span>
+                    </div>
+                  </div>
+                )
               )}
             </div>
           )}
