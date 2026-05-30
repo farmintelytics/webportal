@@ -911,187 +911,112 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   }, [calendarMonth, calendarYear]);
 
   const clampedTimelineIndex = Math.min(selectedTimelineIndex, TIMELINE_DATA.length - 1);
-  const currentTimeline = TIMELINE_DATA[clampedTimelineIndex >= 0 ? clampedTimelineIndex : 0];
+  const currentTimelineA = TIMELINE_DATA[clampedTimelineIndex >= 0 ? clampedTimelineIndex : 0];
 
-  const plotsData = useMemo(() => {
-    const health = currentTimeline.plotsHealth;
+  const clampedCompareTimelineIndex = Math.min(compareTimelineIndex, TIMELINE_DATA.length - 1);
+  const currentTimelineB = TIMELINE_DATA[clampedCompareTimelineIndex >= 0 ? clampedCompareTimelineIndex : 0];
+
+  const currentTimeline = currentTimelineA;
+
+  const plotsDataA = useMemo(() => {
+    const health = currentTimelineA.plotsHealth;
     return [
-      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: currentTimeline.ndvi + 0.04, ndmi: currentTimeline.ndmi + 0.02, color: health.alpha, coords: PLOT_ALPHA_COORDS },
-      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: currentTimeline.ndvi < 0.65 ? 'Stressed' : 'Good', ndvi: currentTimeline.ndvi - 0.15, ndmi: currentTimeline.ndmi - 0.10, color: health.beta, coords: PLOT_BETA_COORDS },
-      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: currentTimeline.ndvi - 0.05, ndmi: currentTimeline.ndmi - 0.04, color: health.gamma, coords: PLOT_GAMMA_COORDS }
+      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: currentTimelineA.ndvi + 0.04, ndmi: currentTimelineA.ndmi + 0.02, color: health.alpha, coords: PLOT_ALPHA_COORDS },
+      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: currentTimelineA.ndvi < 0.65 ? 'Stressed' : 'Good', ndvi: currentTimelineA.ndvi - 0.15, ndmi: currentTimelineA.ndmi - 0.10, color: health.beta, coords: PLOT_BETA_COORDS },
+      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: currentTimelineA.ndvi - 0.05, ndmi: currentTimelineA.ndmi - 0.04, color: health.gamma, coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimeline]);
+  }, [currentTimelineA]);
 
-  const healthPlotsData = useMemo(() => {
-    const health = currentTimeline.plotsHealth;
-    const baseNdvi = currentTimeline.ndvi;
-    const baseNdmi = currentTimeline.ndmi;
+  const plotsDataB = useMemo(() => {
+    const health = currentTimelineB.plotsHealth;
+    return [
+      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: currentTimelineB.ndvi + 0.04, ndmi: currentTimelineB.ndmi + 0.02, color: health.alpha, coords: PLOT_ALPHA_COORDS },
+      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: currentTimelineB.ndvi < 0.65 ? 'Stressed' : 'Good', ndvi: currentTimelineB.ndvi - 0.15, ndmi: currentTimelineB.ndmi - 0.10, color: health.beta, coords: PLOT_BETA_COORDS },
+      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: currentTimelineB.ndvi - 0.05, ndmi: currentTimelineB.ndmi - 0.04, color: health.gamma, coords: PLOT_GAMMA_COORDS }
+    ];
+  }, [currentTimelineB]);
+
+  const plotsData = plotsDataA;
+
+  const healthPlotsDataA = useMemo(() => {
+    const baseNdvi = currentTimelineA.ndvi;
+    const baseNdmi = currentTimelineA.ndmi;
     return [
       { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: baseNdvi + 0.04, chlorophyll: parseFloat((baseNdvi * 0.95).toFixed(2)), waterStress: parseFloat((baseNdmi + 0.02).toFixed(2)), pestRisk: 'Low Risk', coords: PLOT_ALPHA_COORDS },
       { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: baseNdvi < 0.65 ? 'Stressed' : 'Good', ndvi: baseNdvi - 0.15, chlorophyll: parseFloat(((baseNdvi - 0.15) * 0.9).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.10)).toFixed(2)), pestRisk: 'High Risk', coords: PLOT_BETA_COORDS },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: baseNdvi - 0.05, chlorophyll: parseFloat(((baseNdvi - 0.05) * 0.92).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.04)).toFixed(2)), pestRisk: 'Moderate Risk', coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimeline]);
+  }, [currentTimelineA]);
 
-  const getIntelPolygonColor = (plot, indexName) => {
-    if (indexName === 'CVI') {
-      const val = plot.ndvi;
-      if (val > 0.75) return '#15803d';
-      if (val > 0.65) return '#22c55e';
-      if (val > 0.5)  return '#eab308';
-      return '#ef4444';
-    }
-    if (indexName === 'WDI') {
-      const val = plot.ndmi;
-      if (val > 0.45) return '#1d4ed8';
-      if (val > 0.38) return '#3b82f6';
-      if (val > 0.3)  return '#93c5fd';
-      return '#f97316';
-    }
-    if (indexName === 'CAR') {
-      const val = plot.ndvi * 0.9;
-      if (val > 0.65) return '#047857';
-      if (val > 0.52) return '#10b981';
-      return '#eab308';
-    }
-    const val = plot.id === 'PLOT-BETA' ? 0.75 : plot.id === 'PLOT-GAMMA' ? 0.45 : 0.15;
-    if (val > 0.7) return '#ef4444';
-    if (val > 0.4) return '#f97316';
-    return '#16a34a';
-  };
-
-  const getHealthPolygonColor = (plot, indexName) => {
-    if (indexName === 'NDVI') {
-      const val = plot.ndvi;
-      if (val > 0.75) return '#15803d';
-      if (val > 0.65) return '#22c55e';
-      if (val > 0.5)  return '#eab308';
-      return '#ef4444';
-    }
-    if (indexName === 'Chlorophyll') {
-      const val = plot.chlorophyll;
-      if (val > 0.7)  return '#047857';
-      if (val > 0.55) return '#10b981';
-      return '#eab308';
-    }
-    if (indexName === 'WaterStress') {
-      const val = plot.waterStress;
-      if (val > 0.45) return '#1d4ed8';
-      if (val > 0.38) return '#3b82f6';
-      return '#f97316';
-    }
-    const risk = plot.pestRisk;
-    if (risk === 'High Risk') return '#ef4444';
-    if (risk === 'Moderate Risk') return '#f97316';
-    return '#16a34a';
-  };
-
-  const yieldPlotsData = useMemo(() => {
-    const base = currentTimeline.ndvi;
+  const healthPlotsDataB = useMemo(() => {
+    const baseNdvi = currentTimelineB.ndvi;
+    const baseNdmi = currentTimelineB.ndmi;
     return [
-      { 
-        id: 'PLOT-ALPHA', 
-        name: 'West Valley Plot',   
-        area: '12.5 HA', 
-        yieldValue: parseFloat((base * 25).toFixed(1)), 
-        biomass: parseFloat((base * 2.8).toFixed(2)), 
-        readiness: Math.min(100, Math.round(base * 120)), 
-        growth: parseFloat(base.toFixed(2)), 
-        coords: PLOT_ALPHA_COORDS,
-        predAccuracy: '95.4%',
-        predictedYield: parseFloat((base * 25 * 12.5).toFixed(1)),
-        yieldStatus: 'Optimal (On Track)'
-      },
-      { 
-        id: 'PLOT-BETA',  
-        name: 'East Ridge Plot',   
-        area: '8.2 HA',  
-        yieldValue: parseFloat(((base - 0.15) * 20).toFixed(1)), 
-        biomass: parseFloat(((base - 0.15) * 2.2).toFixed(2)), 
-        readiness: Math.min(100, Math.round((base - 0.1) * 100)), 
-        growth: parseFloat((base - 0.15).toFixed(2)), 
-        coords: PLOT_BETA_COORDS,
-        predAccuracy: '89.2%',
-        predictedYield: parseFloat(((base - 0.15) * 20 * 8.2).toFixed(1)),
-        yieldStatus: 'Underperforming (Water Stress)'
-      },
-      { 
-        id: 'PLOT-GAMMA', 
-        name: 'South Slope Plot', 
-        area: '15.0 HA', 
-        yieldValue: parseFloat(((base - 0.05) * 22).toFixed(1)), 
-        biomass: parseFloat(((base - 0.05) * 2.4).toFixed(2)), 
-        readiness: Math.min(100, Math.round((base - 0.05) * 110)), 
-        growth: parseFloat((base - 0.05).toFixed(2)), 
-        coords: PLOT_GAMMA_COORDS,
-        predAccuracy: '92.1%',
-        predictedYield: parseFloat(((base - 0.05) * 22 * 15.0).toFixed(1)),
-        yieldStatus: 'Moderate (Minor Anomaly)'
-      }
+      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: baseNdvi + 0.04, chlorophyll: parseFloat((baseNdvi * 0.95).toFixed(2)), waterStress: parseFloat((baseNdmi + 0.02).toFixed(2)), pestRisk: 'Low Risk', coords: PLOT_ALPHA_COORDS },
+      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: baseNdvi < 0.65 ? 'Stressed' : 'Good', ndvi: baseNdvi - 0.15, chlorophyll: parseFloat(((baseNdvi - 0.15) * 0.9).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.10)).toFixed(2)), pestRisk: 'High Risk', coords: PLOT_BETA_COORDS },
+      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: baseNdvi - 0.05, chlorophyll: parseFloat(((baseNdvi - 0.05) * 0.92).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.04)).toFixed(2)), pestRisk: 'Moderate Risk', coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimeline]);
+  }, [currentTimelineB]);
 
-  const climatePlotsData = useMemo(() => {
+  const healthPlotsData = healthPlotsDataA;
+
+  const yieldPlotsDataA = useMemo(() => {
+    const base = currentTimelineA.ndvi;
+    return [
+      { id: 'PLOT-ALPHA', name: 'West Valley Plot', area: '12.5 HA', yieldValue: parseFloat((base * 25).toFixed(1)), biomass: parseFloat((base * 2.8).toFixed(2)), readiness: Math.min(100, Math.round(base * 120)), growth: parseFloat(base.toFixed(2)), coords: PLOT_ALPHA_COORDS, predAccuracy: '95.4%', predictedYield: parseFloat((base * 25 * 12.5).toFixed(1)), yieldStatus: 'Optimal (On Track)' },
+      { id: 'PLOT-BETA',  name: 'East Ridge Plot', area: '8.2 HA', yieldValue: parseFloat(((base - 0.15) * 20).toFixed(1)), biomass: parseFloat(((base - 0.15) * 2.2).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.1) * 100)), growth: parseFloat((base - 0.15).toFixed(2)), coords: PLOT_BETA_COORDS, predAccuracy: '89.2%', predictedYield: parseFloat(((base - 0.15) * 20 * 8.2).toFixed(1)), yieldStatus: 'Underperforming (Water Stress)' },
+      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', yieldValue: parseFloat(((base - 0.05) * 22).toFixed(1)), biomass: parseFloat(((base - 0.05) * 2.4).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.05) * 110)), growth: parseFloat((base - 0.05).toFixed(2)), coords: PLOT_GAMMA_COORDS, predAccuracy: '92.1%', predictedYield: parseFloat(((base - 0.05) * 22 * 15.0).toFixed(1)), yieldStatus: 'Moderate (Minor Anomaly)' }
+    ];
+  }, [currentTimelineA]);
+
+  const yieldPlotsDataB = useMemo(() => {
+    const base = currentTimelineB.ndvi;
+    return [
+      { id: 'PLOT-ALPHA', name: 'West Valley Plot', area: '12.5 HA', yieldValue: parseFloat((base * 25).toFixed(1)), biomass: parseFloat((base * 2.8).toFixed(2)), readiness: Math.min(100, Math.round(base * 120)), growth: parseFloat(base.toFixed(2)), coords: PLOT_ALPHA_COORDS, predAccuracy: '95.4%', predictedYield: parseFloat((base * 25 * 12.5).toFixed(1)), yieldStatus: 'Optimal (On Track)' },
+      { id: 'PLOT-BETA',  name: 'East Ridge Plot', area: '8.2 HA', yieldValue: parseFloat(((base - 0.15) * 20).toFixed(1)), biomass: parseFloat(((base - 0.15) * 2.2).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.1) * 100)), growth: parseFloat((base - 0.15).toFixed(2)), coords: PLOT_BETA_COORDS, predAccuracy: '89.2%', predictedYield: parseFloat(((base - 0.15) * 20 * 8.2).toFixed(1)), yieldStatus: 'Underperforming (Water Stress)' },
+      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', yieldValue: parseFloat(((base - 0.05) * 22).toFixed(1)), biomass: parseFloat(((base - 0.05) * 2.4).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.05) * 110)), growth: parseFloat((base - 0.05).toFixed(2)), coords: PLOT_GAMMA_COORDS, predAccuracy: '92.1%', predictedYield: parseFloat(((base - 0.05) * 22 * 15.0).toFixed(1)), yieldStatus: 'Moderate (Minor Anomaly)' }
+    ];
+  }, [currentTimelineB]);
+
+  const yieldPlotsData = yieldPlotsDataA;
+
+  const climatePlotsDataA = useMemo(() => {
     return [
       { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', rainfall: 12 + selectedTimelineIndex * 4, soilTemp: 24 + (5 - selectedTimelineIndex), lst: 26 + (5 - selectedTimelineIndex), vpd: parseFloat((1.2 + selectedTimelineIndex * 0.2).toFixed(1)), coords: PLOT_ALPHA_COORDS },
       { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  rainfall: 10 + selectedTimelineIndex * 3, soilTemp: 28 + (5 - selectedTimelineIndex), lst: 32 + (5 - selectedTimelineIndex), vpd: parseFloat((2.5 - selectedTimelineIndex * 0.1).toFixed(1)), coords: PLOT_BETA_COORDS },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', rainfall: 11 + selectedTimelineIndex * 4, soilTemp: 26 + (5 - selectedTimelineIndex), lst: 28 + (5 - selectedTimelineIndex), vpd: parseFloat((1.6 + selectedTimelineIndex * 0.15).toFixed(1)), coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimeline, selectedTimelineIndex]);
+  }, [currentTimelineA, selectedTimelineIndex]);
 
-  const restorationPlotsData = useMemo(() => {
-    const base = currentTimeline.ndvi;
+  const climatePlotsDataB = useMemo(() => {
     return [
-      { 
-        id: 'ZONE-ALPHA', 
-        name: 'Canopy Reforestation', 
-        area: '6.4 HA', 
-        type: 'Canopy Density', 
-        progress: Math.min(100, Math.round(base * 125)), 
-        survival: '94%', 
-        trees: '1,200', 
-        carbon: parseFloat((base * 60).toFixed(1)), 
-        status: 'Optimal Growth', 
-        color: '#16A34A', 
-        coords: RESTORE_ZONE_A_COORDS, 
-        manager: 'John Musa',
-        survivalNum: 94,
-        biodiversity: '92%'
-      },
-      { 
-        id: 'ZONE-BETA',  
-        name: 'Native Species Agroforestry', 
-        area: '5.8 HA', 
-        type: 'Species Diversification', 
-        progress: Math.min(100, Math.round((base - 0.15) * 115)), 
-        survival: '89%', 
-        trees: '980',   
-        carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), 
-        status: 'Active Care',   
-        color: '#EAB308', 
-        coords: RESTORE_ZONE_B_COORDS, 
-        manager: 'Alice Peters',
-        survivalNum: 89,
-        biodiversity: '84%'
-      },
-      { 
-        id: 'ZONE-GAMMA', 
-        name: 'Riparian Buffer Restoration',  
-        area: '8.1 HA', 
-        type: 'Soil Stabilization', 
-        progress: Math.min(100, Math.round((base - 0.05) * 105)), 
-        survival: '81%', 
-        trees: '1,550', 
-        carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), 
-        status: 'Initial Phase', 
-        color: '#0284C7', 
-        coords: RESTORE_ZONE_C_COORDS, 
-        manager: 'David Kalu',
-        survivalNum: 81,
-        biodiversity: '76%'
-      }
+      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', rainfall: 12 + compareTimelineIndex * 4, soilTemp: 24 + (5 - compareTimelineIndex), lst: 26 + (5 - compareTimelineIndex), vpd: parseFloat((1.2 + compareTimelineIndex * 0.2).toFixed(1)), coords: PLOT_ALPHA_COORDS },
+      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  rainfall: 10 + compareTimelineIndex * 3, soilTemp: 28 + (5 - compareTimelineIndex), lst: 32 + (5 - compareTimelineIndex), vpd: parseFloat((2.5 - compareTimelineIndex * 0.1).toFixed(1)), coords: PLOT_BETA_COORDS },
+      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', rainfall: 11 + compareTimelineIndex * 4, soilTemp: 26 + (5 - compareTimelineIndex), lst: 28 + (5 - compareTimelineIndex), vpd: parseFloat((1.6 + compareTimelineIndex * 0.15).toFixed(1)), coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimeline]);
+  }, [currentTimelineB, compareTimelineIndex]);
+
+  const climatePlotsData = climatePlotsDataA;
+
+  const restorationPlotsDataA = useMemo(() => {
+    const base = currentTimelineA.ndvi;
+    return [
+      { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, biodiversity: '92%' },
+      { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, biodiversity: '84%' },
+      { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, biodiversity: '76%' }
+    ];
+  }, [currentTimelineA]);
+
+  const restorationPlotsDataB = useMemo(() => {
+    const base = currentTimelineB.ndvi;
+    return [
+      { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, biodiversity: '92%' },
+      { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, biodiversity: '84%' },
+      { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, biodiversity: '76%' }
+    ];
+  }, [currentTimelineB]);
+
+  const restorationPlotsData = restorationPlotsDataA;
 
   const getRestorePolygonColor = (zone, indexName) => {
     if (indexName === 'progress') {
@@ -1292,7 +1217,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       className={`flex flex-col p-1.5 rounded-lg border text-left transition-all ${
                         activeDateSlot === 'B'
                           ? 'border-blue-600 bg-blue-50/30 shadow-sm'
-                          : 'border-gray-150 bg-gray-55 hover:bg-gray-100/50'
+                          : 'border-gray-150 bg-gray-50 hover:bg-gray-100/50'
                       }`}
                     >
                       <span className="text-[8px] font-bold text-blue-700 uppercase tracking-wide">Date B (Right Pane)</span>
@@ -2298,39 +2223,115 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="flex flex-1 min-h-0">
 
                 {/* ═══ MAP ═══ */}
-                <div className="flex-1 relative min-w-0">
+                <div className="flex-1 relative min-w-0 map-wrapper-pane">
                   <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-                    {plotsData.map(plot => (
-                      <Polygon key={plot.id} positions={plot.coords}
-                        pathOptions={getIntelPlotStyle(plot)}
-                        eventHandlers={{ click: () => setSelectedPlot(plot) }}>
-                        <Popup>
-                          <div className="p-2 w-52 space-y-2 font-sans">
-                            <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">INTELLIGENCE LAYER Composite</div>
-                            <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                            <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                            <div className="w-full h-px bg-gray-100" />
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>CVI Vigor</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                    
+                    {isCompareMode ? (
+                      <>
+                        <MapPaneClipSetter
+                          leftPaneName="left-pane-intel"
+                          rightPaneName="right-pane-intel"
+                          splitPosition={splitPosition}
+                          isCompareMode={isCompareMode}
+                        />
+                        <Pane name="left-pane-intel" style={{ zIndex: 500 }}>
+                          {plotsDataA.map(plot => (
+                            <Polygon key={`${plot.id}-left`} positions={plot.coords}
+                              pathOptions={getIntelPlotStyle(plot)}
+                              eventHandlers={{ click: () => setSelectedPlot(plot) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">INTELLIGENCE LAYER (Left/Date A)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>CVI Vigor</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>WDI Deficit</span><span className="text-blue-600 font-bold">{plot.ndmi.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>CAR Chlorophyll</span><span className="text-emerald-600 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>UAS Anomaly</span><span className={`${plot.id === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600'} font-bold`}>{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                        <Pane name="right-pane-intel" style={{ zIndex: 501 }}>
+                          {plotsDataB.map(plot => (
+                            <Polygon key={`${plot.id}-right`} positions={plot.coords}
+                              pathOptions={getIntelPlotStyle(plot)}
+                              eventHandlers={{ click: () => setSelectedPlot(plot) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">INTELLIGENCE LAYER (Right/Date B)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>CVI Vigor</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>WDI Deficit</span><span className="text-blue-600 font-bold">{plot.ndmi.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>CAR Chlorophyll</span><span className="text-emerald-600 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>UAS Anomaly</span><span className={`${plot.id === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600'} font-bold`}>{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                      </>
+                    ) : (
+                      plotsData.map(plot => (
+                        <Polygon key={plot.id} positions={plot.coords}
+                          pathOptions={getIntelPlotStyle(plot)}
+                          eventHandlers={{ click: () => setSelectedPlot(plot) }}>
+                          <Popup>
+                            <div className="p-2 w-52 space-y-2 font-sans">
+                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">INTELLIGENCE LAYER Composite</div>
+                              <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                              <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                              <div className="w-full h-px bg-gray-100" />
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>CVI Vigor</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>WDI Deficit</span><span className="text-blue-600 font-bold">{plot.ndmi.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>CAR Chlorophyll</span><span className="text-emerald-600 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>UAS Anomaly</span><span className={`${plot.id === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600'} font-bold`}>{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</span>
+                              </div>
                             </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>WDI Deficit</span><span className="text-blue-600 font-bold">{plot.ndmi.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>CAR Chlorophyll</span><span className="text-emerald-600 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>UAS Anomaly</span><span className={`${plot.id === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600'} font-bold`}>{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</span>
-                            </div>
-                          </div>
-                        </Popup>
-                      </Polygon>
-                    ))}
+                          </Popup>
+                        </Polygon>
+                      ))
+                    )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={intelShowLayers} />
                   </MapContainer>
+
+                  <SwipeSliderOverlay
+                    isCompareMode={isCompareMode}
+                    splitPosition={splitPosition}
+                    currentTimelineA={currentTimelineA}
+                    currentTimelineB={currentTimelineB}
+                    handleSplitDragStart={handleSplitDragStart}
+                  />
 
                   {/* Floating Basemap Selector (Top-Left) */}
                   <FloatingBasemapSelector />
@@ -2721,39 +2722,115 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="flex flex-1 min-h-0">
 
                 {/* ═══ MAP ═══ */}
-                <div className="flex-1 relative min-w-0">
+                <div className="flex-1 relative min-w-0 map-wrapper-pane">
                   <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-                    {healthPlotsData.map(plot => (
-                      <Polygon key={plot.id} positions={plot.coords}
-                        pathOptions={getHealthPlotStyle(plot)}
-                        eventHandlers={{ click: () => setSelectedHealthPlot(plot) }}>
-                        <Popup>
-                          <div className="p-2 w-52 space-y-2 font-sans">
-                            <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">HEALTH INDEX</div>
-                            <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                            <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                            <div className="w-full h-px bg-gray-100" />
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>NDVI</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                    
+                    {isCompareMode ? (
+                      <>
+                        <MapPaneClipSetter
+                          leftPaneName="left-pane-health"
+                          rightPaneName="right-pane-health"
+                          splitPosition={splitPosition}
+                          isCompareMode={isCompareMode}
+                        />
+                        <Pane name="left-pane-health" style={{ zIndex: 500 }}>
+                          {healthPlotsDataA.map(plot => (
+                            <Polygon key={`${plot.id}-left`} positions={plot.coords}
+                              pathOptions={getHealthPlotStyle(plot)}
+                              eventHandlers={{ click: () => setSelectedHealthPlot(plot) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">HEALTH INDEX (Left/Date A)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>NDVI</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Chlorophyll</span><span className="text-emerald-600 font-bold">{plot.chlorophyll.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Water Stress</span><span className="text-blue-600 font-bold">{plot.waterStress.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Pest Risk</span><span className={`${plot.pestRisk === 'High Risk' ? 'text-red-600 font-bold' : plot.pestRisk === 'Moderate Risk' ? 'text-amber-500 font-bold' : 'text-green-600 font-bold'}`}>{plot.pestRisk}</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                        <Pane name="right-pane-health" style={{ zIndex: 501 }}>
+                          {healthPlotsDataB.map(plot => (
+                            <Polygon key={`${plot.id}-right`} positions={plot.coords}
+                              pathOptions={getHealthPlotStyle(plot)}
+                              eventHandlers={{ click: () => setSelectedHealthPlot(plot) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">HEALTH INDEX (Right/Date B)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>NDVI</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Chlorophyll</span><span className="text-emerald-600 font-bold">{plot.chlorophyll.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Water Stress</span><span className="text-blue-600 font-bold">{plot.waterStress.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Pest Risk</span><span className={`${plot.pestRisk === 'High Risk' ? 'text-red-600 font-bold' : plot.pestRisk === 'Moderate Risk' ? 'text-amber-500 font-bold' : 'text-green-600 font-bold'}`}>{plot.pestRisk}</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                      </>
+                    ) : (
+                      healthPlotsData.map(plot => (
+                        <Polygon key={plot.id} positions={plot.coords}
+                          pathOptions={getHealthPlotStyle(plot)}
+                          eventHandlers={{ click: () => setSelectedHealthPlot(plot) }}>
+                          <Popup>
+                            <div className="p-2 w-52 space-y-2 font-sans">
+                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">HEALTH INDEX</div>
+                              <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                              <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                              <div className="w-full h-px bg-gray-100" />
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>NDVI</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Chlorophyll</span><span className="text-emerald-600 font-bold">{plot.chlorophyll.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Water Stress</span><span className="text-blue-600 font-bold">{plot.waterStress.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Pest Risk</span><span className={`${plot.pestRisk === 'High Risk' ? 'text-red-600 font-bold' : plot.pestRisk === 'Moderate Risk' ? 'text-amber-500 font-bold' : 'text-green-600 font-bold'}`}>{plot.pestRisk}</span>
+                              </div>
                             </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Chlorophyll</span><span className="text-emerald-600 font-bold">{plot.chlorophyll.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Water Stress</span><span className="text-blue-600 font-bold">{plot.waterStress.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Pest Risk</span><span className={`${plot.pestRisk === 'High Risk' ? 'text-red-600 font-bold' : plot.pestRisk === 'Moderate Risk' ? 'text-amber-500 font-bold' : 'text-green-600 font-bold'}`}>{plot.pestRisk}</span>
-                            </div>
-                          </div>
-                        </Popup>
-                      </Polygon>
-                    ))}
+                          </Popup>
+                        </Polygon>
+                      ))
+                    )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={healthShowLayers} />
                   </MapContainer>
+
+                  <SwipeSliderOverlay
+                    isCompareMode={isCompareMode}
+                    splitPosition={splitPosition}
+                    currentTimelineA={currentTimelineA}
+                    currentTimelineB={currentTimelineB}
+                    handleSplitDragStart={handleSplitDragStart}
+                  />
 
                   {/* Floating Basemap Selector (Top-Left) */}
                   <FloatingBasemapSelector />
@@ -3099,39 +3176,115 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="flex flex-1 min-h-0">
 
                 {/* ═══ MAP ═══ */}
-                <div className="flex-1 relative min-w-0">
+                <div className="flex-1 relative min-w-0 map-wrapper-pane">
                   <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-                    {yieldPlotsData.map(plot => (
-                      <Polygon key={plot.id} positions={plot.coords}
-                        pathOptions={getYieldPlotStyle(plot)}
-                        eventHandlers={{ click: () => setSelectedYieldPlot(plot) }}>
-                        <Popup>
-                          <div className="p-2 w-52 space-y-2 font-sans">
-                            <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">YIELD PREDICTION COMPONENT</div>
-                            <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                            <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                            <div className="w-full h-px bg-gray-100" />
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Est. Yield Rate</span><span className="text-green-700 font-bold">{plot.yieldValue} t/HA</span>
+                    
+                    {isCompareMode ? (
+                      <>
+                        <MapPaneClipSetter
+                          leftPaneName="left-pane-yield"
+                          rightPaneName="right-pane-yield"
+                          splitPosition={splitPosition}
+                          isCompareMode={isCompareMode}
+                        />
+                        <Pane name="left-pane-yield" style={{ zIndex: 500 }}>
+                          {yieldPlotsDataA.map(plot => (
+                            <Polygon key={`${plot.id}-left`} positions={plot.coords}
+                              pathOptions={getYieldPlotStyle(plot)}
+                              eventHandlers={{ click: () => setSelectedYieldPlot(plot) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">YIELD PREDICTION (Left/Date A)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Est. Yield Rate</span><span className="text-green-700 font-bold">{plot.yieldValue} t/HA</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Projected Season</span><span className="text-emerald-700 font-bold">{plot.predictedYield} t</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Confidence Acc.</span><span className="text-blue-600 font-bold">{plot.predAccuracy}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Readiness</span><span className="text-orange-600 font-bold">{plot.readiness}%</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                        <Pane name="right-pane-yield" style={{ zIndex: 501 }}>
+                          {yieldPlotsDataB.map(plot => (
+                            <Polygon key={`${plot.id}-right`} positions={plot.coords}
+                              pathOptions={getYieldPlotStyle(plot)}
+                              eventHandlers={{ click: () => setSelectedYieldPlot(plot) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">YIELD PREDICTION (Right/Date B)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Est. Yield Rate</span><span className="text-green-700 font-bold">{plot.yieldValue} t/HA</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Projected Season</span><span className="text-emerald-700 font-bold">{plot.predictedYield} t</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Confidence Acc.</span><span className="text-blue-600 font-bold">{plot.predAccuracy}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Readiness</span><span className="text-orange-600 font-bold">{plot.readiness}%</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                      </>
+                    ) : (
+                      yieldPlotsData.map(plot => (
+                        <Polygon key={plot.id} positions={plot.coords}
+                          pathOptions={getYieldPlotStyle(plot)}
+                          eventHandlers={{ click: () => setSelectedYieldPlot(plot) }}>
+                          <Popup>
+                            <div className="p-2 w-52 space-y-2 font-sans">
+                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">YIELD PREDICTION COMPONENT</div>
+                              <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                              <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                              <div className="w-full h-px bg-gray-100" />
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Est. Yield Rate</span><span className="text-green-700 font-bold">{plot.yieldValue} t/HA</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Projected Season</span><span className="text-emerald-700 font-bold">{plot.predictedYield} t</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Confidence Acc.</span><span className="text-blue-600 font-bold">{plot.predAccuracy}</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Readiness</span><span className="text-orange-600 font-bold">{plot.readiness}%</span>
+                              </div>
                             </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Projected Season</span><span className="text-emerald-700 font-bold">{plot.predictedYield} t</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Confidence Acc.</span><span className="text-blue-600 font-bold">{plot.predAccuracy}</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Readiness</span><span className="text-orange-600 font-bold">{plot.readiness}%</span>
-                            </div>
-                          </div>
-                        </Popup>
-                      </Polygon>
-                    ))}
+                          </Popup>
+                        </Polygon>
+                      ))
+                    )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={yieldShowLayers} />
                   </MapContainer>
+
+                  <SwipeSliderOverlay
+                    isCompareMode={isCompareMode}
+                    splitPosition={splitPosition}
+                    currentTimelineA={currentTimelineA}
+                    currentTimelineB={currentTimelineB}
+                    handleSplitDragStart={handleSplitDragStart}
+                  />
 
                   {/* Floating Basemap Selector (Top-Left) */}
                   <FloatingBasemapSelector />
@@ -3472,39 +3625,115 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="flex flex-1 min-h-0">
 
                 {/* ═══ MAP ═══ */}
-                <div className="flex-1 relative min-w-0">
+                <div className="flex-1 relative min-w-0 map-wrapper-pane">
                   <MapContainer center={[7.138, 3.356]} zoom={15} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-                    {restorationPlotsData.map(zone => (
-                      <Polygon key={zone.id} positions={zone.coords}
-                        pathOptions={getRestorePlotStyle(zone)}
-                        eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}>
-                        <Popup>
-                          <div className="p-2 w-52 space-y-2 font-sans">
-                            <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">RESTORATION TARGET LAYER</div>
-                            <h4 className="text-sm font-bold text-gray-900">{zone.name}</h4>
-                            <div className="text-xs text-gray-400">Area: {zone.area} · {zone.id}</div>
-                            <div className="w-full h-px bg-gray-100" />
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Canopy Progress</span><span className="text-green-700 font-bold">{zone.progress}%</span>
+                    
+                    {isCompareMode ? (
+                      <>
+                        <MapPaneClipSetter
+                          leftPaneName="left-pane-restore"
+                          rightPaneName="right-pane-restore"
+                          splitPosition={splitPosition}
+                          isCompareMode={isCompareMode}
+                        />
+                        <Pane name="left-pane-restore" style={{ zIndex: 500 }}>
+                          {restorationPlotsDataA.map(zone => (
+                            <Polygon key={`${zone.id}-left`} positions={zone.coords}
+                              pathOptions={getRestorePlotStyle(zone)}
+                              eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">RESTORATION (Left/Date A)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{zone.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {zone.area} · {zone.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Canopy Progress</span><span className="text-green-700 font-bold">{zone.progress}%</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Survival Rate</span><span className="text-emerald-700 font-bold">{zone.survival}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Carbon Offset</span><span className="text-yellow-700 font-bold">{zone.carbon} t</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Biodiversity</span><span className="text-blue-600 font-bold">{zone.biodiversity}</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                        <Pane name="right-pane-restore" style={{ zIndex: 501 }}>
+                          {restorationPlotsDataB.map(zone => (
+                            <Polygon key={`${zone.id}-right`} positions={zone.coords}
+                              pathOptions={getRestorePlotStyle(zone)}
+                              eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">RESTORATION (Right/Date B)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{zone.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {zone.area} · {zone.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Canopy Progress</span><span className="text-green-700 font-bold">{zone.progress}%</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Survival Rate</span><span className="text-emerald-700 font-bold">{zone.survival}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Carbon Offset</span><span className="text-yellow-700 font-bold">{zone.carbon} t</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Biodiversity</span><span className="text-blue-600 font-bold">{zone.biodiversity}</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                      </>
+                    ) : (
+                      restorationPlotsData.map(zone => (
+                        <Polygon key={zone.id} positions={zone.coords}
+                          pathOptions={getRestorePlotStyle(zone)}
+                          eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}>
+                          <Popup>
+                            <div className="p-2 w-52 space-y-2 font-sans">
+                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">RESTORATION TARGET LAYER</div>
+                              <h4 className="text-sm font-bold text-gray-900">{zone.name}</h4>
+                              <div className="text-xs text-gray-400">Area: {zone.area} · {zone.id}</div>
+                              <div className="w-full h-px bg-gray-100" />
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Canopy Progress</span><span className="text-green-700 font-bold">{zone.progress}%</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Survival Rate</span><span className="text-emerald-700 font-bold">{zone.survival}</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Carbon Offset</span><span className="text-yellow-700 font-bold">{zone.carbon} t</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Biodiversity</span><span className="text-blue-600 font-bold">{zone.biodiversity}</span>
+                              </div>
                             </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Survival Rate</span><span className="text-emerald-700 font-bold">{zone.survival}</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Carbon Offset</span><span className="text-yellow-700 font-bold">{zone.carbon} t</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Biodiversity</span><span className="text-blue-600 font-bold">{zone.biodiversity}</span>
-                            </div>
-                          </div>
-                        </Popup>
-                      </Polygon>
-                    ))}
+                          </Popup>
+                        </Polygon>
+                      ))
+                    )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={restoreShowLayers} />
                   </MapContainer>
+
+                  <SwipeSliderOverlay
+                    isCompareMode={isCompareMode}
+                    splitPosition={splitPosition}
+                    currentTimelineA={currentTimelineA}
+                    currentTimelineB={currentTimelineB}
+                    handleSplitDragStart={handleSplitDragStart}
+                  />
 
                   {/* Floating Basemap Selector (Top-Left) */}
                   <FloatingBasemapSelector />
@@ -4448,36 +4677,106 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="flex flex-1 min-h-0">
 
                 {/* ═══ MAP ═══ */}
-                <div className="flex-1 relative min-w-0">
+                <div className="flex-1 relative min-w-0 map-wrapper-pane">
                   <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-                    {climatePlotsData.map(plot => (
-                      <Polygon key={plot.id} positions={plot.coords}
-                        pathOptions={getClimatePlotStyle(plot)}
-                        eventHandlers={{ click: () => setSelectedClimatePlot(plot) }}>
-                        <Popup>
-                          <div className="p-2 w-52 space-y-2 font-sans">
-                            <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">SENSOR TELEMETRY LEDGER</div>
-                            <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                            <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                            <div className="w-full h-px bg-gray-100" />
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Rainfall</span><span className="text-blue-600 font-bold">{plot.rainfall} mm</span>
+                    
+                    {isCompareMode ? (
+                      <>
+                        <MapPaneClipSetter
+                          leftPaneName="left-pane-climate"
+                          rightPaneName="right-pane-climate"
+                          splitPosition={splitPosition}
+                          isCompareMode={isCompareMode}
+                        />
+                        <Pane name="left-pane-climate" style={{ zIndex: 500 }}>
+                          {climatePlotsDataA.map(plot => (
+                            <Polygon key={`${plot.id}-left`} positions={plot.coords}
+                              pathOptions={getClimatePlotStyle(plot)}
+                              eventHandlers={{ click: () => setSelectedClimatePlot(plot) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">CLIMATE (Left/Date A)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Rainfall</span><span className="text-blue-600 font-bold">{plot.rainfall} mm</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Soil Temperature</span><span className="text-orange-600 font-bold">{plot.soilTemp} °C</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Surface Temp (LST)</span><span className="text-red-500 font-bold">{plot.lst} °C</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                        <Pane name="right-pane-climate" style={{ zIndex: 501 }}>
+                          {climatePlotsDataB.map(plot => (
+                            <Polygon key={`${plot.id}-right`} positions={plot.coords}
+                              pathOptions={getClimatePlotStyle(plot)}
+                              eventHandlers={{ click: () => setSelectedClimatePlot(plot) }}>
+                              <Popup>
+                                <div className="p-2 w-52 space-y-2 font-sans">
+                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">CLIMATE (Right/Date B)</div>
+                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                                  <div className="w-full h-px bg-gray-100" />
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Rainfall</span><span className="text-blue-600 font-bold">{plot.rainfall} mm</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Soil Temperature</span><span className="text-orange-600 font-bold">{plot.soilTemp} °C</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span>Surface Temp (LST)</span><span className="text-red-500 font-bold">{plot.lst} °C</span>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Polygon>
+                          ))}
+                        </Pane>
+                      </>
+                    ) : (
+                      climatePlotsData.map(plot => (
+                        <Polygon key={plot.id} positions={plot.coords}
+                          pathOptions={getClimatePlotStyle(plot)}
+                          eventHandlers={{ click: () => setSelectedClimatePlot(plot) }}>
+                          <Popup>
+                            <div className="p-2 w-52 space-y-2 font-sans">
+                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">SENSOR TELEMETRY LEDGER</div>
+                              <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                              <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                              <div className="w-full h-px bg-gray-100" />
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Rainfall</span><span className="text-blue-600 font-bold">{plot.rainfall} mm</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Soil Temperature</span><span className="text-orange-600 font-bold">{plot.soilTemp} °C</span>
+                              </div>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Surface Temp (LST)</span><span className="text-red-500 font-bold">{plot.lst} °C</span>
+                              </div>
                             </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Soil Temperature</span><span className="text-orange-600 font-bold">{plot.soilTemp} °C</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Surface Temp (LST)</span><span className="text-red-500 font-bold">{plot.lst} °C</span>
-                            </div>
-                          </div>
-                        </Popup>
-                      </Polygon>
-                    ))}
+                          </Popup>
+                        </Polygon>
+                      ))
+                    )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={climateShowLayers} />
                   </MapContainer>
+
+                  <SwipeSliderOverlay
+                    isCompareMode={isCompareMode}
+                    splitPosition={splitPosition}
+                    currentTimelineA={currentTimelineA}
+                    currentTimelineB={currentTimelineB}
+                    handleSplitDragStart={handleSplitDragStart}
+                  />
 
                   {/* Floating Basemap Selector (Top-Left) */}
                   <FloatingBasemapSelector />
