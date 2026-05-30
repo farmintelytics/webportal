@@ -19,6 +19,10 @@ import MaizeDashboard from './apps/management/maize/Dashboard';
 import ClimateIntelligence from './apps/advisor/ClimateIntelligence';
 import MonitoringPortal from './apps/monitoring/MonitoringPortal';
 import SustainabilityPortal from './apps/sustainability/SustainabilityPortal';
+import EstatePortal from './apps/sustainability/estate/EstatePortal';
+import GroupsPortal from './apps/sustainability/groups/GroupsPortal';
+import ForestryPortal from './apps/sustainability/forestry/ForestryPortal';
+import EstimatorPortal from './apps/sustainability/estimator/EstimatorPortal';
 
 // === Specialized Monitoring Apps ===
 import RiceMonitoring from './apps/monitoring/rice/Monitoring';
@@ -33,6 +37,8 @@ import GroupsDashboard from './apps/cooperative/Dashboard';
 
 // === Finance & Payments ===
 import FinanceDashboard from './apps/finance/Dashboard';
+
+import AgroMonitor from './apps/custom/AgroMonitor';
 
 import { crops } from './config/crops.jsx';
 import { Zap } from 'lucide-react';
@@ -120,14 +126,15 @@ const App = () => {
       'drone-ffb':            <ComingSoon title="Drone Inspection" description="Live drone feed and high-resolution field surveillance." onSignOut={handleSignOut} />,
       'drone-cashew':         <ComingSoon title="Orchard Survey" description="Tree count, canopy gap analysis and disease spot detection." onSignOut={handleSignOut} />,
       
-      'carbon-ffb':           <SustainabilityPortal title="Estate Carbon" type="Industrial" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'carbon-groups':        <SustainabilityPortal title="Group Carbon" type="Smallholder" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'forestry-intel':       <SustainabilityPortal title="Forestry Intel" type="High Density" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'carbon-estimator':     <SustainabilityPortal title="Carbon Estimator" type="Analytical" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'carbon-ffb':           <EstatePortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'carbon-groups':        <GroupsPortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'forestry-intel':       <ForestryPortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'carbon-estimator':     <EstimatorPortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
 
       'finance-hub':          <FinanceDashboard onSignOut={handleSignOut} />,
       'activity-ffb':         <ComingSoon title="Operations Log" description="Geo-referenced daily field logs — harvesting, planting, spraying." />,
       'advisor':              <ClimateIntelligence onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'custom-agromonitor':   <AgroMonitor onSignOut={handleSignOut} onBack={handleBackToHub} />,
 
       // Groups & Smallholder Management
       'group-management':     <GroupsDashboard mode="group-management" onSignOut={handleSignOut} />,
@@ -163,7 +170,8 @@ const App = () => {
       'group-management': 'Groups Management',
       'group-monitoring': 'Group Monitoring',
       'activity-ffb': 'Operations Logs',
-      'advisor': 'Farm Advisor'
+      'advisor': 'Farm Advisor',
+      'custom-agromonitor': 'Agro Monitoring'
     };
     return <Login onLogin={handleLogin} moduleName={cleanNameMap[selectedModule] || selectedModule} onBack={handleBackToHub} />;
   }
@@ -171,8 +179,8 @@ const App = () => {
   const sectionContent = getSectionContent();
 
   // If it's a Monitoring Portal or Sustainability/Advisor, render it standalone
-  const standaloneModules = ['rs-', 'group-monitoring', 'carbon-', 'forestry-', 'advisor'];
-  if (standaloneModules.some(m => selectedModule?.startsWith(m))) {
+  const standaloneModules = ['rs-', 'group-monitoring', 'carbon-', 'forestry-', 'advisor', 'custom-agromonitor'];
+  if (standaloneModules.some(m => selectedModule?.startsWith(m) || selectedModule === m)) {
     return React.cloneElement(sectionContent, { 
       onBack: handleBackToHub,
       onSignOut: handleSignOut 

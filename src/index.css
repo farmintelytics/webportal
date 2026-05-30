@@ -79,3 +79,19 @@ button:active {
   background: rgba(36, 36, 32, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
+
+/* Fix Leaflet resizing gray background and container styles */
+.leaflet-container {
+  background-color: transparent !important;
+}
+
+/* Hide gray grid line artifacts in Leaflet tiles */
+.leaflet-tile {
+  border: none !important;
+  outline: none !important;
+}
+
+/* Smooth transition for map container resizing */
+.flex-1.relative.min-w-0 {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

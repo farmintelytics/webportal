@@ -118,6 +118,14 @@ const PortalHub = ({ onSelectModule }) => {
         { id: 'advisor',      title: 'Farm Advisor',    crop: 'Agronomy',   icon: <MessageSquare />, active: true  },
       ]
     },
+    {
+      id: 'custom',
+      title: 'Custom Solutions',
+      description: 'Bespoke operational gateways and proprietary analytics models tailored for specific agri-businesses.',
+      modules: [
+        { id: 'custom-agromonitor', title: 'Agro Monitoring', crop: 'Custom', icon: <Satellite />, active: true },
+      ]
+    },
   ];
 
   const currentSection = sections.find(s => s.id === activeTab) || sections[0];
@@ -158,7 +166,8 @@ const PortalHub = ({ onSelectModule }) => {
             { id: 'monitoring', label: 'Monitoring' },
             { id: 'sustainability', label: 'Sustainability' },
             { id: 'payments', label: 'Payments' },
-            { id: 'field-advisory', label: 'Advisory' }
+            { id: 'field-advisory', label: 'Advisory' },
+            { id: 'custom', label: 'Custom' }
           ].map(tab => (
             <button 
               key={tab.id}
