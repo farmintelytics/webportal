@@ -52,6 +52,7 @@ import {
   Eye,
   EyeOff,
   UserPlus,
+  Users,
   Plus,
   Check,
   FileSpreadsheet,
@@ -510,9 +511,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [healthPestOpacity, setHealthPestOpacity] = useState(70);
 
   // New Settings Center states
-  const [profileName, setProfileName] = useState('AM Manager');
-  const [profileEmail, setProfileEmail] = useState('am.manager@farmintelytics.io');
-  const [profileRole, setProfileRole] = useState('Spatial Auditor');
+  const [profileName, setProfileName] = useState('Samuel');
+  const [profileEmail, setProfileEmail] = useState('samuel@farmintelytics.io');
+  const [profileRole, setProfileRole] = useState('Intelligence Analyst');
+  const [brandingMode, setBrandingMode] = useState('AM'); // 'AM' or 'FT'
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('profile');
   const [defaultLat, setDefaultLat] = useState(7.145);
   const [defaultLng, setDefaultLng] = useState(3.355);
   const [defaultMapZoom, setDefaultMapZoom] = useState(14);
@@ -2301,12 +2306,16 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             <ArrowLeft size={17} />
           </button>
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md ring-4 ring-green-50" style={{ backgroundColor: '#16A34A' }}>
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md ring-4 transition-all ${brandingMode === 'AM' ? 'ring-green-50' : 'ring-blue-50'}`} style={{ backgroundColor: brandingMode === 'AM' ? '#16A34A' : '#2563EB' }}>
               <Satellite className="text-white" size={21} />
             </div>
             <div>
-              <h1 className="text-base font-bold tracking-tight text-gray-900 leading-none">Agro Monitoring</h1>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-green-600 mt-1 leading-none">Enterprise Satellite Node</p>
+              <h1 className="text-base font-bold tracking-tight text-gray-900 leading-none">
+                {brandingMode === 'AM' ? 'Agro Monitoring' : 'Farm Tools Harvest'}
+              </h1>
+              <p className={`text-[11px] font-semibold uppercase tracking-widest mt-1 leading-none ${brandingMode === 'AM' ? 'text-green-600' : 'text-blue-600'}`}>
+                {brandingMode === 'AM' ? 'Enterprise Satellite Node' : 'Agricultural Operations Hub'}
+              </p>
             </div>
           </div>
         </div>
@@ -2336,35 +2345,84 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
         {/* User area */}
         <div className="flex items-center gap-4">
-          <button className="p-2.5 hover:bg-gray-50 rounded-xl transition-all border border-gray-200 text-gray-400 hover:text-gray-800 relative">
-            <Bell size={17} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-white" style={{ backgroundColor: '#EF4444' }}></span>
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => { setShowNotifications(n => !n); setShowUserMenu(false); }}
+              className={`p-2.5 rounded-xl transition-all border relative ${showNotifications ? 'bg-green-50 text-green-700 border-green-200' : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50 hover:text-gray-800'}`}
+            >
+              <Bell size={17} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-white animate-pulse" style={{ backgroundColor: '#EF4444' }}></span>
+            </button>
+            {showNotifications && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[500] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-4 py-3.5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                  <div className="text-xs font-black uppercase tracking-wider text-gray-700">Live Alerts Feed</div>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${brandingMode === 'AM' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>3 Active</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
+                  <div className="p-3 hover:bg-gray-50 transition-colors flex gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-red-500 mt-1.5 shrink-0 animate-ping" />
+                    <div>
+                      <div className="text-[11px] font-bold text-gray-900">Critical Waterlogging Alert</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">Plot Beta (East Ridge Plot) registers high anomaly score.</div>
+                    </div>
+                  </div>
+                  <div className="p-3 hover:bg-gray-50 transition-colors flex gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 shrink-0" />
+                    <div>
+                      <div className="text-[11px] font-bold text-gray-900">NDVI Decline Flag</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">West Valley Plot has dropped 8% below baseline average.</div>
+                    </div>
+                  </div>
+                  <div className="p-3 hover:bg-gray-50 transition-colors flex gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                    <div>
+                      <div className="text-[11px] font-bold text-gray-900">New Sentinel Pass Ingested</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">Weekly cloud-free composite uploaded successfully.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="w-px h-8 bg-gray-200"></div>
           {/* Clickable user avatar with sign-out dropdown */}
           <div className="relative" ref={userMenuRef}>
             <button
-              onClick={() => setShowUserMenu(s => !s)}
+              onClick={() => { setShowUserMenu(s => !s); setShowNotifications(false); }}
               className="flex items-center gap-3 hover:opacity-80 transition-all"
             >
               <div className="text-right">
-                <div className="text-sm font-bold text-gray-900 leading-none">AM Manager</div>
-                <div className="text-[11px] font-semibold text-green-600 tracking-wider mt-1 uppercase">Spatial Auditor</div>
+                <div className="text-sm font-bold text-gray-900 leading-none">{profileName}</div>
+                <div className={`text-[11px] font-semibold tracking-wider mt-1 uppercase ${brandingMode === 'AM' ? 'text-green-600' : 'text-blue-600'}`}>{profileRole}</div>
               </div>
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-green-700 text-sm shadow-sm border border-green-200 hover:ring-2 hover:ring-green-200 transition-all" style={{ backgroundColor: '#DCFCE7' }}>
-                AM
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm border hover:ring-2 transition-all ${brandingMode === 'AM' ? 'text-green-700 border-green-200 hover:ring-green-200 bg-green-50' : 'text-blue-700 border-blue-200 hover:ring-blue-200 bg-blue-50'}`}>
+                {brandingMode === 'AM' ? 'AM' : 'FT'}
               </div>
             </button>
             {showUserMenu && (
-              <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[500] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="px-4 py-3.5 border-b border-gray-100">
-                  <div className="text-sm font-bold text-gray-900">AM Manager</div>
-                  <div className="text-xs text-gray-400 font-medium mt-0.5">am.manager@farmintelytics.io</div>
+              <div className="absolute right-0 top-full mt-2.5 w-64 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[500] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="p-4 bg-gray-50/50 flex flex-col items-center text-center border-b border-gray-100">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-white text-xl shadow-md mb-2.5" style={{ backgroundColor: brandingMode === 'AM' ? '#16A34A' : '#2563EB' }}>
+                    {brandingMode === 'AM' ? 'AM' : 'FT'}
+                  </div>
+                  <div className="text-sm font-extrabold text-gray-950">{profileName}</div>
+                  <div className="text-[11px] font-semibold text-gray-400 mt-0.5">{profileEmail}</div>
+                  <span className={`inline-block text-[9px] font-extrabold px-2 py-0.5 rounded-full mt-2 border ${brandingMode === 'AM' ? 'bg-green-50 text-green-700 border-green-150' : 'bg-blue-50 text-blue-700 border-blue-150'}`}>
+                    {profileRole}
+                  </span>
                 </div>
-                <div className="p-1.5">
+                <div className="p-1.5 space-y-0.5">
+                  <button
+                    onClick={() => { setShowUserMenu(false); setShowSettingsModal(true); }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-xl transition-all"
+                  >
+                    <Settings2 size={15} className="text-gray-400" />
+                    Settings Center
+                  </button>
                   <button
                     onClick={() => { setShowUserMenu(false); onSignOut(); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all"
                   >
                     <LogOut size={15} />
                     Sign Out
@@ -2404,7 +2462,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         ? 'text-white shadow-sm'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
-                    style={{ backgroundColor: activeSidebarItem === item.id ? '#16A34A' : undefined }}
+                    style={{ backgroundColor: activeSidebarItem === item.id ? (brandingMode === 'AM' ? '#16A34A' : '#2563EB') : undefined }}
                   >
                     <span className={activeSidebarItem === item.id ? 'text-white' : 'text-gray-400'}>
                       {item.icon}
@@ -2462,7 +2520,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         ? 'text-white shadow-sm'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
-                    style={{ backgroundColor: activeSidebarItem === item.id ? '#16A34A' : undefined }}
+                    style={{ backgroundColor: activeSidebarItem === item.id ? (brandingMode === 'AM' ? '#16A34A' : '#2563EB') : undefined }}
                   >
                     <span className={activeSidebarItem === item.id ? 'text-white' : 'text-gray-400'}>
                       {item.icon}
@@ -6268,6 +6326,271 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
         </main>
       </div>
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-2xl w-[640px] h-[480px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div className="flex items-center gap-2.5">
+                <Settings2 className={brandingMode === 'AM' ? 'text-green-600' : 'text-blue-600'} size={19} />
+                <span className="text-base font-extrabold text-gray-950">Settings Center</span>
+              </div>
+              <button 
+                onClick={() => setShowSettingsModal(false)}
+                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700 transition-all"
+              >
+                <X size={17} />
+              </button>
+            </div>
+            
+            {/* Split Body */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Left Tabs */}
+              <div className="w-[180px] bg-gray-50/50 border-r border-gray-100 p-3 space-y-1">
+                {[
+                  { id: 'profile', label: 'User Profile', icon: <User size={15} /> },
+                  { id: 'branding', label: 'Platform Mode', icon: <Globe size={15} /> },
+                  { id: 'map', label: 'Map Configuration', icon: <MapIcon size={15} /> },
+                  { id: 'users', label: 'Team Access', icon: <Users size={15} /> }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setSettingsTab(tab.id)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all ${
+                      settingsTab === tab.id
+                        ? (brandingMode === 'AM' ? 'bg-green-50 text-green-700 font-extrabold' : 'bg-blue-50 text-blue-700 font-extrabold')
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Right Content Pane */}
+              <div className="flex-1 p-6 overflow-y-auto space-y-5">
+                {settingsTab === 'profile' && (
+                  <div className="space-y-4">
+                    <div className="text-xs font-black uppercase tracking-wider text-gray-400">User Profile Settings</div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Full Name</label>
+                        <input 
+                          type="text" 
+                          value={profileName} 
+                          onChange={e => setProfileName(e.target.value)} 
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white focus:border-green-600 outline-none" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Active Role</label>
+                        <input 
+                          type="text" 
+                          value={profileRole} 
+                          onChange={e => setProfileRole(e.target.value)} 
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white focus:border-green-600 outline-none" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Email Identity</label>
+                        <input 
+                          type="email" 
+                          value={profileEmail} 
+                          onChange={e => setProfileEmail(e.target.value)} 
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white focus:border-green-600 outline-none" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {settingsTab === 'branding' && (
+                  <div className="space-y-4">
+                    <div className="text-xs font-black uppercase tracking-wider text-gray-400">Platform System Mode</div>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div 
+                        onClick={() => setBrandingMode('AM')}
+                        className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover:border-green-500/50 ${
+                          brandingMode === 'AM' ? 'border-green-600 bg-green-50/20 shadow-sm' : 'border-gray-200'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-extrabold text-gray-900 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
+                            AgroMonitor Mode (AM)
+                          </div>
+                          <div className="text-[10px] text-gray-400 mt-1">Satellite analysis, green theme interface, default AM initials.</div>
+                        </div>
+                        {brandingMode === 'AM' && <CheckCircle2 size={16} className="text-green-600" />}
+                      </div>
+                      
+                      <div 
+                        onClick={() => setBrandingMode('FT')}
+                        className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover:border-blue-500/50 ${
+                          brandingMode === 'FT' ? 'border-blue-600 bg-blue-50/20 shadow-sm' : 'border-gray-200'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-extrabold text-gray-900 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                            Farm Tools Harvest Mode (FT)
+                          </div>
+                          <div className="text-[10px] text-gray-400 mt-1">Operational harvest tools, blue/orange branding, FT initials.</div>
+                        </div>
+                        {brandingMode === 'FT' && <CheckCircle2 size={16} className="text-blue-600" />}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {settingsTab === 'map' && (
+                  <div className="space-y-4">
+                    <div className="text-xs font-black uppercase tracking-wider text-gray-400">Map Default Configuration</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Center Latitude</label>
+                        <input 
+                          type="number" 
+                          step="0.0001" 
+                          value={defaultLat} 
+                          onChange={e => setDefaultLat(parseFloat(e.target.value))} 
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:bg-white" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Center Longitude</label>
+                        <input 
+                          type="number" 
+                          step="0.0001" 
+                          value={defaultLng} 
+                          onChange={e => setDefaultLng(parseFloat(e.target.value))} 
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:bg-white" 
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Initial Zoom level</label>
+                        <input 
+                          type="number" 
+                          value={defaultMapZoom} 
+                          onChange={e => setDefaultMapZoom(parseInt(e.target.value))} 
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:bg-white" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {settingsTab === 'users' && (
+                  <div className="space-y-4">
+                    <div className="text-xs font-black uppercase tracking-wider text-gray-400">Team Access Management</div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {settingsUsers.map(user => (
+                        <div key={user.id} className="flex items-center justify-between p-2.5 border border-gray-100 rounded-xl bg-gray-50/30">
+                          <div>
+                            <div className="text-xs font-bold text-gray-900">{user.name}</div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">{user.email} · {user.role}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span 
+                              onClick={() => {
+                                setSettingsUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: u.status === 'Active' ? 'Offline' : 'Active' } : u));
+                              }}
+                              className={`text-[9px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors ${user.status === 'Active' ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-150 text-gray-500 hover:bg-gray-200'}`}
+                            >
+                              {user.status}
+                            </span>
+                            <button 
+                              onClick={() => setSettingsUsers(prev => prev.filter(u => u.id !== user.id))}
+                              className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Add User mini-form */}
+                    <div className="pt-2 border-t border-gray-100 space-y-2">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-gray-400">Add Team Member</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input 
+                          id="new-user-name"
+                          type="text" 
+                          placeholder="Name" 
+                          className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold outline-none focus:bg-white" 
+                        />
+                        <input 
+                          id="new-user-email"
+                          type="email" 
+                          placeholder="Email" 
+                          className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold outline-none focus:bg-white" 
+                        />
+                        <input 
+                          id="new-user-role"
+                          type="text" 
+                          placeholder="Role (e.g. Field Agent)" 
+                          className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold outline-none focus:bg-white col-span-2" 
+                        />
+                      </div>
+                      <button 
+                        onClick={() => {
+                          const nameEl = document.getElementById('new-user-name');
+                          const emailEl = document.getElementById('new-user-email');
+                          const roleEl = document.getElementById('new-user-role');
+                          if (nameEl && emailEl && roleEl && nameEl.value && emailEl.value) {
+                            const newUser = {
+                              id: `USER-${Date.now()}`,
+                              name: nameEl.value,
+                              email: emailEl.value,
+                              role: roleEl.value || 'Viewer',
+                              status: 'Active'
+                            };
+                            setSettingsUsers(prev => [...prev, newUser]);
+                            nameEl.value = '';
+                            emailEl.value = '';
+                            roleEl.value = '';
+                          }
+                        }}
+                        className={`w-full py-2 rounded-lg text-xs font-bold text-white transition-all ${
+                          brandingMode === 'AM' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                      >
+                        Add Member
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-2.5">
+              <button 
+                onClick={() => setShowSettingsModal(false)}
+                className="px-4.5 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition-all"
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => {
+                  setShowSettingsModal(false);
+                  setShowProfileSaved(true);
+                  setTimeout(() => setShowProfileSaved(false), 2000);
+                }}
+                className={`px-4.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all hover:scale-102 active:scale-98 ${
+                  brandingMode === 'AM' ? 'bg-green-600 hover:bg-green-700 shadow-green-600/10' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/10'
+                }`}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
