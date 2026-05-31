@@ -2446,9 +2446,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={intelBoundariesOpacity}
                                 onChange={e => setIntelBoundariesOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -2482,7 +2482,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={intelGrowthOpacity}
                                 onChange={e => setIntelGrowthOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'Tillering', color: '#86efac' },
@@ -2491,7 +2491,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Harvest Ready', color: '#ea580c' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2534,7 +2534,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={intelEviOpacity}
                                 onChange={e => setIntelEviOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'Exceptional (>0.8)', color: '#14532D' },
@@ -2544,7 +2544,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<=0.45)', color: '#EF4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2580,7 +2580,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={intelLswiOpacity}
                                 onChange={e => setIntelLswiOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'Waterlogged (>0.5)', color: '#1E3A8A' },
@@ -2590,7 +2590,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Severe Stress (<=0.28)', color: '#DC2626' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2633,7 +2633,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={intelVhiOpacity}
                                 onChange={e => setIntelVhiOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'Exceptional (>0.8)', color: '#14532D' },
@@ -2643,7 +2643,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<=0.45)', color: '#EF4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2679,14 +2679,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={intelSuitabilityOpacity}
                                 onChange={e => setIntelSuitabilityOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'Suitable', color: '#16a34a' },
                                   { label: 'Unsuitable', color: '#dc2626' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2945,9 +2945,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={healthBoundariesOpacity}
                                 onChange={e => setHealthBoundariesOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -2988,7 +2988,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={healthNdviOpacity}
                                 onChange={e => setHealthNdviOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'Exceptional (>0.8)', color: '#14532D' },
@@ -2998,7 +2998,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<=0.45)', color: '#EF4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3034,7 +3034,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={healthChlorophyllOpacity}
                                 onChange={e => setHealthChlorophyllOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'Exceptional (>0.8)', color: '#14532D' },
@@ -3044,7 +3044,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<=0.45)', color: '#EF4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3087,7 +3087,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={healthWaterOpacity}
                                 onChange={e => setHealthWaterOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'Waterlogged (>0.5)', color: '#1E3A8A' },
@@ -3097,7 +3097,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Severe Stress (<=0.28)', color: '#DC2626' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3133,7 +3133,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={healthPestOpacity}
                                 onChange={e => setHealthPestOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High Risk', color: '#ef4444' },
@@ -3141,7 +3141,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low Risk', color: '#16a34a' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3400,9 +3400,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={yieldBoundariesOpacity}
                                 onChange={e => setYieldBoundariesOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -3443,7 +3443,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={yieldYieldOpacity}
                                 onChange={e => setYieldYieldOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (18t/HA+)', color: '#15803d' },
@@ -3452,7 +3452,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'High Stress (<8t/HA)', color: '#ef4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3488,7 +3488,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={yieldBiomassOpacity}
                                 onChange={e => setYieldBiomassOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (2.0kg+)', color: '#15803d' },
@@ -3497,7 +3497,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Critical (<0.8kg)', color: '#ef4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3540,7 +3540,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={yieldReadinessOpacity}
                                 onChange={e => setYieldReadinessOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'Ready (85%+)', color: '#16a34a' },
@@ -3548,7 +3548,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Unready (<65%)', color: '#f97316' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3584,7 +3584,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={yieldGrowthOpacity}
                                 onChange={e => setYieldGrowthOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (0.7+)', color: '#15803d' },
@@ -3593,7 +3593,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<0.4)', color: '#ef4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3849,9 +3849,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={restoreBoundariesOpacity}
                                 onChange={e => setRestoreBoundariesOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -3892,7 +3892,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={restoreProgressOpacity}
                                 onChange={e => setRestoreProgressOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (85%+)', color: '#15803d' },
@@ -3901,7 +3901,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Initial (<55%)', color: '#ef4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3937,7 +3937,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={restoreSurvivalOpacity}
                                 onChange={e => setRestoreSurvivalOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (90%+)', color: '#15803d' },
@@ -3945,7 +3945,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<85%)', color: '#eab308' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3981,7 +3981,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={restoreCarbonOpacity}
                                 onChange={e => setRestoreCarbonOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (40t+)', color: '#15803d' },
@@ -3989,7 +3989,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<30t)', color: '#eab308' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -4025,7 +4025,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={restoreBiodiversityOpacity}
                                 onChange={e => setRestoreBiodiversityOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (90%+)', color: '#15803d' },
@@ -4033,7 +4033,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<80%)', color: '#eab308' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -4890,9 +4890,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={climateBoundariesOpacity}
                                 onChange={e => setClimateBoundariesOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -4933,7 +4933,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={climateRainfallOpacity}
                                 onChange={e => setClimateRainfallOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (25mm+)', color: '#1d4ed8' },
@@ -4941,7 +4941,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<18mm)', color: '#93c5fd' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -4977,7 +4977,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={climateSoilTempOpacity}
                                 onChange={e => setClimateSoilTempOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (>29°C)', color: '#ef4444' },
@@ -4985,7 +4985,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Cool (<25°C)', color: '#10b981' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -5028,7 +5028,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={climateLstOpacity}
                                 onChange={e => setClimateLstOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (>36°C)', color: '#b91c1c' },
@@ -5037,7 +5037,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Cool (<25°C)', color: '#10b981' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -5073,7 +5073,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               </div>
                               <input type="range" min="10" max="100" value={climateVaporDeficitOpacity}
                                 onChange={e => setClimateVaporDeficitOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="grid grid-cols-1 gap-1.5 pt-1">
                                 {[
                                   { label: 'High (>2.2 kPa)', color: '#ef4444' },
@@ -5081,7 +5081,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<1.5 kPa)', color: '#10b981' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
