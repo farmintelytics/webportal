@@ -3167,89 +3167,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           isCompareMode={isCompareMode}
                         />
                         <Pane name="left-pane-health" style={{ zIndex: 500 }}>
-                          {healthPlotsDataA.map(plot => (
-                            <Polygon key={`${plot.id}-left`} positions={plot.coords}
-                              pathOptions={getHealthPlotStyle(plot)}
-                              eventHandlers={{ click: () => setSelectedHealthPlot(plot) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">HEALTH INDEX (Left/Date A)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>NDVI</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Chlorophyll</span><span className="text-emerald-600 font-bold">{plot.chlorophyll.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Water Stress</span><span className="text-blue-600 font-bold">{plot.waterStress.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Pest Risk</span><span className={`${plot.pestRisk === 'High Risk' ? 'text-red-600 font-bold' : plot.pestRisk === 'Moderate Risk' ? 'text-amber-500 font-bold' : 'text-green-600 font-bold'}`}>{plot.pestRisk}</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderHealthPolygons(healthPlotsDataA, 'left')}
                         </Pane>
                         <Pane name="right-pane-health" style={{ zIndex: 501 }}>
-                          {healthPlotsDataB.map(plot => (
-                            <Polygon key={`${plot.id}-right`} positions={plot.coords}
-                              pathOptions={getHealthPlotStyle(plot)}
-                              eventHandlers={{ click: () => setSelectedHealthPlot(plot) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">HEALTH INDEX (Right/Date B)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>NDVI</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Chlorophyll</span><span className="text-emerald-600 font-bold">{plot.chlorophyll.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Water Stress</span><span className="text-blue-600 font-bold">{plot.waterStress.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Pest Risk</span><span className={`${plot.pestRisk === 'High Risk' ? 'text-red-600 font-bold' : plot.pestRisk === 'Moderate Risk' ? 'text-amber-500 font-bold' : 'text-green-600 font-bold'}`}>{plot.pestRisk}</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderHealthPolygons(healthPlotsDataB, 'right')}
                         </Pane>
                       </>
                     ) : (
-                      healthPlotsData.map(plot => (
-                        <Polygon key={plot.id} positions={plot.coords}
-                          pathOptions={getHealthPlotStyle(plot)}
-                          eventHandlers={{ click: () => setSelectedHealthPlot(plot) }}>
-                          <Popup>
-                            <div className="p-2 w-52 space-y-2 font-sans">
-                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">HEALTH INDEX</div>
-                              <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                              <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                              <div className="w-full h-px bg-gray-100" />
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>NDVI</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Chlorophyll</span><span className="text-emerald-600 font-bold">{plot.chlorophyll.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Water Stress</span><span className="text-blue-600 font-bold">{plot.waterStress.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Pest Risk</span><span className={`${plot.pestRisk === 'High Risk' ? 'text-red-600 font-bold' : plot.pestRisk === 'Moderate Risk' ? 'text-amber-500 font-bold' : 'text-green-600 font-bold'}`}>{plot.pestRisk}</span>
-                              </div>
-                            </div>
-                          </Popup>
-                        </Polygon>
-                      ))
+                      renderHealthPolygons(healthPlotsData)
                     )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={healthShowLayers} />
@@ -3596,89 +3521,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           isCompareMode={isCompareMode}
                         />
                         <Pane name="left-pane-yield" style={{ zIndex: 500 }}>
-                          {yieldPlotsDataA.map(plot => (
-                            <Polygon key={`${plot.id}-left`} positions={plot.coords}
-                              pathOptions={getYieldPlotStyle(plot)}
-                              eventHandlers={{ click: () => setSelectedYieldPlot(plot) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">YIELD PREDICTION (Left/Date A)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Est. Yield Rate</span><span className="text-green-700 font-bold">{plot.yieldValue} t/HA</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Projected Season</span><span className="text-emerald-700 font-bold">{plot.predictedYield} t</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Confidence Acc.</span><span className="text-blue-600 font-bold">{plot.predAccuracy}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Readiness</span><span className="text-orange-600 font-bold">{plot.readiness}%</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderYieldPolygons(yieldPlotsDataA, 'left')}
                         </Pane>
                         <Pane name="right-pane-yield" style={{ zIndex: 501 }}>
-                          {yieldPlotsDataB.map(plot => (
-                            <Polygon key={`${plot.id}-right`} positions={plot.coords}
-                              pathOptions={getYieldPlotStyle(plot)}
-                              eventHandlers={{ click: () => setSelectedYieldPlot(plot) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">YIELD PREDICTION (Right/Date B)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Est. Yield Rate</span><span className="text-green-700 font-bold">{plot.yieldValue} t/HA</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Projected Season</span><span className="text-emerald-700 font-bold">{plot.predictedYield} t</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Confidence Acc.</span><span className="text-blue-600 font-bold">{plot.predAccuracy}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Readiness</span><span className="text-orange-600 font-bold">{plot.readiness}%</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderYieldPolygons(yieldPlotsDataB, 'right')}
                         </Pane>
                       </>
                     ) : (
-                      yieldPlotsData.map(plot => (
-                        <Polygon key={plot.id} positions={plot.coords}
-                          pathOptions={getYieldPlotStyle(plot)}
-                          eventHandlers={{ click: () => setSelectedYieldPlot(plot) }}>
-                          <Popup>
-                            <div className="p-2 w-52 space-y-2 font-sans">
-                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">YIELD PREDICTION COMPONENT</div>
-                              <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                              <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                              <div className="w-full h-px bg-gray-100" />
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Est. Yield Rate</span><span className="text-green-700 font-bold">{plot.yieldValue} t/HA</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Projected Season</span><span className="text-emerald-700 font-bold">{plot.predictedYield} t</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Confidence Acc.</span><span className="text-blue-600 font-bold">{plot.predAccuracy}</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Readiness</span><span className="text-orange-600 font-bold">{plot.readiness}%</span>
-                              </div>
-                            </div>
-                          </Popup>
-                        </Polygon>
-                      ))
+                      renderYieldPolygons(yieldPlotsData)
                     )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={yieldShowLayers} />
@@ -4019,89 +3869,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           isCompareMode={isCompareMode}
                         />
                         <Pane name="left-pane-restore" style={{ zIndex: 500 }}>
-                          {restorationPlotsDataA.map(zone => (
-                            <Polygon key={`${zone.id}-left`} positions={zone.coords}
-                              pathOptions={getRestorePlotStyle(zone)}
-                              eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">RESTORATION (Left/Date A)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{zone.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {zone.area} · {zone.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Canopy Progress</span><span className="text-green-700 font-bold">{zone.progress}%</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Survival Rate</span><span className="text-emerald-700 font-bold">{zone.survival}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Carbon Offset</span><span className="text-yellow-700 font-bold">{zone.carbon} t</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Biodiversity</span><span className="text-blue-600 font-bold">{zone.biodiversity}</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderRestorePolygons(restorationPlotsDataA, 'left')}
                         </Pane>
                         <Pane name="right-pane-restore" style={{ zIndex: 501 }}>
-                          {restorationPlotsDataB.map(zone => (
-                            <Polygon key={`${zone.id}-right`} positions={zone.coords}
-                              pathOptions={getRestorePlotStyle(zone)}
-                              eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">RESTORATION (Right/Date B)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{zone.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {zone.area} · {zone.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Canopy Progress</span><span className="text-green-700 font-bold">{zone.progress}%</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Survival Rate</span><span className="text-emerald-700 font-bold">{zone.survival}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Carbon Offset</span><span className="text-yellow-700 font-bold">{zone.carbon} t</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Biodiversity</span><span className="text-blue-600 font-bold">{zone.biodiversity}</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderRestorePolygons(restorationPlotsDataB, 'right')}
                         </Pane>
                       </>
                     ) : (
-                      restorationPlotsData.map(zone => (
-                        <Polygon key={zone.id} positions={zone.coords}
-                          pathOptions={getRestorePlotStyle(zone)}
-                          eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}>
-                          <Popup>
-                            <div className="p-2 w-52 space-y-2 font-sans">
-                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">RESTORATION TARGET LAYER</div>
-                              <h4 className="text-sm font-bold text-gray-900">{zone.name}</h4>
-                              <div className="text-xs text-gray-400">Area: {zone.area} · {zone.id}</div>
-                              <div className="w-full h-px bg-gray-100" />
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Canopy Progress</span><span className="text-green-700 font-bold">{zone.progress}%</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Survival Rate</span><span className="text-emerald-700 font-bold">{zone.survival}</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Carbon Offset</span><span className="text-yellow-700 font-bold">{zone.carbon} t</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Biodiversity</span><span className="text-blue-600 font-bold">{zone.biodiversity}</span>
-                              </div>
-                            </div>
-                          </Popup>
-                        </Polygon>
-                      ))
+                      renderRestorePolygons(restorationPlotsData)
                     )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={restoreShowLayers} />
@@ -5038,80 +4813,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           isCompareMode={isCompareMode}
                         />
                         <Pane name="left-pane-climate" style={{ zIndex: 500 }}>
-                          {climatePlotsDataA.map(plot => (
-                            <Polygon key={`${plot.id}-left`} positions={plot.coords}
-                              pathOptions={getClimatePlotStyle(plot)}
-                              eventHandlers={{ click: () => setSelectedClimatePlot(plot) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">CLIMATE (Left/Date A)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Rainfall</span><span className="text-blue-600 font-bold">{plot.rainfall} mm</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Soil Temperature</span><span className="text-orange-600 font-bold">{plot.soilTemp} °C</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Surface Temp (LST)</span><span className="text-red-500 font-bold">{plot.lst} °C</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderClimatePolygons(climatePlotsDataA, 'left')}
                         </Pane>
                         <Pane name="right-pane-climate" style={{ zIndex: 501 }}>
-                          {climatePlotsDataB.map(plot => (
-                            <Polygon key={`${plot.id}-right`} positions={plot.coords}
-                              pathOptions={getClimatePlotStyle(plot)}
-                              eventHandlers={{ click: () => setSelectedClimatePlot(plot) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">CLIMATE (Right/Date B)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Rainfall</span><span className="text-blue-600 font-bold">{plot.rainfall} mm</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Soil Temperature</span><span className="text-orange-600 font-bold">{plot.soilTemp} °C</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>Surface Temp (LST)</span><span className="text-red-500 font-bold">{plot.lst} °C</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderClimatePolygons(climatePlotsDataB, 'right')}
                         </Pane>
                       </>
                     ) : (
-                      climatePlotsData.map(plot => (
-                        <Polygon key={plot.id} positions={plot.coords}
-                          pathOptions={getClimatePlotStyle(plot)}
-                          eventHandlers={{ click: () => setSelectedClimatePlot(plot) }}>
-                          <Popup>
-                            <div className="p-2 w-52 space-y-2 font-sans">
-                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">SENSOR TELEMETRY LEDGER</div>
-                              <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                              <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                              <div className="w-full h-px bg-gray-100" />
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Rainfall</span><span className="text-blue-600 font-bold">{plot.rainfall} mm</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Soil Temperature</span><span className="text-orange-600 font-bold">{plot.soilTemp} °C</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>Surface Temp (LST)</span><span className="text-red-500 font-bold">{plot.lst} °C</span>
-                              </div>
-                            </div>
-                          </Popup>
-                        </Polygon>
-                      ))
+                      renderClimatePolygons(climatePlotsData)
                     )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={climateShowLayers} />
