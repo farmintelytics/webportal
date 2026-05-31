@@ -519,6 +519,27 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [glassmorphismEnabled, setGlassmorphismEnabled] = useState(true);
   const [showProfileSaved, setShowProfileSaved] = useState(false);
 
+  // Collapsible sidebar section groups states (collapsed/false by default)
+  const [intelOpExpanded, setIntelOpExpanded] = useState(false);
+  const [intelBioExpanded, setIntelBioExpanded] = useState(false);
+  const [intelMonExpanded, setIntelMonExpanded] = useState(false);
+
+  const [healthOpExpanded, setHealthOpExpanded] = useState(false);
+  const [healthBioExpanded, setHealthBioExpanded] = useState(false);
+  const [healthMonExpanded, setHealthMonExpanded] = useState(false);
+
+  const [yieldOpExpanded, setYieldOpExpanded] = useState(false);
+  const [yieldProdExpanded, setYieldProdExpanded] = useState(false);
+  const [yieldStatExpanded, setYieldStatExpanded] = useState(false);
+
+  const [restoreOpExpanded, setRestoreOpExpanded] = useState(false);
+  const [restoreEcoExpanded, setRestoreEcoExpanded] = useState(false);
+
+  const [climateOpExpanded, setClimateOpExpanded] = useState(false);
+  const [climateBioExpanded, setClimateBioExpanded] = useState(false);
+  const [climateAtmExpanded, setClimateAtmExpanded] = useState(false);
+
+
   const [telemetryLogs, setTelemetryLogs] = useState([
     '[SUCCESS] GIS Engine initialized at 2026-05-30T16:00:00Z',
     '[SUCCESS] Sentinel-2 API connected. RTT: 124ms',
@@ -2415,11 +2436,16 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <div className="p-4 space-y-6">
                       {/* OPERATIONAL SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Operational
+
+                        <div 
+                          onClick={() => setIntelOpExpanded(!intelOpExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {intelOpExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Operational
                         </div>
-                        
-                        {/* Farm Boundaries Card */}
+                        {intelOpExpanded && (
+                          <div className="space-y-3">
+                            {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -2499,15 +2525,22 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* BIOPHYSICAL SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Biophysical
+
+                        <div 
+                          onClick={() => setIntelBioExpanded(!intelBioExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {intelBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical
                         </div>
-                        
-                        {/* EVI (Vegetation Vigor) Card */}
+                        {intelBioExpanded && (
+                          <div className="space-y-3">
+                            {/* EVI (Vegetation Vigor) Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -2598,15 +2631,22 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* MONITORING SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Monitoring
+
+                        <div 
+                          onClick={() => setIntelMonExpanded(!intelMonExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {intelMonExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Monitoring
                         </div>
-                        
-                        {/* VHI (Stress) Card */}
+                        {intelMonExpanded && (
+                          <div className="space-y-3">
+                            {/* VHI (Stress) Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -2694,7 +2734,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
-
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2914,11 +2955,16 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <div className="p-4 space-y-6">
                       {/* OPERATIONAL SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Operational
+
+                        <div 
+                          onClick={() => setHealthOpExpanded(!healthOpExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {healthOpExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Operational
                         </div>
-                        
-                        {/* Farm Boundaries Card */}
+                        {healthOpExpanded && (
+                          <div className="space-y-3">
+                            {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -2953,15 +2999,22 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* BIOPHYSICAL HEALTH SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Biophysical Health
+
+                        <div 
+                          onClick={() => setHealthBioExpanded(!healthBioExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {healthBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical Health
                         </div>
-                        
-                        {/* NDVI Card */}
+                        {healthBioExpanded && (
+                          <div className="space-y-3">
+                            {/* NDVI Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -3052,15 +3105,22 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* MONITORING & RISK SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Monitoring & Risk
+
+                        <div 
+                          onClick={() => setHealthMonExpanded(!healthMonExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {healthMonExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Monitoring & Risk
                         </div>
-                        
-                        {/* Water Stress Card */}
+                        {healthMonExpanded && (
+                          <div className="space-y-3">
+                            {/* Water Stress Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -3149,6 +3209,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3369,11 +3431,16 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <div className="p-4 space-y-6">
                       {/* OPERATIONAL SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Operational
+
+                        <div 
+                          onClick={() => setYieldOpExpanded(!yieldOpExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {yieldOpExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Operational
                         </div>
-                        
-                        {/* Farm Boundaries Card */}
+                        {yieldOpExpanded && (
+                          <div className="space-y-3">
+                            {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -3408,15 +3475,22 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* PRODUCTION SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Production Metrics
+
+                        <div 
+                          onClick={() => setYieldProdExpanded(!yieldProdExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {yieldProdExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Production Metrics
                         </div>
-                        
-                        {/* Est. Yield Card */}
+                        {yieldProdExpanded && (
+                          <div className="space-y-3">
+                            {/* Est. Yield Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -3505,15 +3579,22 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* STATUS SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Status & Conditions
+
+                        <div 
+                          onClick={() => setYieldStatExpanded(!yieldStatExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {yieldStatExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Status & Conditions
                         </div>
-                        
-                        {/* Harvest Readiness Card */}
+                        {yieldStatExpanded && (
+                          <div className="space-y-3">
+                            {/* Harvest Readiness Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -3601,6 +3682,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3818,11 +3901,16 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <div className="p-4 space-y-6">
                       {/* OPERATIONAL SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Operational
+
+                        <div 
+                          onClick={() => setRestoreOpExpanded(!restoreOpExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {restoreOpExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Operational
                         </div>
-                        
-                        {/* Farm Boundaries Card */}
+                        {restoreOpExpanded && (
+                          <div className="space-y-3">
+                            {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -3857,15 +3945,22 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* ECOLOGICAL PROGRESS SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Ecological Progress
+
+                        <div 
+                          onClick={() => setRestoreEcoExpanded(!restoreEcoExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {restoreEcoExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Ecological Progress
                         </div>
-                        
-                        {/* Canopy Density Card */}
+                        {restoreEcoExpanded && (
+                          <div className="space-y-3">
+                            {/* Canopy Density Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -4041,6 +4136,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -4859,11 +4956,16 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <div className="p-4 space-y-6">
                       {/* OPERATIONAL SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Operational
+
+                        <div 
+                          onClick={() => setClimateOpExpanded(!climateOpExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {climateOpExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Operational
                         </div>
-                        
-                        {/* Farm Boundaries Card */}
+                        {climateOpExpanded && (
+                          <div className="space-y-3">
+                            {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -4898,15 +5000,22 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* BIOPHYSICAL SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Biophysical
+
+                        <div 
+                          onClick={() => setClimateBioExpanded(!climateBioExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {climateBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical
                         </div>
-                        
-                        {/* Precipitation Card */}
+                        {climateBioExpanded && (
+                          <div className="space-y-3">
+                            {/* Precipitation Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -4993,15 +5102,22 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* ATMOSPHERE SECTION */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <ChevronDown size={12} /> Atmosphere
+
+                        <div 
+                          onClick={() => setClimateAtmExpanded(!climateAtmExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {climateAtmExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Atmosphere
                         </div>
-                        
-                        {/* LST Card */}
+                        {climateAtmExpanded && (
+                          <div className="space-y-3">
+                            {/* LST Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
@@ -5089,6 +5205,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
