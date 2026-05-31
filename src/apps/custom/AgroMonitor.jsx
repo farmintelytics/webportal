@@ -861,28 +861,57 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               pathOptions={getIntelPlotStyleFill(plot, layer)}
               eventHandlers={{ click: () => setSelectedPlot(plot) }}
             >
-              <Popup>
-                <div className="p-2 w-52 space-y-2 font-sans">
-                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'INTELLIGENCE LAYER (Left/Date A)' : suffix === 'right' ? 'INTELLIGENCE LAYER (Right/Date B)' : 'INTELLIGENCE LAYER Composite'}
-                  </div>
-                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                  <div className="w-full h-px bg-gray-100" />
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>CVI Vigor</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>WDI Deficit</span><span className="text-blue-600 font-bold">{plot.ndmi.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>CAR Chlorophyll</span><span className="text-emerald-600 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>UAS Anomaly</span><span className={`${plot.id === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600'} font-bold`}>{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</span>
+                          <Popup>
+              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'Intelligence Popup (Left)' : suffix === 'right' ? 'Intelligence Popup (Right)' : 'Intelligence Popup'}
+                  </span>
+                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
+                    WGS 84
+                  </span>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-black text-gray-950 leading-tight">{plot.name}</h4>
+                  <p className="text-[10px] text-gray-400 font-bold">{plot.id}</p>
+                </div>
+
+                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Index Summary</div>
+                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
+                    "{plot.id}: {plot.id === 'PLOT-BETA' ? 'Elevated anomaly score detected in crop water stress index (WDI).' : 'Optimal vigor (CVI) and stable chlorophyll concentration.'}"
+                  </p>
+                </div>
+
+                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
+                  <Line data={{
+                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    datasets: [{
+                      data: TIMELINE_DATA.map(t =>
+                        plot.id === 'PLOT-ALPHA' ? t.ndvi + 0.04 :
+                        plot.id === 'PLOT-BETA'  ? t.ndvi - 0.15 : t.ndvi - 0.05),
+                      borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
+                      fill: true, tension: 0.3, pointRadius: 2
+                    }]
+                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
+                </div>
+
+                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
+                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
+                    <div>CVI Vigor:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.ndvi.toFixed(2)}</div>
+                    <div>WDI Deficit:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.ndmi.toFixed(2)}</div>
+                    <div>CAR Chlorophyll:</div>
+                    <div className="text-right text-gray-950 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</div>
+                    <div>UAS Anomaly:</div>
+                    <div className="text-right text-red-600 font-bold">{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</div>
                   </div>
                 </div>
-              </Popup>
+              </div>
+            </Popup>
             </Polygon>
           ))}
         </React.Fragment>
@@ -918,28 +947,57 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               pathOptions={getHealthPlotStyleFill(plot, layer)}
               eventHandlers={{ click: () => activePlotHandler(plot) }}
             >
-              <Popup>
-                <div className="p-2 w-52 space-y-2 font-sans">
-                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'CROP HEALTH (Left/Date A)' : suffix === 'right' ? 'CROP HEALTH (Right/Date B)' : 'CROP HEALTH Composite'}
-                  </div>
-                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                  <div className="w-full h-px bg-gray-100" />
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>NDVI Index</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Chlorophyll</span><span className="text-emerald-600 font-bold">{plot.chlorophyll.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Water Status</span><span className="text-blue-600 font-bold">{plot.waterStress.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Pest Risk</span><span className={`${plot.pestRisk === 'High Risk' ? 'text-red-600' : plot.pestRisk === 'Moderate Risk' ? 'text-orange-500' : 'text-green-600'} font-bold`}>{plot.pestRisk}</span>
+                          <Popup>
+              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'Crop Health Popup (Left)' : suffix === 'right' ? 'Crop Health Popup (Right)' : 'Crop Health Popup'}
+                  </span>
+                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
+                    WGS 84
+                  </span>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-black text-gray-950 leading-tight">{plot.name}</h4>
+                  <p className="text-[10px] text-gray-400 font-bold">{plot.id}</p>
+                </div>
+
+                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Agronomic Health Summary</div>
+                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
+                    "{plot.id} currently displays a '{plot.health}' status with pest risk categorized as {plot.pestRisk}."
+                  </p>
+                </div>
+
+                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
+                  <Line data={{
+                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    datasets: [{
+                      data: TIMELINE_DATA.map(t =>
+                        plot.id === 'PLOT-ALPHA' ? t.ndvi + 0.04 :
+                        plot.id === 'PLOT-BETA'  ? t.ndvi - 0.15 : t.ndvi - 0.05),
+                      borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
+                      fill: true, tension: 0.3, pointRadius: 2
+                    }]
+                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
+                </div>
+
+                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
+                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
+                    <div>NDVI Index:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.ndvi.toFixed(2)}</div>
+                    <div>Chlorophyll:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.chlorophyll.toFixed(2)}</div>
+                    <div>Water Status:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.waterStress.toFixed(2)}</div>
+                    <div>Pest Risk:</div>
+                    <div className="text-right font-bold text-gray-950">{plot.pestRisk}</div>
                   </div>
                 </div>
-              </Popup>
+              </div>
+            </Popup>
             </Polygon>
           ))}
         </React.Fragment>
@@ -975,28 +1033,57 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               pathOptions={getYieldPlotStyleFill(plot, layer)}
               eventHandlers={{ click: () => activePlotHandler(plot) }}
             >
-              <Popup>
-                <div className="p-2 w-52 space-y-2 font-sans">
-                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'CROP YIELD (Left/Date A)' : suffix === 'right' ? 'CROP YIELD (Right/Date B)' : 'CROP YIELD Composite'}
-                  </div>
-                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                  <div className="w-full h-px bg-gray-100" />
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Est. Yield</span><span className="text-green-600 font-bold">{plot.yieldValue} t/HA</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Biomass</span><span className="text-emerald-600 font-bold">{plot.biomass} kg/m²</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Maturity Ratio</span><span className="text-amber-600 font-bold">{plot.readiness}%</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Growth Index</span><span className="text-green-600 font-bold">{plot.growth.toFixed(2)}</span>
+                          <Popup>
+              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'Crop Yield Popup (Left)' : suffix === 'right' ? 'Crop Yield Popup (Right)' : 'Crop Yield Popup'}
+                  </span>
+                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
+                    WGS 84
+                  </span>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-black text-gray-950 leading-tight">{plot.name}</h4>
+                  <p className="text-[10px] text-gray-400 font-bold">{plot.id}</p>
+                </div>
+
+                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Yield Prediction Analysis</div>
+                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
+                    "Plot {plot.id} is projected at {plot.predictedYield} Tonnes total yield ({plot.yieldValue} t/HA) with a prediction accuracy of {plot.predAccuracy}. Status: {plot.yieldStatus}."
+                  </p>
+                </div>
+
+                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
+                  <Line data={{
+                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    datasets: [{
+                      data: TIMELINE_DATA.map(t =>
+                        plot.id === 'PLOT-ALPHA' ? t.ndvi * 24.5 :
+                        plot.id === 'PLOT-BETA'  ? (t.ndvi - 0.15) * 19.5 : (t.ndvi - 0.05) * 21.5),
+                      borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
+                      fill: true, tension: 0.3, pointRadius: 2
+                    }]
+                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
+                </div>
+
+                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
+                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
+                    <div>Est. Yield:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.yieldValue} t/HA</div>
+                    <div>Biomass:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.biomass} kg/m²</div>
+                    <div>Maturity Ratio:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.readiness}%</div>
+                    <div>Growth Index:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.growth.toFixed(2)}</div>
                   </div>
                 </div>
-              </Popup>
+              </div>
+            </Popup>
             </Polygon>
           ))}
         </React.Fragment>
@@ -1031,31 +1118,59 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               pathOptions={getRestorePlotStyleFill(zone, layer)}
               eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}
             >
-              <Popup>
-                <div className="p-2 w-52 space-y-2 font-sans">
-                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'RESTORATION ZONE (Left/Date A)' : suffix === 'right' ? 'RESTORATION ZONE (Right/Date B)' : 'RESTORATION ZONE Composite'}
-                  </div>
-                  <h4 className="text-sm font-bold text-gray-900">{zone.name}</h4>
-                  <div className="text-xs text-gray-400">Area: {zone.area} · {zone.id}</div>
-                  <div className="w-full h-px bg-gray-100" />
-                  <div className="flex justify-between text-[11px] font-semibold">
-                    <span>Canopy Progress</span><span className="text-green-600 font-bold">{zone.progress}%</span>
-                  </div>
-                  <div className="flex justify-between text-[11px] font-semibold">
-                    <span>Seedling Survival</span><span className="text-emerald-600 font-bold">{zone.survival}</span>
-                  </div>
-                  <div className="flex justify-between text-[11px] font-semibold">
-                    <span>Carbon Offset</span><span className="text-blue-600 font-bold">{zone.carbon}</span>
-                  </div>
-                  <div className="flex justify-between text-[11px] font-semibold">
-                    <span>Species Count</span><span className="text-gray-800 font-bold">{zone.trees} trees</span>
-                  </div>
-                  <div className="flex justify-between text-[11px] font-semibold">
-                    <span>Site Manager</span><span className="text-gray-800 font-medium">{zone.manager}</span>
+                          <Popup>
+              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'Restoration Popup (Left)' : suffix === 'right' ? 'Restoration Popup (Right)' : 'Restoration Popup'}
+                  </span>
+                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
+                    WGS 84
+                  </span>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-black text-gray-950 leading-tight">{zone.name}</h4>
+                  <p className="text-[10px] text-gray-400 font-bold">{zone.id}</p>
+                </div>
+
+                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Progress Summary</div>
+                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
+                    "Managing under supervisor {zone.manager}. Currently showing {zone.status} with {zone.survival} seedling survival. Active carbon sequestered: {zone.carbon} tCO2e."
+                  </p>
+                </div>
+
+                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
+                  <Line data={{
+                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    datasets: [{
+                      data: TIMELINE_DATA.map(t =>
+                        zone.id === 'ZONE-ALPHA' ? Math.min(100, Math.round(t.ndvi * 125)) :
+                        zone.id === 'ZONE-BETA'  ? Math.min(100, Math.round((t.ndvi - 0.15) * 115)) : Math.min(100, Math.round((t.ndvi - 0.05) * 105))),
+                      borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
+                      fill: true, tension: 0.3, pointRadius: 2
+                    }]
+                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
+                </div>
+
+                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
+                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
+                    <div>Canopy Progress:</div>
+                    <div className="text-right text-gray-950 font-bold">{zone.progress}%</div>
+                    <div>Seedling Survival:</div>
+                    <div className="text-right text-gray-950 font-bold">{zone.survival}</div>
+                    <div>Carbon Offset:</div>
+                    <div className="text-right text-gray-950 font-bold">{zone.carbon}</div>
+                    <div>Species Count:</div>
+                    <div className="text-right text-gray-950 font-bold">{zone.trees} trees</div>
+                    <div>Site Manager:</div>
+                    <div className="text-right text-gray-950 font-bold">{zone.manager}</div>
                   </div>
                 </div>
-              </Popup>
+              </div>
+            </Popup>
             </Polygon>
           ))}
         </React.Fragment>
@@ -1091,28 +1206,57 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               pathOptions={getClimatePlotStyleFill(plot, layer)}
               eventHandlers={{ click: () => activePlotHandler(plot) }}
             >
-              <Popup>
-                <div className="p-2 w-52 space-y-2 font-sans">
-                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'CLIMATE CONDITION (Left/Date A)' : suffix === 'right' ? 'CLIMATE CONDITION (Right/Date B)' : 'CLIMATE Composite'}
-                  </div>
-                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                  <div className="w-full h-px bg-gray-100" />
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Precipitation</span><span className="text-blue-600 font-bold">{plot.rainfall} mm</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Soil Temp</span><span className="text-orange-600 font-bold">{plot.soilTemp}°C</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Surface Temp (LST)</span><span className="text-red-600 font-bold">{plot.lst}°C</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>VPD Stress</span><span className="text-purple-600 font-bold">{plot.vpd} kPa</span>
+                          <Popup>
+              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'Climate Popup (Left)' : suffix === 'right' ? 'Climate Popup (Right)' : 'Climate Popup'}
+                  </span>
+                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
+                    WGS 84
+                  </span>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-black text-gray-950 leading-tight">{plot.name}</h4>
+                  <p className="text-[10px] text-gray-400 font-bold">{plot.id}</p>
+                </div>
+
+                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Microclimate Summary</div>
+                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
+                    "Telemetry feed active from Abeokuta MET station. Sensor node battery status: 94%. Current relative humidity: 68%. VPD transpiration stress level: {plot.vpd} kPa."
+                  </p>
+                </div>
+
+                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
+                  <Line data={{
+                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    datasets: [{
+                      data: TIMELINE_DATA.map((t, idx) =>
+                        plot.id === 'PLOT-ALPHA' ? 12 + idx * 4 :
+                        plot.id === 'PLOT-BETA'  ? 10 + idx * 3 : 11 + idx * 4),
+                      borderColor: '#1D4ED8', borderWidth: 2, backgroundColor: 'rgba(29,78,216,0.06)',
+                      fill: true, tension: 0.3, pointRadius: 2
+                    }]
+                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
+                </div>
+
+                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
+                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
+                    <div>Precipitation:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.rainfall} mm</div>
+                    <div>Soil Temp:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.soilTemp}°C</div>
+                    <div>Surface Temp:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.lst}°C</div>
+                    <div>VPD Stress:</div>
+                    <div className="text-right text-gray-950 font-bold">{plot.vpd} kPa</div>
                   </div>
                 </div>
-              </Popup>
+              </div>
+            </Popup>
             </Polygon>
           ))}
         </React.Fragment>
@@ -2604,53 +2748,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  {selectedPlot && (
-                    <div className="absolute top-[76px] right-4 w-72 bg-white border border-gray-200 shadow-2xl rounded-2xl p-5 flex flex-col gap-4 pointer-events-auto animate-in slide-in-from-right-6 duration-300" style={{ zIndex: 10000 }}>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide mb-1">Intelligence Ledger</div>
-                          <h3 className="text-lg font-bold text-gray-900">{selectedPlot.id}</h3>
-                          <p className="text-xs text-gray-400 font-semibold mt-0.5">{selectedPlot.name}</p>
-                        </div>
-                        <button onClick={() => setSelectedPlot(null)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700">
-                          <X size={15} />
-                        </button>
-                      </div>
-                      <div className="bg-slate-900 p-3.5 rounded-xl text-white">
-                        <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Index Summary</div>
-                        <p className="text-xs font-medium italic leading-relaxed text-slate-100">
-                          "{selectedPlot.id}: {selectedPlot.id === 'PLOT-BETA' ? 'Elevated anomaly score detected in crop water stress index (WDI).' : 'Optimal vigor (CVI) and stable chlorophyll concentration.'}"
-                        </p>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="h-24 bg-gray-50 rounded-xl p-2">
-                          <Line data={{
-                            labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                            datasets: [{
-                              data: TIMELINE_DATA.map(t =>
-                                selectedPlot.id === 'PLOT-ALPHA' ? t.ndvi + 0.04 :
-                                selectedPlot.id === 'PLOT-BETA'  ? t.ndvi - 0.15 : t.ndvi - 0.05),
-                              borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
-                              fill: true, tension: 0.3, pointRadius: 2
-                            }]
-                          }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                        </div>
-                        <div className="space-y-2 pt-2 border-t border-gray-100">
-                          {[
-                            { label: 'CVI Vigor Index',   value: selectedPlot.ndvi.toFixed(2), color: 'text-green-600' },
-                            { label: 'WDI Water Deficit',  value: selectedPlot.ndmi.toFixed(2), color: 'text-blue-600' },
-                            { label: 'CAR Chlorophyll',    value: (selectedPlot.ndvi * 0.9).toFixed(2), color: 'text-emerald-600' },
-                            { label: 'UAS Anomaly Score',  value: selectedPlot.id === 'PLOT-BETA' ? '0.75' : selectedPlot.id === 'PLOT-GAMMA' ? '0.45' : '0.15', color: selectedPlot.id === 'PLOT-BETA' ? 'text-red-500' : 'text-green-600' },
-                            { label: 'Area Extent',        value: selectedPlot.area,            color: 'text-gray-800' }
-                          ].map((r, i) => (
-                            <div key={i} className="flex justify-between text-xs font-semibold text-gray-600">
-                              <span>{r.label}</span><span className={`font-bold ${r.color}`}>{r.value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  null
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
@@ -3123,53 +3221,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  {selectedHealthPlot && (
-                    <div className="absolute top-[76px] right-4 w-72 bg-white border border-gray-200 shadow-2xl rounded-2xl p-5 flex flex-col gap-4 pointer-events-auto animate-in slide-in-from-right-6 duration-300" style={{ zIndex: 10000 }}>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide mb-1">Block Health Ledger</div>
-                          <h3 className="text-lg font-bold text-gray-900">{selectedHealthPlot.id}</h3>
-                          <p className="text-xs text-gray-400 font-semibold mt-0.5">{selectedHealthPlot.name}</p>
-                        </div>
-                        <button onClick={() => setSelectedHealthPlot(null)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700">
-                          <X size={15} />
-                        </button>
-                      </div>
-                      <div className="bg-slate-900 p-3.5 rounded-xl text-white">
-                        <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Agronomic Health Summary</div>
-                        <p className="text-xs font-medium italic leading-relaxed text-slate-100">
-                          "{selectedHealthPlot.id} currently displays a '{selectedHealthPlot.health}' status with pest risk categorized as {selectedHealthPlot.pestRisk}."
-                        </p>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="h-24 bg-gray-50 rounded-xl p-2">
-                          <Line data={{
-                            labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                            datasets: [{
-                              data: TIMELINE_DATA.map(t =>
-                                selectedHealthPlot.id === 'PLOT-ALPHA' ? t.ndvi + 0.04 :
-                                selectedHealthPlot.id === 'PLOT-BETA'  ? t.ndvi - 0.15 : t.ndvi - 0.05),
-                              borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
-                              fill: true, tension: 0.3, pointRadius: 2
-                            }]
-                          }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                        </div>
-                        <div className="space-y-2 pt-2 border-t border-gray-100">
-                          {[
-                            { label: 'NDVI Value',        value: selectedHealthPlot.ndvi.toFixed(2), color: 'text-green-600' },
-                            { label: 'Chlorophyll (NDRE)',value: selectedHealthPlot.chlorophyll.toFixed(2), color: 'text-emerald-700' },
-                            { label: 'Water Stress (NDMI)',value: selectedHealthPlot.waterStress.toFixed(2), color: 'text-blue-600' },
-                            { label: 'Pest Vulnerability',value: selectedHealthPlot.pestRisk, color: selectedHealthPlot.pestRisk === 'High Risk' ? 'text-red-500' : selectedHealthPlot.pestRisk === 'Moderate Risk' ? 'text-amber-500' : 'text-green-600' },
-                            { label: 'Area Extent',        value: selectedHealthPlot.area,            color: 'text-gray-800' }
-                          ].map((r, i) => (
-                            <div key={i} className="flex justify-between text-xs font-semibold text-gray-600">
-                              <span>{r.label}</span><span className={`font-bold ${r.color}`}>{r.value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  null
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
@@ -3598,54 +3650,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  {selectedYieldPlot && (
-                    <div className="absolute top-[76px] right-4 w-72 bg-white border border-gray-200 shadow-2xl rounded-2xl p-5 flex flex-col gap-4 pointer-events-auto animate-in slide-in-from-right-6 duration-300" style={{ zIndex: 10000 }}>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide mb-1">Block Yield Projections</div>
-                          <h3 className="text-lg font-bold text-gray-900">{selectedYieldPlot.id}</h3>
-                          <p className="text-xs text-gray-400 font-semibold mt-0.5">{selectedYieldPlot.name}</p>
-                        </div>
-                        <button onClick={() => setSelectedYieldPlot(null)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700">
-                          <X size={15} />
-                        </button>
-                      </div>
-                      <div className="bg-slate-900 p-3.5 rounded-xl text-white">
-                        <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Yield Prediction Analysis</div>
-                        <p className="text-xs font-medium italic leading-relaxed text-slate-100">
-                          "Plot {selectedYieldPlot.id} is projected at {selectedYieldPlot.predictedYield} Tonnes total yield ({selectedYieldPlot.yieldValue} t/HA) with a prediction accuracy of {selectedYieldPlot.predAccuracy}. Status: {selectedYieldPlot.yieldStatus}."
-                        </p>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="h-24 bg-gray-50 rounded-xl p-2">
-                          <Line data={{
-                            labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                            datasets: [{
-                              data: TIMELINE_DATA.map(t =>
-                                selectedYieldPlot.id === 'PLOT-ALPHA' ? t.ndvi * 24.5 :
-                                selectedYieldPlot.id === 'PLOT-BETA'  ? (t.ndvi - 0.15) * 19.5 : (t.ndvi - 0.05) * 21.5),
-                              borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
-                              fill: true, tension: 0.3, pointRadius: 2
-                            }]
-                          }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                        </div>
-                        <div className="space-y-2 pt-2 border-t border-gray-100">
-                          {[
-                            { label: 'Est. Yield Value',       value: `${selectedYieldPlot.yieldValue} t/HA`, color: 'text-green-600' },
-                            { label: 'Projected Total Yield',  value: `${selectedYieldPlot.predictedYield} Tonnes`, color: 'text-emerald-700' },
-                            { label: 'Prediction Accuracy',    value: selectedYieldPlot.predAccuracy, color: 'text-blue-600' },
-                            { label: 'Biomass Output Index',   value: `${selectedYieldPlot.biomass} kg/m²`, color: 'text-gray-800' },
-                            { label: 'Growth VCI',             value: selectedYieldPlot.growth,            color: 'text-gray-800' },
-                            { label: 'Harvest Readiness',      value: `${selectedYieldPlot.readiness}%`,   color: 'text-orange-600' }
-                          ].map((r, i) => (
-                            <div key={i} className="flex justify-between text-xs font-semibold text-gray-600">
-                              <span>{r.label}</span><span className={`font-bold ${r.color}`}>{r.value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  null
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
@@ -4068,54 +4073,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  {selectedRestoreZone && (
-                    <div className="absolute top-[76px] right-4 w-72 bg-white border border-gray-200 shadow-2xl rounded-2xl p-5 flex flex-col gap-4 pointer-events-auto animate-in slide-in-from-right-6 duration-300" style={{ zIndex: 10000 }}>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide mb-1">Zone Restoration Ledger</div>
-                          <h3 className="text-lg font-bold text-gray-900">{selectedRestoreZone.id}</h3>
-                          <p className="text-xs text-gray-400 font-semibold mt-0.5">{selectedRestoreZone.name}</p>
-                        </div>
-                        <button onClick={() => setSelectedRestoreZone(null)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700">
-                          <X size={15} />
-                        </button>
-                      </div>
-                      <div className="bg-slate-900 p-3.5 rounded-xl text-white">
-                        <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Progress Summary</div>
-                        <p className="text-xs font-medium italic leading-relaxed text-slate-100">
-                          "Managing under supervisor {selectedRestoreZone.manager}. Currently showing {selectedRestoreZone.status} with {selectedRestoreZone.survival} seedling survival. Active carbon sequestered: {selectedRestoreZone.carbon} tCO2e."
-                        </p>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="h-24 bg-gray-50 rounded-xl p-2">
-                          <Line data={{
-                            labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                            datasets: [{
-                              data: TIMELINE_DATA.map(t =>
-                                selectedRestoreZone.id === 'ZONE-ALPHA' ? Math.min(100, Math.round(t.ndvi * 125)) :
-                                selectedRestoreZone.id === 'ZONE-BETA'  ? Math.min(100, Math.round((t.ndvi - 0.15) * 115)) : Math.min(100, Math.round((t.ndvi - 0.05) * 105))),
-                              borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
-                              fill: true, tension: 0.3, pointRadius: 2
-                            }]
-                          }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                        </div>
-                        <div className="space-y-2 pt-2 border-t border-gray-100">
-                          {[
-                            { label: 'Canopy Density',      value: `${selectedRestoreZone.progress}%`, color: 'text-green-600' },
-                            { label: 'Soil Carbon Stock',   value: `${selectedRestoreZone.carbon} tCO2e`, color: 'text-emerald-700' },
-                            { label: 'Seedling Survival',   value: selectedRestoreZone.survival, color: 'text-blue-600' },
-                            { label: 'Active Trees',        value: selectedRestoreZone.trees, color: 'text-gray-800' },
-                            { label: 'Manager Assigned',    value: selectedRestoreZone.manager,            color: 'text-gray-800' },
-                            { label: 'Growth Status',       value: selectedRestoreZone.status,   color: 'text-orange-600' }
-                          ].map((r, i) => (
-                            <div key={i} className="flex justify-between text-xs font-semibold text-gray-600">
-                              <span>{r.label}</span><span className={`font-bold ${r.color}`}>{r.value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  null
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
@@ -5125,52 +5083,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  {selectedClimatePlot && (
-                    <div className="absolute top-[76px] right-4 w-72 bg-white border border-gray-200 shadow-2xl rounded-2xl p-5 flex flex-col gap-4 pointer-events-auto animate-in slide-in-from-right-6 duration-300" style={{ zIndex: 10000 }}>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide mb-1">Climate & Sensors</div>
-                          <h3 className="text-lg font-bold text-gray-900">{selectedClimatePlot.id}</h3>
-                          <p className="text-xs text-gray-400 font-semibold mt-0.5">{selectedClimatePlot.name}</p>
-                        </div>
-                        <button onClick={() => setSelectedClimatePlot(null)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700">
-                          <X size={15} />
-                        </button>
-                      </div>
-                      <div className="bg-slate-900 p-3.5 rounded-xl text-white">
-                        <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Station Feed</div>
-                        <p className="text-xs font-medium italic leading-relaxed text-slate-100">
-                          "Telemetry feed active from Abeokuta MET station. Sensor node battery status: 94%. Current relative humidity: 68%. VPD transpiration stress level: {selectedClimatePlot.vpd} kPa."
-                        </p>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="h-24 bg-gray-50 rounded-xl p-2">
-                          <Line data={{
-                            labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                            datasets: [{
-                              data: TIMELINE_DATA.map((t, idx) =>
-                                selectedClimatePlot.id === 'PLOT-ALPHA' ? 12 + idx * 4 :
-                                selectedClimatePlot.id === 'PLOT-BETA'  ? 10 + idx * 3 : 11 + idx * 4),
-                              borderColor: '#1D4ED8', borderWidth: 2, backgroundColor: 'rgba(29,78,216,0.06)',
-                              fill: true, tension: 0.3, pointRadius: 2
-                            }]
-                          }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                        </div>
-                        <div className="space-y-2 pt-2 border-t border-gray-100">
-                          {[
-                            { label: 'Rainfall (mm)',     value: `${selectedClimatePlot.rainfall} mm`, color: 'text-blue-600' },
-                            { label: 'Soil Temp (°C)',    value: `${selectedClimatePlot.soilTemp} °C`, color: 'text-orange-600' },
-                            { label: 'Surface LST (°C)',  value: `${selectedClimatePlot.lst} °C`,      color: 'text-red-500' },
-                            { label: 'VPD Transpiration', value: `${selectedClimatePlot.vpd} kPa`,     color: 'text-gray-800' }
-                          ].map((r, i) => (
-                            <div key={i} className="flex justify-between text-xs font-semibold text-gray-600">
-                              <span>{r.label}</span><span className={`font-bold ${r.color}`}>{r.value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  null
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
