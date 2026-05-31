@@ -134,23 +134,23 @@ const SwipeSliderOverlay = ({ isCompareMode, splitPosition, currentTimelineA, cu
         <span className="text-green-600 font-extrabold text-lg select-none">↔</span>
       </div>
 
-      {/* Floating Date Badges */}
+      {/* Floating Date Badges (At the lower side, square, smaller, and no colors) */}
       {/* Left Badge */}
       <div
-        className="absolute top-4 bg-white/90 backdrop-blur-sm border-l-4 border-green-600 px-3 py-1.5 rounded-r-xl shadow-lg flex flex-col pointer-events-none animate-in slide-in-from-left duration-205"
-        style={{ left: '172px', zIndex: 20000 }}
+        className="absolute bg-white/90 backdrop-blur-sm border border-gray-200 px-2 py-1 rounded-sm shadow-md flex flex-col pointer-events-none animate-in fade-in duration-200"
+        style={{ left: '12px', bottom: '12px', zIndex: 20000 }}
       >
-        <span className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Left</span>
-        <span className="text-xs font-extrabold text-gray-800">{currentTimelineA?.label}</span>
+        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Left</span>
+        <span className="text-[10px] font-extrabold text-gray-800">{currentTimelineA?.label?.split(',')[0]}</span>
       </div>
 
       {/* Right Badge */}
       <div
-        className="absolute top-4 bg-white/90 backdrop-blur-sm border-r-4 border-blue-600 px-3 py-1.5 rounded-l-xl shadow-lg flex flex-col pointer-events-none text-right animate-in slide-in-from-right duration-205"
-        style={{ right: '152px', zIndex: 20000 }}
+        className="absolute bg-white/90 backdrop-blur-sm border border-gray-200 px-2 py-1 rounded-sm shadow-md flex flex-col pointer-events-none text-right animate-in fade-in duration-200"
+        style={{ right: '55px', bottom: '12px', zIndex: 20000 }}
       >
-        <span className="text-[9px] font-bold text-blue-700 uppercase tracking-wider">Right</span>
-        <span className="text-xs font-extrabold text-gray-800">{currentTimelineB?.label}</span>
+        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Right</span>
+        <span className="text-[10px] font-extrabold text-gray-800">{currentTimelineB?.label?.split(',')[0]}</span>
       </div>
     </>
   );
@@ -268,6 +268,53 @@ const BAR_CHART_OPTIONS = {
 const AgroMonitor = ({ onBack, onSignOut }) => {
   const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
   const [activeTab, setActiveTab] = useState('monitor');
+
+  // Layout Resizing States
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(240);
+  const [activeResizeType, setActiveResizeType] = useState(null); // 'sidebar', 'bottom', or null
+
+  const startSidebarResize = (e) => {
+    e.preventDefault();
+    setActiveResizeType('sidebar');
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const doDrag = (moveEvent) => {
+      const newWidth = Math.max(180, Math.min(360, startWidth + (moveEvent.clientX - startX)));
+      setSidebarWidth(newWidth);
+    };
+
+    const stopDrag = () => {
+      setActiveResizeType(null);
+      document.removeEventListener('mousemove', doDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    };
+
+    document.addEventListener('mousemove', doDrag);
+    document.addEventListener('mouseup', stopDrag);
+  };
+
+  const startBottomPanelResize = (e) => {
+    e.preventDefault();
+    setActiveResizeType('bottom');
+    const startY = e.clientY;
+    const startHeight = bottomPanelHeight;
+
+    const doDrag = (moveEvent) => {
+      const newHeight = Math.max(120, Math.min(500, startHeight - (moveEvent.clientY - startY)));
+      setBottomPanelHeight(newHeight);
+    };
+
+    const stopDrag = () => {
+      setActiveResizeType(null);
+      document.removeEventListener('mousemove', doDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    };
+
+    document.addEventListener('mousemove', doDrag);
+    document.addEventListener('mouseup', stopDrag);
+  };
   const [selectedTimelineIndex, setSelectedTimelineIndex] = useState(2);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [compareTimelineIndex, setCompareTimelineIndex] = useState(3);
@@ -347,29 +394,29 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       <div className="absolute top-4 left-4" style={{ zIndex: 40000 }} ref={basemapDropdownRef}>
         <button
           onClick={() => setShowBasemapDropdown(!showBasemapDropdown)}
-          className="bg-white border border-gray-200 px-3.5 py-2.5 rounded-2xl shadow-xl hover:bg-gray-50 flex items-center gap-2.5 font-bold text-xs text-gray-705 transition-all active:scale-95"
+          className="bg-white border border-gray-200 px-2 py-1.5 rounded-sm shadow-md hover:bg-gray-55 flex items-center gap-1.5 font-bold text-[10px] text-gray-700 transition-all active:scale-95"
         >
-          <span className="text-sm">{activeBasemapObj.emoji}</span>
-          <span className="truncate max-w-[100px]">{activeBasemapObj.label}</span>
-          <ChevronDown size={14} className={`text-gray-400 transition-transform ${showBasemapDropdown ? 'rotate-180' : ''}`} />
+          <span className="text-xs">{activeBasemapObj.emoji}</span>
+          <span className="truncate max-w-[85px]">{activeBasemapObj.label}</span>
+          <ChevronDown size={11} className={`text-gray-400 transition-transform ${showBasemapDropdown ? 'rotate-180' : ''}`} />
         </button>
         {showBasemapDropdown && (
-          <div className="absolute left-0 top-full mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-            <div className="p-1.5 space-y-1">
+          <div className="absolute left-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-sm shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="p-1 space-y-0.5">
               {BASEMAPS.map(src => (
                 <button
                   key={src.id}
                   onClick={() => { setSelectedBasemap(src.id); setShowBasemapDropdown(false); }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all ${
-                    selectedBasemap === src.id ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-sm text-left transition-all ${
+                    selectedBasemap === src.id ? 'bg-green-50 text-green-700 font-extrabold' : 'hover:bg-gray-55 text-gray-700'
                   }`}
                 >
-                  <span className="text-sm shrink-0">{src.emoji}</span>
+                  <span className="text-xs shrink-0">{src.emoji}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold truncate leading-tight">{src.label}</div>
+                    <div className="text-[10px] font-bold truncate leading-tight">{src.label}</div>
                     <div className="text-[9px] text-gray-400 mt-0.5">{src.sub}</div>
                   </div>
-                  {selectedBasemap === src.id && <CheckCircle2 size={11} className="text-green-600 shrink-0" />}
+                  {selectedBasemap === src.id && <CheckCircle2 size={10} className="text-green-600 shrink-0" />}
                 </button>
               ))}
             </div>
@@ -1583,7 +1630,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return null;
     }
     return (
-      <div className="bg-white border-t border-gray-200 shrink-0">
+      <div style={{ height: `${bottomPanelHeight}px` }} className="bg-white border-t border-gray-200 shrink-0 flex flex-col relative overflow-hidden">
+        {/* Draggable horizontal divider */}
+        <div 
+          onMouseDown={startBottomPanelResize} 
+          className="absolute top-[-4px] left-0 right-0 h-2 cursor-row-resize hover:bg-green-500/55 active:bg-green-500 transition-colors z-50"
+        />
         {/* Slider + Play row */}
         {!hideCalendarAndSlider && showTimeSliderTool && (
           <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-4">
@@ -1644,7 +1696,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           </div>
         )}
 
-        <div className="flex divide-x divide-gray-100 bg-gray-50/30" style={{ maxHeight: '360px' }}>
+        <div className="flex divide-x divide-gray-100 bg-gray-50/30 min-h-0 flex-1">
           {/* Mini Calendar (Enlarged) */}
           {!hideCalendarAndSlider && showCalendarTool && (
             <div className="p-4 shrink-0 w-[440px] bg-white flex flex-col justify-between overflow-y-auto">
@@ -2383,7 +2435,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
         {/* ── LEFT SIDEBAR ── */}
         {activeTab === 'monitor' && (
-          <aside className="w-[240px] bg-white border-r border-gray-100 flex flex-col z-50 shadow-sm shrink-0">
+          <aside style={{ width: `${sidebarWidth}px` }} className="bg-white border-r border-gray-100 flex flex-col z-50 shadow-sm shrink-0 relative">
+            {/* Draggable vertical divider */}
+            <div 
+              onMouseDown={startSidebarResize} 
+              className="absolute right-[-4px] top-0 bottom-0 w-2 cursor-col-resize hover:bg-green-500/50 active:bg-green-500 transition-colors z-50"
+            />
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
 
               {/* MAIN */}
@@ -2538,7 +2595,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 <div className="bg-white px-5 py-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 shrink-0">
                   <CalendarIcon size={16} className="text-green-600" />
                   <span className="text-sm font-bold text-gray-700">
-                    {currentTimeline.label} · {currentTimeline.satellite}
+                    Date last update: {currentTimeline.label}
                   </span>
                 </div>
               </div>
@@ -2790,7 +2847,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  null
+                  {null}
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
@@ -3188,7 +3245,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  null
+                  {null}
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
@@ -3542,7 +3599,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  null
+                  {null}
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
@@ -3890,7 +3947,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  null
+                  {null}
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
@@ -4834,7 +4891,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
 
                   {/* Plot detail panel (over map) */}
-                  null
+                  {null}
                 </div>
 
                 {/* ═══ RIGHT MAP LAYERS SIDEBAR ═══ */}
@@ -6283,6 +6340,15 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Resizing and dragging overlay helper */}
+      {(activeResizeType || isDraggingSplit) && (
+        <div 
+          className={`fixed inset-0 z-[999999] bg-transparent select-none ${
+            activeResizeType === 'sidebar' || isDraggingSplit ? 'cursor-col-resize' : 'cursor-row-resize'
+          }`}
+        />
       )}
     </div>
   );
