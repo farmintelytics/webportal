@@ -65,7 +65,8 @@ import {
   Radio,
   Target,
   Gauge,
-  ListFilter
+  ListFilter,
+  Columns
 } from 'lucide-react';
 import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap, Pane } from 'react-leaflet';
 const ResizeMap = ({ trigger }) => {
@@ -134,21 +135,21 @@ const SwipeSliderOverlay = ({ isCompareMode, splitPosition, currentTimelineA, cu
       </div>
 
       {/* Floating Date Badges */}
-      {/* Left Badge: Date A (Green) */}
+      {/* Left Badge */}
       <div
         className="absolute top-4 bg-white/90 backdrop-blur-sm border-l-4 border-green-600 px-3 py-1.5 rounded-r-xl shadow-lg flex flex-col pointer-events-none animate-in slide-in-from-left duration-205"
         style={{ left: '172px', zIndex: 20000 }}
       >
-        <span className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Date A (Left)</span>
+        <span className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Left</span>
         <span className="text-xs font-extrabold text-gray-800">{currentTimelineA?.label}</span>
       </div>
 
-      {/* Right Badge: Date B (Blue) */}
+      {/* Right Badge */}
       <div
         className="absolute top-4 bg-white/90 backdrop-blur-sm border-r-4 border-blue-600 px-3 py-1.5 rounded-l-xl shadow-lg flex flex-col pointer-events-none text-right animate-in slide-in-from-right duration-205"
         style={{ right: '152px', zIndex: 20000 }}
       >
-        <span className="text-[9px] font-bold text-blue-700 uppercase tracking-wider">Date B (Right)</span>
+        <span className="text-[9px] font-bold text-blue-700 uppercase tracking-wider">Right</span>
         <span className="text-xs font-extrabold text-gray-800">{currentTimelineB?.label}</span>
       </div>
     </>
@@ -1648,64 +1649,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           {!hideCalendarAndSlider && showCalendarTool && (
             <div className="p-4 shrink-0 w-[440px] bg-white flex flex-col justify-between overflow-y-auto">
               <div>
-                {/* Compare Mode Toggle Header */}
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-                  <span className="text-xs font-bold text-gray-700">Split Comparison Mode</span>
-                  <button
-                    onClick={() => {
-                      const nextVal = !isCompareMode;
-                      setIsCompareMode(nextVal);
-                      if (nextVal) {
-                        if (compareTimelineIndex === selectedTimelineIndex) {
-                          setCompareTimelineIndex((selectedTimelineIndex + 1) % TIMELINE_DATA.length);
-                        }
-                        setActiveDateSlot('B');
-                      } else {
-                        setActiveDateSlot('A');
-                      }
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${
-                      isCompareMode
-                        ? 'bg-green-55 text-green-700 border-green-200 shadow-sm font-extrabold'
-                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-                    }`}
-                  >
-                    {isCompareMode ? 'ACTIVE' : 'INACTIVE'}
-                  </button>
-                </div>
 
-                {/* Date Slots Selection inside Calendar */}
-                {isCompareMode && (
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <button
-                      onClick={() => setActiveDateSlot('A')}
-                      className={`flex flex-col p-1.5 rounded-lg border text-left transition-all ${
-                        activeDateSlot === 'A'
-                          ? 'border-green-600 bg-green-50/30 shadow-sm'
-                          : 'border-gray-150 bg-gray-50 hover:bg-gray-100/50'
-                      }`}
-                    >
-                      <span className="text-[8px] font-bold text-green-700 uppercase tracking-wide">Date A (Left Pane)</span>
-                      <span className="text-xs font-extrabold text-gray-800 truncate">
-                        {currentTimelineA ? currentTimelineA.label.split(',')[0] : 'Not Selected'}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveDateSlot('B')}
-                      className={`flex flex-col p-1.5 rounded-lg border text-left transition-all ${
-                        activeDateSlot === 'B'
-                          ? 'border-blue-600 bg-blue-50/30 shadow-sm'
-                          : 'border-gray-150 bg-gray-50 hover:bg-gray-100/50'
-                      }`}
-                    >
-                      <span className="text-[8px] font-bold text-blue-700 uppercase tracking-wide">Date B (Right Pane)</span>
-                      <span className="text-xs font-extrabold text-gray-800 truncate">
-                        {currentTimelineB ? currentTimelineB.label.split(',')[0] : 'Not Selected'}
-                      </span>
-                    </button>
-                  </div>
-                )}
 
                 <div className="flex items-center justify-between mb-3">
                   <button onClick={prevCalMonth} className="p-1 hover:bg-gray-100 rounded-lg transition-all text-gray-500 hover:text-gray-900 border border-gray-100 shadow-sm">
@@ -2482,7 +2426,19 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-3">Tools</div>
                 {[
                   { id: 'calendar-tool', label: 'Calendar',     icon: <CalendarIcon size={17} />, active: showCalendarTool, toggle: () => setShowCalendarTool(!showCalendarTool) },
-                  { id: 'slider-tool',   label: 'Time Slider',  icon: <SlidersHorizontal size={17} />, active: showTimeSliderTool, toggle: () => setShowTimeSliderTool(!showTimeSliderTool) }
+                  { id: 'slider-tool',   label: 'Time Slider',  icon: <SlidersHorizontal size={17} />, active: showTimeSliderTool, toggle: () => setShowTimeSliderTool(!showTimeSliderTool) },
+                  { id: 'compare-tool',  label: 'Split Comparison', icon: <Columns size={17} />, active: isCompareMode, toggle: () => {
+                    const nextVal = !isCompareMode;
+                    setIsCompareMode(nextVal);
+                    if (nextVal) {
+                      if (compareTimelineIndex === selectedTimelineIndex) {
+                        setCompareTimelineIndex((selectedTimelineIndex + 1) % TIMELINE_DATA.length);
+                      }
+                      setActiveDateSlot('B');
+                    } else {
+                      setActiveDateSlot('A');
+                    }
+                  } }
                 ].map(item => (
                   <button
                     key={item.id}
@@ -2504,6 +2460,34 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     )}
                   </button>
                 ))}
+
+                {isCompareMode && (
+                  <div className="px-3 py-2.5 bg-blue-50/40 rounded-xl mt-1.5 space-y-2 border border-blue-100/50">
+                    <div className="text-[10px] font-bold text-blue-700 uppercase tracking-widest px-1">Active Date Slot</div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        onClick={() => setActiveDateSlot('A')}
+                        className={`py-2 px-1.5 rounded-lg text-[10px] font-extrabold text-center border transition-all ${
+                          activeDateSlot === 'A'
+                            ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        Left
+                      </button>
+                      <button
+                        onClick={() => setActiveDateSlot('B')}
+                        className={`py-2 px-1.5 rounded-lg text-[10px] font-extrabold text-center border transition-all ${
+                          activeDateSlot === 'B'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        Right
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* SETTINGS */}

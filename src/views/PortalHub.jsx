@@ -167,7 +167,7 @@ const PortalHub = ({ onSelectModule }) => {
             { id: 'sustainability', label: 'Sustainability' },
             { id: 'payments', label: 'Payments' },
             { id: 'field-advisory', label: 'Advisory' },
-            { id: 'custom', label: 'Custom' }
+            { id: 'custom', label: 'Organization' }
           ].map(tab => (
             <button 
               key={tab.id}
