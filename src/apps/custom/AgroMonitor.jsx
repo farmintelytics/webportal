@@ -564,33 +564,37 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
   const cardStyle = glassmorphismEnabled ? 'glass shadow-premium border border-white/20' : 'bg-white border border-gray-100 shadow-sm';
 
-  const getHealthPlotStyle = (plot) => {
-    const showStroke = healthShowBoundaries;
-    const strokeColor = '#15803d';
-    const strokeOpacity = healthBoundariesOpacity / 100;
-    
+  const getHealthPlotStyleOutline = () => ({
+    color: healthShowBoundaries ? '#000000' : 'transparent',
+    weight: healthShowBoundaries ? 2.5 : 0,
+    opacity: healthBoundariesOpacity / 100,
+    fillColor: 'transparent',
+    fillOpacity: 0
+  });
+
+  const getHealthPlotStyleFill = (plot, layer) => {
     let fillColor = 'transparent';
     let fillOpacity = 0;
     
-    if (healthShowPest) {
+    if (layer === 'pest') {
       const risk = plot.pestRisk;
       fillColor = risk === 'High Risk' ? '#ef4444' : risk === 'Moderate Risk' ? '#f97316' : '#16a34a';
       fillOpacity = healthPestOpacity / 100;
-    } else if (healthShowWater) {
+    } else if (layer === 'water') {
       fillColor = getIndexFiveClasses(plot.waterStress, 'NDMI').color;
       fillOpacity = healthWaterOpacity / 100;
-    } else if (healthShowChlorophyll) {
+    } else if (layer === 'chlorophyll') {
       fillColor = getIndexFiveClasses(plot.chlorophyll, 'NDVI').color;
       fillOpacity = healthChlorophyllOpacity / 100;
-    } else if (healthShowNdvi) {
+    } else if (layer === 'ndvi') {
       fillColor = getIndexFiveClasses(plot.ndvi, 'NDVI').color;
       fillOpacity = healthNdviOpacity / 100;
     }
     
     return {
-      color: showStroke ? strokeColor : 'transparent',
-      weight: showStroke ? 2.5 : 0,
-      opacity: strokeOpacity,
+      color: 'transparent',
+      weight: 0,
+      opacity: 0,
       fillColor: fillColor,
       fillOpacity: fillOpacity
     };
@@ -609,36 +613,40 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [yieldShowGrowth, setYieldShowGrowth] = useState(false);
   const [yieldGrowthOpacity, setYieldGrowthOpacity] = useState(70);
 
-  const getYieldPlotStyle = (plot) => {
-    const showStroke = yieldShowBoundaries;
-    const strokeColor = '#15803d';
-    const strokeOpacity = yieldBoundariesOpacity / 100;
-    
+  const getYieldPlotStyleOutline = () => ({
+    color: yieldShowBoundaries ? '#000000' : 'transparent',
+    weight: yieldShowBoundaries ? 2.5 : 0,
+    opacity: yieldBoundariesOpacity / 100,
+    fillColor: 'transparent',
+    fillOpacity: 0
+  });
+
+  const getYieldPlotStyleFill = (plot, layer) => {
     let fillColor = 'transparent';
     let fillOpacity = 0;
     
-    if (yieldShowReadiness) {
+    if (layer === 'readiness') {
       const val = plot.readiness;
       fillColor = val > 85 ? '#16a34a' : val > 65 ? '#eab308' : '#f97316';
       fillOpacity = yieldReadinessOpacity / 100;
-    } else if (yieldShowGrowth) {
+    } else if (layer === 'growth') {
       const val = plot.growth;
       fillColor = val > 0.7 ? '#15803d' : val > 0.55 ? '#22c55e' : val > 0.4 ? '#eab308' : '#ef4444';
       fillOpacity = yieldGrowthOpacity / 100;
-    } else if (yieldShowBiomass) {
+    } else if (layer === 'biomass') {
       const val = plot.biomass;
       fillColor = val > 2.0 ? '#15803d' : val > 1.3 ? '#22c55e' : val > 0.8 ? '#eab308' : '#ef4444';
       fillOpacity = yieldBiomassOpacity / 100;
-    } else if (yieldShowYield) {
+    } else if (layer === 'yield') {
       const val = plot.yieldValue;
       fillColor = val > 18 ? '#15803d' : val > 12 ? '#22c55e' : val > 8 ? '#eab308' : '#ef4444';
       fillOpacity = yieldYieldOpacity / 100;
     }
     
     return {
-      color: showStroke ? strokeColor : 'transparent',
-      weight: showStroke ? 2.5 : 0,
-      opacity: strokeOpacity,
+      color: 'transparent',
+      weight: 0,
+      opacity: 0,
       fillColor: fillColor,
       fillOpacity: fillOpacity
     };
@@ -657,36 +665,40 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [climateShowVaporDeficit, setClimateShowVaporDeficit] = useState(false);
   const [climateVaporDeficitOpacity, setClimateVaporDeficitOpacity] = useState(70);
 
-  const getClimatePlotStyle = (plot) => {
-    const showStroke = climateShowBoundaries;
-    const strokeColor = '#15803d';
-    const strokeOpacity = climateBoundariesOpacity / 100;
-    
+  const getClimatePlotStyleOutline = () => ({
+    color: climateShowBoundaries ? '#000000' : 'transparent',
+    weight: climateShowBoundaries ? 2.5 : 0,
+    opacity: climateBoundariesOpacity / 100,
+    fillColor: 'transparent',
+    fillOpacity: 0
+  });
+
+  const getClimatePlotStyleFill = (plot, layer) => {
     let fillColor = 'transparent';
     let fillOpacity = 0;
     
-    if (climateShowVaporDeficit) {
+    if (layer === 'vpd') {
       const val = plot.vpd;
       fillColor = val > 2.2 ? '#ef4444' : val > 1.5 ? '#f97316' : '#10b981';
       fillOpacity = climateVaporDeficitOpacity / 100;
-    } else if (climateShowLst) {
+    } else if (layer === 'lst') {
       const val = plot.lst;
       fillColor = val > 36 ? '#b91c1c' : val > 30 ? '#ef4444' : val > 25 ? '#f97316' : '#10b981';
       fillOpacity = climateLstOpacity / 100;
-    } else if (climateShowSoilTemp) {
+    } else if (layer === 'soilTemp') {
       const val = plot.soilTemp;
       fillColor = val > 29 ? '#ef4444' : val > 25 ? '#f97316' : '#10b981';
       fillOpacity = climateSoilTempOpacity / 100;
-    } else if (climateShowRainfall) {
+    } else if (layer === 'rainfall') {
       const val = plot.rainfall;
       fillColor = val > 25 ? '#1d4ed8' : val > 18 ? '#3b82f6' : '#93c5fd';
       fillOpacity = climateRainfallOpacity / 100;
     }
     
     return {
-      color: showStroke ? strokeColor : 'transparent',
-      weight: showStroke ? 2.5 : 0,
-      opacity: strokeOpacity,
+      color: 'transparent',
+      weight: 0,
+      opacity: 0,
       fillColor: fillColor,
       fillOpacity: fillOpacity
     };
@@ -705,110 +717,407 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [restoreShowBiodiversity, setRestoreShowBiodiversity] = useState(false);
   const [restoreBiodiversityOpacity, setRestoreBiodiversityOpacity] = useState(70);
 
-  // Layer mutual exclusivity helpers for each page
+  // Layer independent toggle handlers for each page (allowing concurrent layers)
   const handleIntelToggle = (layer) => {
-    setIntelShowGrowth(layer === 'growth' ? !intelShowGrowth : false);
-    setIntelShowEvi(layer === 'evi' ? !intelShowEvi : false);
-    setIntelShowLswi(layer === 'lswi' ? !intelShowLswi : false);
-    setIntelShowVhi(layer === 'vhi' ? !intelShowVhi : false);
-    setIntelShowSuitability(layer === 'suitability' ? !intelShowSuitability : false);
+    if (layer === 'growth') setIntelShowGrowth(!intelShowGrowth);
+    if (layer === 'evi') setIntelShowEvi(!intelShowEvi);
+    if (layer === 'lswi') setIntelShowLswi(!intelShowLswi);
+    if (layer === 'vhi') setIntelShowVhi(!intelShowVhi);
+    if (layer === 'suitability') setIntelShowSuitability(!intelShowSuitability);
   };
 
   const handleHealthToggle = (layer) => {
-    setHealthShowNdvi(layer === 'ndvi' ? !healthShowNdvi : false);
-    setHealthShowChlorophyll(layer === 'chlorophyll' ? !healthShowChlorophyll : false);
-    setHealthShowWater(layer === 'water' ? !healthShowWater : false);
-    setHealthShowPest(layer === 'pest' ? !healthShowPest : false);
+    if (layer === 'ndvi') setHealthShowNdvi(!healthShowNdvi);
+    if (layer === 'chlorophyll') setHealthShowChlorophyll(!healthShowChlorophyll);
+    if (layer === 'water') setHealthShowWater(!healthShowWater);
+    if (layer === 'pest') setHealthShowPest(!healthShowPest);
   };
 
   const handleYieldToggle = (layer) => {
-    setYieldShowYield(layer === 'yield' ? !yieldShowYield : false);
-    setYieldShowBiomass(layer === 'biomass' ? !yieldShowBiomass : false);
-    setYieldShowReadiness(layer === 'readiness' ? !yieldShowReadiness : false);
-    setYieldShowGrowth(layer === 'growth' ? !yieldShowGrowth : false);
+    if (layer === 'yield') setYieldShowYield(!yieldShowYield);
+    if (layer === 'biomass') setYieldShowBiomass(!yieldShowBiomass);
+    if (layer === 'readiness') setYieldShowReadiness(!yieldShowReadiness);
+    if (layer === 'growth') setYieldShowGrowth(!yieldShowGrowth);
   };
 
   const handleClimateToggle = (layer) => {
-    setClimateShowRainfall(layer === 'rainfall' ? !climateShowRainfall : false);
-    setClimateShowSoilTemp(layer === 'soilTemp' ? !climateShowSoilTemp : false);
-    setClimateShowLst(layer === 'lst' ? !climateShowLst : false);
-    setClimateShowVaporDeficit(layer === 'vpd' ? !climateShowVaporDeficit : false);
+    if (layer === 'rainfall') setClimateShowRainfall(!climateShowRainfall);
+    if (layer === 'soilTemp') setClimateShowSoilTemp(!climateShowSoilTemp);
+    if (layer === 'lst') setClimateShowLst(!climateShowLst);
+    if (layer === 'vpd') setClimateShowVaporDeficit(!climateShowVaporDeficit);
   };
 
   const handleRestoreToggle = (layer) => {
-    setRestoreShowProgress(layer === 'progress' ? !restoreShowProgress : false);
-    setRestoreShowSurvival(layer === 'survival' ? !restoreShowSurvival : false);
-    setRestoreShowCarbon(layer === 'carbon' ? !restoreShowCarbon : false);
-    setRestoreShowBiodiversity(layer === 'biodiversity' ? !restoreShowBiodiversity : false);
+    if (layer === 'progress') setRestoreShowProgress(!restoreShowProgress);
+    if (layer === 'survival') setRestoreShowSurvival(!restoreShowSurvival);
+    if (layer === 'carbon') setRestoreShowCarbon(!restoreShowCarbon);
+    if (layer === 'biodiversity') setRestoreShowBiodiversity(!restoreShowBiodiversity);
   };
 
-  const getRestorePlotStyle = (zone) => {
-    const showStroke = restoreShowBoundaries;
-    const strokeColor = '#15803d';
-    const strokeOpacity = restoreBoundariesOpacity / 100;
-    
+  const getRestorePlotStyleOutline = () => ({
+    color: restoreShowBoundaries ? '#000000' : 'transparent',
+    weight: restoreShowBoundaries ? 2.5 : 0,
+    opacity: restoreBoundariesOpacity / 100,
+    fillColor: 'transparent',
+    fillOpacity: 0
+  });
+
+  const getRestorePlotStyleFill = (zone, layer) => {
     let fillColor = 'transparent';
     let fillOpacity = 0;
     
-    if (restoreShowBiodiversity) {
+    if (layer === 'biodiversity') {
       const val = zone.id === 'ZONE-ALPHA' ? 92 : zone.id === 'ZONE-BETA' ? 84 : 76;
       fillColor = val > 90 ? '#15803d' : val > 80 ? '#22c55e' : '#eab308';
       fillOpacity = restoreBiodiversityOpacity / 100;
-    } else if (restoreShowCarbon) {
+    } else if (layer === 'carbon') {
       const val = zone.carbon;
       fillColor = val > 40 ? '#15803d' : val > 30 ? '#22c55e' : '#eab308';
       fillOpacity = restoreCarbonOpacity / 100;
-    } else if (restoreShowSurvival) {
+    } else if (layer === 'survival') {
       const val = zone.survivalNum;
       fillColor = val > 90 ? '#15803d' : val > 85 ? '#22c55e' : '#eab308';
       fillOpacity = restoreSurvivalOpacity / 100;
-    } else if (restoreShowProgress) {
+    } else if (layer === 'progress') {
       const val = zone.progress;
       fillColor = val > 85 ? '#15803d' : val > 70 ? '#22c55e' : val > 55 ? '#eab308' : '#ef4444';
       fillOpacity = restoreProgressOpacity / 100;
     }
     
     return {
-      color: showStroke ? strokeColor : 'transparent',
-      weight: showStroke ? 2.5 : 0,
-      opacity: strokeOpacity,
+      color: 'transparent',
+      weight: 0,
+      opacity: 0,
       fillColor: fillColor,
       fillOpacity: fillOpacity
     };
   };
 
-  const getIntelPlotStyle = (plot) => {
-    const showStroke = intelShowBoundaries;
-    const strokeColor = '#15803d'; // block boundary color matching key
-    const strokeOpacity = intelBoundariesOpacity / 100;
-    
+  const getIntelPlotStyleOutline = () => ({
+    color: intelShowBoundaries ? '#000000' : 'transparent',
+    weight: intelShowBoundaries ? 2.5 : 0,
+    opacity: intelBoundariesOpacity / 100,
+    fillColor: 'transparent',
+    fillOpacity: 0
+  });
+
+  const getIntelPlotStyleFill = (plot, layer) => {
     let fillColor = 'transparent';
     let fillOpacity = 0;
     
-    if (intelShowSuitability) {
+    if (layer === 'suitability') {
       fillColor = (plot.id === 'PLOT-BETA') ? '#dc2626' : '#16a34a';
       fillOpacity = intelSuitabilityOpacity / 100;
-    } else if (intelShowVhi) {
+    } else if (layer === 'vhi') {
       fillColor = getIndexFiveClasses(plot.ndvi, 'NDVI').color;
       fillOpacity = intelVhiOpacity / 100;
-    } else if (intelShowLswi) {
+    } else if (layer === 'lswi') {
       fillColor = getIndexFiveClasses(plot.ndmi, 'LSWI').color;
       fillOpacity = intelLswiOpacity / 100;
-    } else if (intelShowEvi) {
+    } else if (layer === 'evi') {
       fillColor = getIndexFiveClasses(plot.ndvi * 0.95, 'EVI').color;
       fillOpacity = intelEviOpacity / 100;
-    } else if (intelShowGrowth) {
+    } else if (layer === 'growth') {
       fillColor = (plot.id === 'PLOT-ALPHA') ? '#15803d' : (plot.id === 'PLOT-BETA') ? '#86efac' : '#fbbf24';
       fillOpacity = intelGrowthOpacity / 100;
     }
     
     return {
-      color: showStroke ? strokeColor : 'transparent',
-      weight: showStroke ? 2.5 : 0,
-      opacity: strokeOpacity,
+      color: 'transparent',
+      weight: 0,
+      opacity: 0,
       fillColor: fillColor,
       fillOpacity: fillOpacity
     };
+  };
+
+
+  // Helper methods to render overlapping active layers
+  const renderIntelPolygons = (plots, suffix = '') => {
+    const activeLayers = [];
+    if (intelShowGrowth) activeLayers.push('growth');
+    if (intelShowEvi) activeLayers.push('evi');
+    if (intelShowLswi) activeLayers.push('lswi');
+    if (intelShowVhi) activeLayers.push('vhi');
+    if (intelShowSuitability) activeLayers.push('suitability');
+
+    return plots.map(plot => {
+      const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
+      return (
+        <React.Fragment key={keyPrefix}>
+          {/* Base Boundary outline */}
+          {intelShowBoundaries && (
+            <Polygon 
+              positions={plot.coords}
+              pathOptions={getIntelPlotStyleOutline()}
+              eventHandlers={{ click: () => setSelectedPlot(plot) }}
+            />
+          )}
+          {/* Active Fill Layers */}
+          {activeLayers.map(layer => (
+            <Polygon
+              key={`${keyPrefix}-${layer}`}
+              positions={plot.coords}
+              pathOptions={getIntelPlotStyleFill(plot, layer)}
+              eventHandlers={{ click: () => setSelectedPlot(plot) }}
+            >
+              <Popup>
+                <div className="p-2 w-52 space-y-2 font-sans">
+                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'INTELLIGENCE LAYER (Left/Date A)' : suffix === 'right' ? 'INTELLIGENCE LAYER (Right/Date B)' : 'INTELLIGENCE LAYER Composite'}
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                  <div className="w-full h-px bg-gray-100" />
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>CVI Vigor</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>WDI Deficit</span><span className="text-blue-600 font-bold">{plot.ndmi.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>CAR Chlorophyll</span><span className="text-emerald-600 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>UAS Anomaly</span><span className={`${plot.id === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600'} font-bold`}>{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</span>
+                  </div>
+                </div>
+              </Popup>
+            </Polygon>
+          ))}
+        </React.Fragment>
+      );
+    });
+  };
+
+  const renderHealthPolygons = (plots, suffix = '') => {
+    const activeLayers = [];
+    if (healthShowNdvi) activeLayers.push('ndvi');
+    if (healthShowChlorophyll) activeLayers.push('chlorophyll');
+    if (healthShowWater) activeLayers.push('water');
+    if (healthShowPest) activeLayers.push('pest');
+
+    return plots.map(plot => {
+      const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
+      const activePlotHandler = suffix === 'left' || suffix === 'right' ? setSelectedHealthPlot : setSelectedHealthPlot;
+      return (
+        <React.Fragment key={keyPrefix}>
+          {/* Base Boundary outline */}
+          {healthShowBoundaries && (
+            <Polygon 
+              positions={plot.coords}
+              pathOptions={getHealthPlotStyleOutline()}
+              eventHandlers={{ click: () => activePlotHandler(plot) }}
+            />
+          )}
+          {/* Active Fill Layers */}
+          {activeLayers.map(layer => (
+            <Polygon
+              key={`${keyPrefix}-${layer}`}
+              positions={plot.coords}
+              pathOptions={getHealthPlotStyleFill(plot, layer)}
+              eventHandlers={{ click: () => activePlotHandler(plot) }}
+            >
+              <Popup>
+                <div className="p-2 w-52 space-y-2 font-sans">
+                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'CROP HEALTH (Left/Date A)' : suffix === 'right' ? 'CROP HEALTH (Right/Date B)' : 'CROP HEALTH Composite'}
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                  <div className="w-full h-px bg-gray-100" />
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>NDVI Index</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Chlorophyll</span><span className="text-emerald-600 font-bold">{plot.chlorophyll.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Water Status</span><span className="text-blue-600 font-bold">{plot.waterStress.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Pest Risk</span><span className={`${plot.pestRisk === 'High Risk' ? 'text-red-600' : plot.pestRisk === 'Moderate Risk' ? 'text-orange-500' : 'text-green-600'} font-bold`}>{plot.pestRisk}</span>
+                  </div>
+                </div>
+              </Popup>
+            </Polygon>
+          ))}
+        </React.Fragment>
+      );
+    });
+  };
+
+  const renderYieldPolygons = (plots, suffix = '') => {
+    const activeLayers = [];
+    if (yieldShowYield) activeLayers.push('yield');
+    if (yieldShowBiomass) activeLayers.push('biomass');
+    if (yieldShowReadiness) activeLayers.push('readiness');
+    if (yieldShowGrowth) activeLayers.push('growth');
+
+    return plots.map(plot => {
+      const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
+      const activePlotHandler = setSelectedYieldPlot;
+      return (
+        <React.Fragment key={keyPrefix}>
+          {/* Base Boundary outline */}
+          {yieldShowBoundaries && (
+            <Polygon 
+              positions={plot.coords}
+              pathOptions={getYieldPlotStyleOutline()}
+              eventHandlers={{ click: () => activePlotHandler(plot) }}
+            />
+          )}
+          {/* Active Fill Layers */}
+          {activeLayers.map(layer => (
+            <Polygon
+              key={`${keyPrefix}-${layer}`}
+              positions={plot.coords}
+              pathOptions={getYieldPlotStyleFill(plot, layer)}
+              eventHandlers={{ click: () => activePlotHandler(plot) }}
+            >
+              <Popup>
+                <div className="p-2 w-52 space-y-2 font-sans">
+                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'CROP YIELD (Left/Date A)' : suffix === 'right' ? 'CROP YIELD (Right/Date B)' : 'CROP YIELD Composite'}
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                  <div className="w-full h-px bg-gray-100" />
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Est. Yield</span><span className="text-green-600 font-bold">{plot.yieldValue} t/HA</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Biomass</span><span className="text-emerald-600 font-bold">{plot.biomass} kg/m²</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Maturity Ratio</span><span className="text-amber-600 font-bold">{plot.readiness}%</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Growth Index</span><span className="text-green-600 font-bold">{plot.growth.toFixed(2)}</span>
+                  </div>
+                </div>
+              </Popup>
+            </Polygon>
+          ))}
+        </React.Fragment>
+      );
+    });
+  };
+
+  const renderRestorePolygons = (zones, suffix = '') => {
+    const activeLayers = [];
+    if (restoreShowProgress) activeLayers.push('progress');
+    if (restoreShowSurvival) activeLayers.push('survival');
+    if (restoreShowCarbon) activeLayers.push('carbon');
+    if (restoreShowBiodiversity) activeLayers.push('biodiversity');
+
+    return zones.map(zone => {
+      const keyPrefix = `${zone.id}${suffix ? '-' + suffix : ''}`;
+      return (
+        <React.Fragment key={keyPrefix}>
+          {/* Base Boundary outline */}
+          {restoreShowBoundaries && (
+            <Polygon 
+              positions={zone.coords}
+              pathOptions={getRestorePlotStyleOutline()}
+              eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}
+            />
+          )}
+          {/* Active Fill Layers */}
+          {activeLayers.map(layer => (
+            <Polygon
+              key={`${keyPrefix}-${layer}`}
+              positions={zone.coords}
+              pathOptions={getRestorePlotStyleFill(zone, layer)}
+              eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}
+            >
+              <Popup>
+                <div className="p-2 w-52 space-y-2 font-sans">
+                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'RESTORATION ZONE (Left/Date A)' : suffix === 'right' ? 'RESTORATION ZONE (Right/Date B)' : 'RESTORATION ZONE Composite'}
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-900">{zone.name}</h4>
+                  <div className="text-xs text-gray-400">Area: {zone.area} · {zone.id}</div>
+                  <div className="w-full h-px bg-gray-100" />
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span>Canopy Progress</span><span className="text-green-600 font-bold">{zone.progress}%</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span>Seedling Survival</span><span className="text-emerald-600 font-bold">{zone.survival}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span>Carbon Offset</span><span className="text-blue-600 font-bold">{zone.carbon}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span>Species Count</span><span className="text-gray-800 font-bold">{zone.trees} trees</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span>Site Manager</span><span className="text-gray-800 font-medium">{zone.manager}</span>
+                  </div>
+                </div>
+              </Popup>
+            </Polygon>
+          ))}
+        </React.Fragment>
+      );
+    });
+  };
+
+  const renderClimatePolygons = (plots, suffix = '') => {
+    const activeLayers = [];
+    if (climateShowRainfall) activeLayers.push('rainfall');
+    if (climateShowSoilTemp) activeLayers.push('soilTemp');
+    if (climateShowLst) activeLayers.push('lst');
+    if (climateShowVaporDeficit) activeLayers.push('vpd');
+
+    return plots.map(plot => {
+      const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
+      const activePlotHandler = setSelectedClimatePlot;
+      return (
+        <React.Fragment key={keyPrefix}>
+          {/* Base Boundary outline */}
+          {climateShowBoundaries && (
+            <Polygon 
+              positions={plot.coords}
+              pathOptions={getClimatePlotStyleOutline()}
+              eventHandlers={{ click: () => activePlotHandler(plot) }}
+            />
+          )}
+          {/* Active Fill Layers */}
+          {activeLayers.map(layer => (
+            <Polygon
+              key={`${keyPrefix}-${layer}`}
+              positions={plot.coords}
+              pathOptions={getClimatePlotStyleFill(plot, layer)}
+              eventHandlers={{ click: () => activePlotHandler(plot) }}
+            >
+              <Popup>
+                <div className="p-2 w-52 space-y-2 font-sans">
+                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
+                    {suffix === 'left' ? 'CLIMATE CONDITION (Left/Date A)' : suffix === 'right' ? 'CLIMATE CONDITION (Right/Date B)' : 'CLIMATE Composite'}
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
+                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
+                  <div className="w-full h-px bg-gray-100" />
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Precipitation</span><span className="text-blue-600 font-bold">{plot.rainfall} mm</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Soil Temp</span><span className="text-orange-600 font-bold">{plot.soilTemp}°C</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>Surface Temp (LST)</span><span className="text-red-600 font-bold">{plot.lst}°C</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>VPD Stress</span><span className="text-purple-600 font-bold">{plot.vpd} kPa</span>
+                  </div>
+                </div>
+              </Popup>
+            </Polygon>
+          ))}
+        </React.Fragment>
+      );
+    });
   };
 
   const handleEstateChange = (val) => {
@@ -2258,89 +2567,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           isCompareMode={isCompareMode}
                         />
                         <Pane name="left-pane-intel" style={{ zIndex: 500 }}>
-                          {plotsDataA.map(plot => (
-                            <Polygon key={`${plot.id}-left`} positions={plot.coords}
-                              pathOptions={getIntelPlotStyle(plot)}
-                              eventHandlers={{ click: () => setSelectedPlot(plot) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">INTELLIGENCE LAYER (Left/Date A)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>CVI Vigor</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>WDI Deficit</span><span className="text-blue-600 font-bold">{plot.ndmi.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>CAR Chlorophyll</span><span className="text-emerald-600 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>UAS Anomaly</span><span className={`${plot.id === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600'} font-bold`}>{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderIntelPolygons(plotsDataA, 'left')}
                         </Pane>
                         <Pane name="right-pane-intel" style={{ zIndex: 501 }}>
-                          {plotsDataB.map(plot => (
-                            <Polygon key={`${plot.id}-right`} positions={plot.coords}
-                              pathOptions={getIntelPlotStyle(plot)}
-                              eventHandlers={{ click: () => setSelectedPlot(plot) }}>
-                              <Popup>
-                                <div className="p-2 w-52 space-y-2 font-sans">
-                                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">INTELLIGENCE LAYER (Right/Date B)</div>
-                                  <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                                  <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                                  <div className="w-full h-px bg-gray-100" />
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>CVI Vigor</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>WDI Deficit</span><span className="text-blue-600 font-bold">{plot.ndmi.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>CAR Chlorophyll</span><span className="text-emerald-600 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs font-semibold">
-                                    <span>UAS Anomaly</span><span className={`${plot.id === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600'} font-bold`}>{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</span>
-                                  </div>
-                                </div>
-                              </Popup>
-                            </Polygon>
-                          ))}
+                          {renderIntelPolygons(plotsDataB, 'right')}
                         </Pane>
                       </>
                     ) : (
-                      plotsData.map(plot => (
-                        <Polygon key={plot.id} positions={plot.coords}
-                          pathOptions={getIntelPlotStyle(plot)}
-                          eventHandlers={{ click: () => setSelectedPlot(plot) }}>
-                          <Popup>
-                            <div className="p-2 w-52 space-y-2 font-sans">
-                              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide">INTELLIGENCE LAYER Composite</div>
-                              <h4 className="text-sm font-bold text-gray-900">{plot.name}</h4>
-                              <div className="text-xs text-gray-400">Area: {plot.area} · {plot.id}</div>
-                              <div className="w-full h-px bg-gray-100" />
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>CVI Vigor</span><span className="text-green-600 font-bold">{plot.ndvi.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>WDI Deficit</span><span className="text-blue-600 font-bold">{plot.ndmi.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>CAR Chlorophyll</span><span className="text-emerald-600 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span>UAS Anomaly</span><span className={`${plot.id === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600'} font-bold`}>{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</span>
-                              </div>
-                            </div>
-                          </Popup>
-                        </Polygon>
-                      ))
+                      renderIntelPolygons(plotsData)
                     )}
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={intelShowLayers} />
@@ -2474,7 +2708,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                 onChange={e => setIntelBoundariesOpacity(parseInt(e.target.value))}
                                 className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
+                                <div className="w-4 h-4 rounded-sm bg-[#000000] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -2517,7 +2751,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Harvest Ready', color: '#ea580c' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2577,7 +2811,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<=0.45)', color: '#EF4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2623,7 +2857,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Severe Stress (<=0.28)', color: '#DC2626' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2683,7 +2917,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<=0.45)', color: '#EF4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2726,7 +2960,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Unsuitable', color: '#dc2626' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -2993,7 +3227,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                 onChange={e => setHealthBoundariesOpacity(parseInt(e.target.value))}
                                 className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
+                                <div className="w-4 h-4 rounded-sm bg-[#000000] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -3051,7 +3285,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<=0.45)', color: '#EF4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3097,7 +3331,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<=0.45)', color: '#EF4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3157,7 +3391,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Severe Stress (<=0.28)', color: '#DC2626' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3201,7 +3435,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low Risk', color: '#16a34a' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3469,7 +3703,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                 onChange={e => setYieldBoundariesOpacity(parseInt(e.target.value))}
                                 className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
+                                <div className="w-4 h-4 rounded-sm bg-[#000000] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -3526,7 +3760,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'High Stress (<8t/HA)', color: '#ef4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3571,7 +3805,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Critical (<0.8kg)', color: '#ef4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3629,7 +3863,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Unready (<65%)', color: '#f97316' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3674,7 +3908,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Deficit (<0.4)', color: '#ef4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -3939,7 +4173,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                 onChange={e => setRestoreBoundariesOpacity(parseInt(e.target.value))}
                                 className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
+                                <div className="w-4 h-4 rounded-sm bg-[#000000] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -3996,7 +4230,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Initial (<55%)', color: '#ef4444' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -4040,7 +4274,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<85%)', color: '#eab308' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -4084,7 +4318,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<30t)', color: '#eab308' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -4128,7 +4362,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<80%)', color: '#eab308' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -4994,7 +5228,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                 onChange={e => setClimateBoundariesOpacity(parseInt(e.target.value))}
                                 className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
                               <div className="flex items-center gap-2 mt-1.5">
-                                <div className="w-2 h-2 rounded-sm bg-[#16A34A] shrink-0" />
+                                <div className="w-4 h-4 rounded-sm bg-[#000000] shrink-0" />
                                 <span className="text-[10px] font-semibold text-gray-500">Block boundary</span>
                               </div>
                             </div>
@@ -5050,7 +5284,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<18mm)', color: '#93c5fd' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -5094,7 +5328,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Cool (<25°C)', color: '#10b981' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -5153,7 +5387,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Cool (<25°C)', color: '#10b981' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
@@ -5197,7 +5431,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                   { label: 'Low (<1.5 kPa)', color: '#10b981' }
                                 ].map((item, i) => (
                                   <div key={i} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                                     <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
                                   </div>
                                 ))}
