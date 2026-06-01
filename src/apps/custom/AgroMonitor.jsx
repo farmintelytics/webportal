@@ -359,16 +359,36 @@ const TOOLTIP_DESCRIPTIONS = {
     done: 'Processed from multispectral UAV orthomosaic using local spatial variance anomaly detection.',
     formula: 'Anomaly Score = Local Spatial Variance Index'
   },
+  'EVI (Vegetation Vigor)': {
+    desc: 'Enhanced Vegetation Index (EVI) measures crop biomass density and greenness while correcting for atmospheric conditions and soil background signals, making it highly sensitive in dense canopy areas.',
+    done: 'Atmospherically corrected Sentinel-2 Red (B4), Near-Infrared (B8), and Blue (B2) band normalization.',
+    formula: 'EVI = 2.5 × (B8 − B4) ÷ (B8 + 6 × B4 − 7.5 × B2 + 1)'
+  },
+  'LSWI (Water Status)': {
+    desc: 'Land Surface Water Index (LSWI) monitors canopy moisture content and crop water status by utilizing absorption features in the shortwave infrared spectrum.',
+    done: 'Derived from Sentinel-2 Near-Infrared (B8) and Shortwave Infrared (B11) bands.',
+    formula: 'LSWI = (B8 − B11) ÷ (B8 + B11)'
+  },
+  'VHI (Stress)': {
+    desc: 'Vegetation Health Index (VHI) combines temperature and moisture indices to evaluate overall crop stress and drought conditions.',
+    done: 'Fused index integrating Sentinel-2 NDVI and Landsat-8 thermal land surface temperature (LST) anomalies.',
+    formula: 'VHI = 0.5 × VCI + 0.5 × TCI'
+  },
+  'Growth Stage': {
+    desc: 'Maps the current development phase of the crop (tillering, grand growth, maturation, etc.) across different plots.',
+    done: 'Compares Sentinel-1 RVI growth curves against accumulated Growing Degree Days (GDD) thermal models.',
+    formula: 'Growth Stage = f(Cumulative GDD, RVI trajectory)'
+  },
 
   // ── Crop Health Layers ───────────────────────────────────────────────────
-  'NDVI Health': {
+  'Vegetation Health': {
     desc: 'The most widely used crop health index. Measures greenness and photosynthetic activity. Below 0.45 signals crop stress.',
     done: 'Atmospherically corrected Sentinel-2 Red (B4) and Near-Infrared (B8) band normalization.',
     formula: 'NDVI = (B8 − B4) ÷ (B8 + B4)'
   },
-  'Chlorophyll Index': {
-    desc: 'Estimates active chlorophyll and leaf nitrogen content. A drop in this index often precedes visible crop yellowing.',
-    done: 'Sentinel-2 NIR (B8) and Red-Edge-1 (B5) ratio — avoids NIR saturation common in dense canopies.',
+  'Chlorophyll VCI': {
+    desc: 'Chlorophyll Vegetation Condition Index (VCI) measures active chlorophyll concentration to detect plant physiological stress and nitrogen levels.',
+    done: 'Atmospherically corrected Sentinel-2 Red-Edge (B5) and Near-Infrared (B8) bands.',
     formula: 'RECI = (B8 ÷ B5) − 1'
   },
   'Red-Edge NDVI (NDRE)': {
@@ -376,20 +396,20 @@ const TOOLTIP_DESCRIPTIONS = {
     done: 'Normalized ratio of Sentinel-2 narrow NIR (B8A) and Red-Edge (B5) — more sensitive than standard NDVI.',
     formula: 'NDRE = (B8A − B5) ÷ (B8A + B5)'
   },
-  'Water Stress Index': {
-    desc: 'Measures how much the crop is water-stressed by combining canopy moisture content with surface temperature readings.',
-    done: 'Fused Sentinel-2 SWIR/NIR moisture index with Landsat-8/9 thermal surface temperature anomalies.',
-    formula: 'WDI = 0.5 × (1 − NDMI) + 0.5 × LST_norm'
+  'Water Stress (NDMI)': {
+    desc: 'Normalized Difference Moisture Index (NDMI) measures liquid water molecules in crop canopies to identify water-limiting conditions.',
+    done: 'Calculated from Sentinel-2 NIR (B8) and SWIR (B11) bands to indicate plant water stress.',
+    formula: 'NDMI = (B8 − B11) ÷ (B8 + B11)'
   },
   'SAR Soil Moisture (SMI)': {
     desc: 'Estimates surface soil moisture (top 5 cm) using radar backscatter. Works best when crop canopy is thin (early growth stage).',
     done: 'Compares current Sentinel-1 VV backscatter against a calibrated dry-season reference image.',
     formula: 'SMI = VV_current (dB) − VV_dry_reference (dB)'
   },
-  'Pest / Disease risk': {
-    desc: 'Flags areas at elevated risk of pest outbreak or disease based on sudden vegetation index drops and thermal anomaly clusters.',
-    done: 'Spatiotemporal anomaly clustering combining rapid CVI/NDVI declines with thermal and moisture outliers.',
-    formula: 'Risk Score = f(ΔCVI/Δt, ΔWDI/Δt, local_variance)'
+  'Pest Risk (Inundation)': {
+    desc: 'Predicts pest and disease vulnerability based on spatial anomalies in canopy density and soil moisture indices.',
+    done: 'Spatiotemporal anomaly clustering engine combining rapid NDVI declines with water logging events.',
+    formula: 'Risk = f(ΔNDVI/Δt, ΔSMI/Δt, Local Variance)'
   },
 
   // ── Crop Yield Layers ────────────────────────────────────────────────────
@@ -516,6 +536,21 @@ const TOOLTIP_DESCRIPTIONS = {
     desc: 'Highlights areas where tree cover has been lost since January 2020 — required for EU Deforestation Regulation compliance.',
     done: 'Bitemporal SAR change magnitude fused with near-real-time optical deforestation alert layers.',
     formula: 'Change Magnitude = √(ΔVV² + ΔVH² + (1−γ)²)'
+  },
+  'Soil Carbon Offset': {
+    desc: 'Estimates soil organic carbon content and sequestered carbon stock in metric tons of CO2 equivalent (tCO2e) inside restoration zones.',
+    done: 'Ensemble machine learning model calibrated with local soil samples and satellite multispectral reflectances.',
+    formula: 'Carbon Stock (tCO2e) = SOC_density × Soil_Depth × Bulk_Density × 3.67'
+  },
+  'Biodiversity': {
+    desc: 'Assesses species richness and ecological diversification inside restoration zones using high-resolution spectral entropy.',
+    done: 'Shannon entropy calculated from the spatial distribution of spectral endmembers across high-resolution imagery.',
+    formula: 'H′ = −Σ(Pi × ln(Pi))'
+  },
+  'SAR AGB Proxy': {
+    desc: 'Estimates above-ground biomass (wood volume and carbon stock) using Sentinel-1 radar cross-polarization backscatter signals.',
+    done: 'Calibrated Sentinel-1 VH polarization backscatter regression model validated with local forest plots.',
+    formula: 'AGB (t/HA) = VH_backscatter (dB) × Scaling_Factor'
   },
 
   // ── Analytics Charts & Cards ─────────────────────────────────────────────
@@ -673,17 +708,21 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     const lowerTitle = title.toLowerCase().trim();
 
     // Explicit mapping of common variants
-    if (lowerTitle.includes('agb')) lookupKey = 'SAR AGB Proxy (VH)';
+    if (lowerTitle.includes('agb')) lookupKey = 'SAR AGB Proxy';
     else if (lowerTitle.includes('lulc') || lowerTitle.includes('land cover')) lookupKey = 'LULC Classification';
     else if (lowerTitle.includes('eudr') || lowerTitle.includes('deforestation')) lookupKey = 'EUDR Deforestation';
-    else if (lowerTitle.includes('biodiversity') || lowerTitle.includes('diversification')) lookupKey = 'Species Diversification';
+    else if (lowerTitle.includes('biodiversity')) lookupKey = 'Biodiversity';
+    else if (lowerTitle.includes('diversification')) lookupKey = 'Species Diversification';
+    else if (lowerTitle.includes('soil carbon offset')) lookupKey = 'Soil Carbon Offset';
     else if (lowerTitle.includes('carbon') || lowerTitle.includes('stabilization')) lookupKey = 'Soil Stabilization';
     else if (lowerTitle.includes('survival')) lookupKey = 'Seedling Survival';
-    else if (lowerTitle.includes('growth')) lookupKey = 'Growth Stage Mapping';
+    else if (lowerTitle.includes('growth')) lookupKey = 'Growth Stage';
     else if (lowerTitle.includes('surface temp') || lowerTitle.includes('lst')) lookupKey = 'Surface Temp (LST)';
     else if (lowerTitle.includes('soil moisture') || lowerTitle.includes('smi')) lookupKey = 'Soil Moisture';
-    else if (lowerTitle.includes('water stress') || lowerTitle.includes('lswi') || lowerTitle.includes('ndmi')) lookupKey = 'Water Stress (NDMI)';
+    else if (lowerTitle.includes('water stress (ndmi)')) lookupKey = 'Water Stress (NDMI)';
+    else if (lowerTitle.includes('water stress') || lowerTitle.includes('lswi') || lowerTitle.includes('ndmi')) lookupKey = 'LSWI (Water Status)';
     else if (lowerTitle.includes('ndre') || lowerTitle.includes('red-edge')) lookupKey = 'Red-Edge NDVI (NDRE)';
+    else if (lowerTitle.includes('vegetation health')) lookupKey = 'Vegetation Health';
 
     // Fallback search in keys
     let info = TOOLTIP_DESCRIPTIONS[lookupKey];
@@ -4087,7 +4126,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight font-sans">EVI (Vegetation Vigor)</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">EVI (Vegetation Vigor) {renderInfoTooltip("EVI (Vegetation Vigor)")}</div>
                               <span className="text-[10px] text-gray-400">Crop biomass density</span>
                             </div>
                             <button
@@ -4797,7 +4836,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDVI (Vegetation Health) {renderInfoTooltip("NDVI (Vegetation Health)")}</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Vegetation Health {renderInfoTooltip("Vegetation Health")}</div>
                               <span className="text-[10px] text-gray-400">Chlorophyll absorption density</span>
                             </div>
                             <button
@@ -5093,7 +5132,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 healthShowPest ? 'Pest Risk' :
                 healthShowWater ? 'Water Stress' :
                 healthShowChlorophyll ? 'Chlorophyll' :
-                healthShowNdvi ? 'NDVI' :
+                healthShowNdvi ? 'Vegetation Health' :
                 healthShowNdre ? 'Red-Edge NDVI (NDRE)' :
                 healthShowSmi ? 'SAR Soil Moisture (SMI)' : 'No Active Layer'
               )}
@@ -6291,7 +6330,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         const isWarn = p.warnCount > 0 && !isCrit;
                         const isSelected = selectedAlertPlot === p.id;
 
-                        const borderClass = isCrit ? 'border-red-200 pulse-critical' : isWarn ? 'border-amber-200 pulse-warning' : 'border-blue-200';
+                        const borderClass = isCrit ? 'border-l-red-500' : isWarn ? 'border-l-amber-500' : 'border-l-blue-400';
                         const dotColor = isCrit ? 'bg-red-500' : isWarn ? 'bg-amber-500' : 'bg-blue-400';
                         const badgeBg = isCrit ? 'bg-red-50 text-red-700 border-red-200' : isWarn ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200';
                         const ndviColor = p.ndvi > 0.7 ? '#10B981' : p.ndvi > 0.5 ? '#F59E0B' : '#EF4444';
@@ -6301,7 +6340,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             key={p.id}
                             id={`alert-plot-row-${p.id.toLowerCase()}`}
                             onClick={() => setSelectedAlertPlot(isSelected ? null : p.id)}
-                            className={`w-full text-left bg-white rounded-xl border p-3.5 transition-all hover:shadow-md active:scale-[0.98] ${borderClass} ${isSelected ? 'ring-2 ring-gray-900 ring-offset-1 shadow-md' : 'shadow-sm hover:border-gray-300'}`}
+                            className={`w-full text-left bg-white rounded-xl border-t border-r border-b border-gray-200 border-l-4 p-3.5 transition-all hover:shadow-md active:scale-[0.98] ${borderClass} ${isSelected ? 'ring-2 ring-gray-900 ring-offset-1 shadow-md' : 'shadow-sm hover:border-gray-300'}`}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-start gap-2.5 min-w-0">
@@ -6407,10 +6446,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           {/* Stats row */}
                           <div className="grid grid-cols-4 gap-3">
                             {[
-                              { label: 'Active Incidents', value: activePlotAlerts.length, color: 'text-red-600', bg: 'bg-red-50 border-red-100' },
-                              { label: 'Critical', value: critCount, color: 'text-red-700', bg: 'bg-red-50 border-red-100' },
-                              { label: 'Warning', value: warnCount, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-100' },
-                              { label: 'Acknowledged', value: plotAlerts.length - activePlotAlerts.length, color: 'text-green-700', bg: 'bg-green-50 border-green-100' }
+                              { label: 'Active Incidents', value: activePlotAlerts.length, color: activePlotAlerts.length > 0 ? 'text-red-600' : 'text-gray-400', bg: activePlotAlerts.length > 0 ? 'bg-red-50/70 border-red-100' : 'bg-gray-50/50 border-gray-150' },
+                              { label: 'Critical', value: critCount, color: critCount > 0 ? 'text-red-700' : 'text-gray-400', bg: critCount > 0 ? 'bg-red-50/70 border-red-100' : 'bg-gray-50/50 border-gray-150' },
+                              { label: 'Warning', value: warnCount, color: warnCount > 0 ? 'text-amber-700' : 'text-gray-400', bg: warnCount > 0 ? 'bg-amber-50/70 border-amber-100' : 'bg-gray-50/50 border-gray-150' },
+                              { label: 'Acknowledged', value: plotAlerts.length - activePlotAlerts.length, color: (plotAlerts.length - activePlotAlerts.length) > 0 ? 'text-green-700' : 'text-gray-400', bg: (plotAlerts.length - activePlotAlerts.length) > 0 ? 'bg-green-50/70 border-green-100' : 'bg-gray-50/50 border-gray-150' }
                             ].map((s, i) => (
                               <div key={i} className={`${s.bg} border rounded-xl p-3 text-center`}>
                                 <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
@@ -6683,7 +6722,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight font-sans">Precipitation</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Precipitation {renderInfoTooltip("Precipitation")}</div>
                               <span className="text-[10px] text-gray-400">Rainfall volume mm</span>
                             </div>
                             <button
