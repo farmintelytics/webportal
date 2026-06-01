@@ -49,7 +49,7 @@ import {
    SimpleCard,
    MetricTile,
    WorkerActivityTable
-} from '../../../shared/components/SharedComponents';
+} from '../../../../shared/components/SharedComponents';
 import { Line, Bar, Radar } from 'react-chartjs-2';
 import {
    Chart as ChartJS,
