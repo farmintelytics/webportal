@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, createPortal } from 'react';
 import { 
   Globe, 
   Layers, 
@@ -69,6 +69,106 @@ import {
   Columns
 } from 'lucide-react';
 import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap, Pane } from 'react-leaflet';
+import ReactDOM from 'react-dom';
+
+/* ─── Portal-based Info Tooltip ─────────────────────────────────────────── */
+const InfoTooltipPortal = ({ title, desc, done, formula }) => {
+  const [visible, setVisible] = useState(false);
+  const [pos, setPos]         = useState({ top: 0, left: 0 });
+  const iconRef               = useRef(null);
+
+  const show = () => {
+    if (!iconRef.current) return;
+    const rect = iconRef.current.getBoundingClientRect();
+    // Position above the icon, right-aligned to it
+    setPos({
+      top:  rect.top  + window.scrollY - 8,   // 8px gap above icon
+      left: rect.right + window.scrollX,       // right edge of icon
+    });
+    setVisible(true);
+  };
+  const hide = () => setVisible(false);
+
+  const tooltipContent = desc
+    ? (
+      <>
+        <div style={{ fontWeight: 800, color: '#e5e7eb', marginBottom: 4, fontSize: 11 }}>{title}</div>
+        <p style={{ color: '#d1d5db', marginBottom: desc && (done || formula) ? 6 : 0 }}>{desc}</p>
+        {done && (
+          <div style={{ marginBottom: formula ? 6 : 0 }}>
+            <span style={{ fontWeight: 900, fontSize: 8, color: 'rgba(52,211,153,0.8)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block' }}>Methodology:</span>
+            <span style={{ color: '#d1d5db' }}>{done}</span>
+          </div>
+        )}
+        {formula && (
+          <div>
+            <span style={{ fontWeight: 900, fontSize: 8, color: 'rgba(52,211,153,0.8)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block' }}>Formula:</span>
+            <span style={{ fontFamily: 'monospace', color: '#86efac', fontSize: 9.5, fontWeight: 700, display: 'block', marginTop: 4, background: 'rgba(20,83,45,0.6)', padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(22,101,52,0.3)', wordBreak: 'break-all', whiteSpace: 'normal' }}>{formula}</span>
+          </div>
+        )}
+      </>
+    )
+    : <span style={{ color: '#d1d5db' }}>{`Info about ${title}.`}</span>;
+
+  return (
+    <div
+      ref={iconRef}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+      style={{ display: 'inline-block', marginLeft: 6, verticalAlign: 'middle', cursor: 'pointer', position: 'relative' }}
+    >
+      <Info size={12} style={{ color: '#9ca3af', transition: 'color 0.15s' }}
+        onMouseEnter={e => e.currentTarget.style.color = '#6b7280'}
+        onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}
+      />
+      {visible && ReactDOM.createPortal(
+        <div
+          onMouseEnter={show}
+          onMouseLeave={hide}
+          style={{
+            position: 'absolute',
+            top: pos.top,
+            left: pos.left,
+            transform: 'translate(-100%, -100%)',
+            width: 224,
+            padding: '10px 12px',
+            background: 'rgba(5,46,22,0.97)',
+            backdropFilter: 'blur(8px)',
+            color: 'white',
+            fontSize: 10,
+            borderRadius: 12,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(52,211,153,0.15)',
+            zIndex: 2147483647,
+            lineHeight: 1.55,
+            textAlign: 'left',
+            fontFamily: 'sans-serif',
+            fontWeight: 500,
+            textTransform: 'none',
+            letterSpacing: 'normal',
+            border: '1px solid rgba(52,211,153,0.2)',
+            pointerEvents: 'auto',
+          }}
+        >
+          {tooltipContent}
+          {/* Arrow pointing down-right toward the icon */}
+          <div style={{
+            position: 'absolute',
+            bottom: -7,
+            right: 8,
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: '7px solid rgba(5,46,22,0.97)',
+          }} />
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 const ResizeMap = ({ trigger }) => {
   const map = useMap();
   useEffect(() => {
@@ -204,9 +304,303 @@ const RESTORATION_ZONES = [
   { id: 'ZONE-GAMMA', name: 'Riparian Buffer Zone',  area: '8.1 HA', type: 'Soil Stabilization', progress: 62, survival: '81%', trees: '1,550', carbon: '21.5 tCO2e', status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu' }
 ];
 
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const TOOLTIP_DESCRIPTIONS = {
 
-// ── Index Classification Helper (5 Classes) ──────────────────────────────
+  // ── Operational Layers ───────────────────────────────────────────────────
+  'Farm Boundaries': {
+    desc: 'Shows the boundary outline of each registered farm plot, aligned to official cadastral (land registry) coordinates.',
+    done: 'Vector polygons co-registered with Sentinel-2 and Landsat spatial grids at 10–30 m resolution.',
+    formula: 'GIS Cadastral Vector Overlay'
+  },
+
+  // ── Intelligence Layers ──────────────────────────────────────────────────
+  'Crop Vegetation Index (CVI)': {
+    desc: 'Measures canopy density and crop health by combining red-edge and NIR reflectance. Higher values indicate denser, healthier canopy.',
+    done: 'Derived from Sentinel-2 multispectral bands aggregated to 20 m resolution.',
+    formula: 'CVI = (B8 ÷ B4) × (B5 ÷ B4)'
+  },
+  'Canopy Closure (CVI)': {
+    desc: 'Estimates how much of the ground is covered by the crop canopy from directly above. Low values signal gaps or sparse growth.',
+    done: 'Atmospherically corrected Sentinel-2 Red-Edge (B5) and NIR (B8) band ratio.',
+    formula: 'CVI = (B8 ÷ B4) × (B5 ÷ B4)'
+  },
+  'Leaf Chlorophyll Density (CAR/RECI)': {
+    desc: 'Maps leaf-level chlorophyll and nitrogen content. Low values often signal a need for topdressing fertilizer.',
+    done: 'Ratio of Sentinel-2 NIR (B8) and Red-Edge-1 (B5) — sensitive to leaf nitrogen without saturation.',
+    formula: 'RECI = (B8 ÷ B5) − 1'
+  },
+  'Early Stress Detection (NDRE)': {
+    desc: 'Detects plant stress earlier than NDVI by using the red-edge band, which responds to chlorophyll loss before visible yellowing appears.',
+    done: 'Normalized ratio of Sentinel-2 narrow NIR (B8A) and Red-Edge (B5) bands.',
+    formula: 'NDRE = (B8A − B5) ÷ (B8A + B5)'
+  },
+  'Crop Water Stress (WDI)': {
+    desc: 'Indicates how stressed the crop is from lack of water. High values mean the plant is closing its stomata and reducing transpiration.',
+    done: 'Combines Sentinel-2 SWIR-based moisture index with Landsat thermal surface temperature anomalies.',
+    formula: 'WDI = 0.5 × (1 − NDMI) + 0.5 × LST_norm'
+  },
+  'Radar Canopy Structure (DpRVI)': {
+    desc: 'Uses radar signals to measure crop canopy volume and structure — even through clouds. Useful for monitoring canopy loss or thinning.',
+    done: 'Sentinel-1 SAR dual-polarization IW GRD product, orthorectified and speckle-filtered.',
+    formula: 'DpRVI = 1 − VV ÷ (VV + VH)²'
+  },
+  'Radar Vegetation Index (RVI)': {
+    desc: 'SAR-based crop density index that works through cloud cover and harmattan haze. Tracks canopy volume changes over time.',
+    done: 'Sentinel-1 VH and VV polarization backscatter in linear sigma-nought intensity.',
+    formula: 'RVI = (4 × VH) ÷ (VV + VH)'
+  },
+  'SAR Flood Mask': {
+    desc: 'Detects flooded or waterlogged areas using radar imagery. The signal drops sharply over open water surfaces.',
+    done: 'Compares current Sentinel-1 VV backscatter to a dry-season reference baseline using change detection.',
+    formula: 'Flood detected if: ΔdB = VV_current − VV_reference < −3 dB'
+  },
+  'UAS Spatial Anomaly': {
+    desc: 'High-resolution drone anomaly map showing localized stress patches, canopy gaps, or failed seedling zones not visible at satellite scale.',
+    done: 'Processed from multispectral UAV orthomosaic using local spatial variance anomaly detection.',
+    formula: 'Anomaly Score = Local Spatial Variance Index'
+  },
+
+  // ── Crop Health Layers ───────────────────────────────────────────────────
+  'NDVI Health': {
+    desc: 'The most widely used crop health index. Measures greenness and photosynthetic activity. Below 0.45 signals crop stress.',
+    done: 'Atmospherically corrected Sentinel-2 Red (B4) and Near-Infrared (B8) band normalization.',
+    formula: 'NDVI = (B8 − B4) ÷ (B8 + B4)'
+  },
+  'Chlorophyll Index': {
+    desc: 'Estimates active chlorophyll and leaf nitrogen content. A drop in this index often precedes visible crop yellowing.',
+    done: 'Sentinel-2 NIR (B8) and Red-Edge-1 (B5) ratio — avoids NIR saturation common in dense canopies.',
+    formula: 'RECI = (B8 ÷ B5) − 1'
+  },
+  'Red-Edge NDVI (NDRE)': {
+    desc: 'An early-warning stress index that detects nitrogen depletion and cell damage before the crop visibly changes color.',
+    done: 'Normalized ratio of Sentinel-2 narrow NIR (B8A) and Red-Edge (B5) — more sensitive than standard NDVI.',
+    formula: 'NDRE = (B8A − B5) ÷ (B8A + B5)'
+  },
+  'Water Stress Index': {
+    desc: 'Measures how much the crop is water-stressed by combining canopy moisture content with surface temperature readings.',
+    done: 'Fused Sentinel-2 SWIR/NIR moisture index with Landsat-8/9 thermal surface temperature anomalies.',
+    formula: 'WDI = 0.5 × (1 − NDMI) + 0.5 × LST_norm'
+  },
+  'SAR Soil Moisture (SMI)': {
+    desc: 'Estimates surface soil moisture (top 5 cm) using radar backscatter. Works best when crop canopy is thin (early growth stage).',
+    done: 'Compares current Sentinel-1 VV backscatter against a calibrated dry-season reference image.',
+    formula: 'SMI = VV_current (dB) − VV_dry_reference (dB)'
+  },
+  'Pest / Disease risk': {
+    desc: 'Flags areas at elevated risk of pest outbreak or disease based on sudden vegetation index drops and thermal anomaly clusters.',
+    done: 'Spatiotemporal anomaly clustering combining rapid CVI/NDVI declines with thermal and moisture outliers.',
+    formula: 'Risk Score = f(ΔCVI/Δt, ΔWDI/Δt, local_variance)'
+  },
+
+  // ── Crop Yield Layers ────────────────────────────────────────────────────
+  'Estimated Yield Rate (t/HA)': {
+    desc: 'Predicted fresh fruit or crop yield per hectare based on satellite-derived radiation absorption and crop growth models.',
+    done: 'Monteith light-use efficiency model using Sentinel-2 fAPAR and accumulated Growing Degree Days (GDD).',
+    formula: 'Yield = Σ(fAPAR × PAR × LUE × f(T) × f(W)) × Harvest Index'
+  },
+  'Estimated Yield': {
+    desc: 'Predicted crop yield per hectare based on satellite radiation data and seasonal growth modeling.',
+    done: 'Monteith light-use efficiency model using Sentinel-2 fAPAR and accumulated Growing Degree Days (GDD).',
+    formula: 'Yield = Σ(fAPAR × PAR × LUE × f(T) × f(W)) × Harvest Index'
+  },
+  'Dry Biomass Accumulation (kg/m²)': {
+    desc: 'Daily rate of dry matter (carbon) being built up in the crop. Higher values mean the plant is growing fast and photosynthesising well.',
+    done: 'Computed from daily solar radiation, canopy radiation absorption (fAPAR), and temperature-limited light-use efficiency.',
+    formula: 'Biomass = fAPAR × IPAR × LUE_ε'
+  },
+  'Daily Biomass': {
+    desc: 'Daily dry matter production rate — a direct measure of how fast the crop is growing on a given day.',
+    done: 'Computed from daily solar radiation, canopy radiation absorption (fAPAR), and temperature-limited light-use efficiency.',
+    formula: 'Biomass = fAPAR × IPAR × LUE_ε'
+  },
+  'Canopy Harvest Readiness (%)': {
+    desc: 'Estimates how ready a plot is for harvest based on crop senescence signals — canopy water loss and structural change.',
+    done: 'Combines NDWI canopy water decline trends with SAR-derived RVI senescence trajectory.',
+    formula: 'Readiness = f(NDWI_senescence, RVI_senescence)'
+  },
+  'Harvest Readiness': {
+    desc: 'Spectral readiness score estimating how close the crop is to optimal harvest window.',
+    done: 'Combines NDWI canopy water decline trends with SAR-derived RVI senescence trajectory.',
+    formula: 'Readiness = f(NDWI_senescence, RVI_senescence)'
+  },
+  'Growth Stage Mapping': {
+    desc: 'Maps the current growth phase of each plot (establishment, tillering, grand growth, etc.) using satellite and thermal data.',
+    done: 'Matches Sentinel-1 RVI growth curve against accumulated Growing Degree Days (GDD) since planting.',
+    formula: 'Growth Stage = f(Cumulative GDD, RVI trajectory)'
+  },
+  'Vegetative Growth Rate': {
+    desc: 'Tracks how fast the crop canopy is expanding week-over-week using satellite imagery.',
+    done: 'Derived from sequential Sentinel-1 RVI observations cross-referenced with GDD thermal accumulation.',
+    formula: 'Growth Rate = f(ΔRVI/Δt, GDD trajectory)'
+  },
+
+  // ── Climate & Moisture Layers ────────────────────────────────────────────
+  'Precipitation': {
+    desc: 'Daily and cumulative rainfall in mm derived from satellite and ground gauge blended data. Used to identify wet and dry spells.',
+    done: 'CHIRPS satellite infrared precipitation estimates blended with local rain gauge records.',
+    formula: 'Rainfall (mm/day) = CHIRPS_blended_estimate'
+  },
+  'Soil Moisture': {
+    desc: 'Estimates the amount of water held in the top 5 cm of soil using radar backscatter. Important for irrigation scheduling.',
+    done: 'Sentinel-1 VV backscatter change detection referenced against a calibrated dry-season baseline.',
+    formula: 'SMI = VV_current (dB) − VV_reference (dB)'
+  },
+  'Soil Temp': {
+    desc: 'Root zone soil temperature — directly affects germination, nutrient uptake, and microbial activity. Optimal range is 20–28 °C.',
+    done: 'ERA5-Land reanalysis model output blended with local in-situ telemetry readings.',
+    formula: 'T_soil = ERA5_RootZone_Temperature (°C)'
+  },
+  'Surface Temp (LST)': {
+    desc: 'Land surface temperature measured from space. High values can indicate drought stress, bare soil, or burning events.',
+    done: 'Landsat-8/9 TIRS Band 10 single-channel thermal retrieval using scene emissivity and metadata.',
+    formula: 'LST (°C) = Tb ÷ (1 + λ × Tb ÷ ρ × ln(ε)) − 273.15'
+  },
+  'VPD Stress': {
+    desc: 'Vapor Pressure Deficit — measures how "thirsty" the atmosphere is. High VPD forces plants to close stomata and stop growing.',
+    done: 'Calculated from air temperature and relative humidity; high VPD (>2 kPa) triggers plant stress responses.',
+    formula: 'VPD = es × (1 − RH)   es = 0.6108 × exp(17.27T ÷ (T + 237.3))'
+  },
+
+  // ── Land Restoration Layers ──────────────────────────────────────────────
+  'Canopy Density': {
+    desc: 'Percentage of the restoration zone covered by tree canopy. Target is above 85% for full restoration success.',
+    done: 'Sentinel-2 CVI temporal composite normalized to a 0–100% canopy coverage scale.',
+    formula: 'Canopy Density (%) = CVI_normalized × 100'
+  },
+  'Species Diversification': {
+    desc: 'Measures how diverse the tree species mix is within a restoration zone using the Shannon entropy index.',
+    done: 'Shannon entropy calculated from the distribution of spectral endmembers across high-resolution imagery.',
+    formula: 'H′ = −Σ(Pi × ln(Pi))'
+  },
+  'Seedling Survival': {
+    desc: 'Tracks the percentage of planted seedlings still alive. Below 80% survival triggers replanting protocols.',
+    done: 'Zonal seedling count from high-resolution multispectral UAV/satellite data verified against baseline planting density.',
+    formula: 'Survival Rate (%) = (Surviving Seedlings ÷ Planted Seedlings) × 100'
+  },
+  'Soil Stabilization': {
+    desc: 'Rates the risk of soil erosion based on terrain slope, vegetation cover, and rainfall intensity.',
+    done: 'RUSLE empirical soil loss model integrating terrain slope, vegetation cover factor, and CHIRPS rainfall.',
+    formula: 'Erosion Risk = R × K × LS × C  (RUSLE model)'
+  },
+  'Ecological Progress': {
+    desc: 'A composite score summarizing overall ecosystem recovery — combining canopy health, soil moisture, and erosion risk.',
+    done: 'Weighted multivariate index combining CVI, NDWI, and soil stabilization scores.',
+    formula: 'Eco Progress = w₁×CVI + w₂×NDWI + w₃×Stabilization'
+  },
+  'InSAR Coherence (γ)': {
+    desc: 'Radar coherence score that drops sharply when vegetation is disturbed or forest is cleared — used to detect illegal logging.',
+    done: 'Phase similarity computed from pairs of Sentinel-1 SLC images acquired 6–12 days apart.',
+    formula: 'γ = |E[s₁ × s₂*]| ÷ √(E[|s₁|²] × E[|s₂|²])'
+  },
+  'GEDI Canopy Height': {
+    desc: 'Tree height measurements from NASA\'s space-based LiDAR instrument, used to validate canopy volume in restoration zones.',
+    done: 'Waveform metrics extracted from GEDI footprints intersected with estate boundaries.',
+    formula: 'Tree Height (m) = rh100 (100% cumulative return height)'
+  },
+  'NDWI Canopy Water': {
+    desc: 'Detects water in plant leaves and on the soil surface. Low values indicate canopy dryness or water stress.',
+    done: 'Sentinel-2 NIR (B8) and SWIR (B11) band ratio, sensitive to leaf water content.',
+    formula: 'NDWI = (B8 − B11) ÷ (B8 + B11)'
+  },
+  'SAR AGB Proxy (VH)': {
+    desc: 'Estimates above-ground biomass (wood volume and carbon stock) using Sentinel-1 radar cross-polarization signal strength.',
+    done: 'Calibrated Sentinel-1 VH backscatter regression against field forest inventory biomass plots.',
+    formula: 'AGB Proxy (dB) = σ₀_VH × scaling_factor'
+  },
+  'LULC Classification': {
+    desc: 'Classifies every pixel into a land cover type: tree cover, cropland, shrubland, bare soil, or water.',
+    done: 'Ensemble fusion of ESA WorldCover, Google Dynamic World, and a custom SAR+Optical trained classifier.',
+    formula: 'Class = argmax(Classifier(VV, VH, B2–B12, NDVI, RVI))'
+  },
+  'EUDR Deforestation': {
+    desc: 'Highlights areas where tree cover has been lost since January 2020 — required for EU Deforestation Regulation compliance.',
+    done: 'Bitemporal SAR change magnitude fused with near-real-time optical deforestation alert layers.',
+    formula: 'Change Magnitude = √(ΔVV² + ΔVH² + (1−γ)²)'
+  },
+
+  // ── Analytics Charts & Cards ─────────────────────────────────────────────
+  'Geospatial Vegetation Vigor & Health Trends': {
+    desc: 'Time-series chart showing how NDVI (crop greenness and health) has changed over the season for each plot.',
+    done: 'Plot-mean NDVI computed from atmospherically corrected Sentinel-2 pixels within each boundary, per acquisition date.',
+    formula: 'NDVI_plot = Σ(NDVI_pixel) ÷ N_pixels'
+  },
+  'Moisture Retention (NDMI)': {
+    desc: 'Tracks canopy moisture content over time. A falling trend can signal water stress or a need for irrigation.',
+    done: 'Sentinel-2 NIR (B8) and SWIR (B11) band ratio computed per overpass and averaged per plot.',
+    formula: 'NDMI = (B8 − B11) ÷ (B8 + B11)'
+  },
+  'Land Classification Area': {
+    desc: 'Pie-chart breakdown of how land is used within the audit zone — what fraction is tree cover, cropland, bare soil, etc.',
+    done: 'Pixel-level LULC classification aggregated into class area percentages using zonal histogram counting.',
+    formula: 'Area_Class (%) = (Class_Pixels ÷ Total_Pixels) × 100'
+  },
+  'Seasonal Trajectory vs GDD Reference Curve': {
+    desc: 'Compares the actual radar-measured crop growth curve to what is expected at each thermal stage of the season.',
+    done: 'Dual-axis chart overlaying Sentinel-1 RVI time-series with GDD-based phenological reference growth curve.',
+    formula: 'Deviation = RVI_observed − RVI_expected(GDD)'
+  },
+  'Plot-by-Plot Growing Degree Days (GDD) Completion Rate': {
+    desc: 'Shows how much accumulated heat each plot has received since planting — determines which growth stage the crop is in.',
+    done: 'Sum of daily average temperatures above the base temperature (T_base) from planting date to today.',
+    formula: 'GDD = Σ(T_mean − T_base)   T_mean = (T_max + T_min) ÷ 2'
+  },
+  'FAO-56 Evapotranspiration Model': {
+    desc: 'Shows the water demand of the crop (ETc) versus actual water used (ETa) — the gap indicates irrigation deficit.',
+    done: 'FAO Penman-Monteith energy balance model using temperature, solar radiation, humidity, and wind speed inputs.',
+    formula: 'ETo = f(Rn, G, T, u₂, eₛ−eₐ, Δ, γ)   ETc = Kc × ETo'
+  },
+  '7-Day Evapotranspiration Historical Log': {
+    desc: 'A 7-day log of daily crop water consumption and root zone soil water depletion — useful for irrigation planning.',
+    done: 'Daily water balance model tracking soil water depletion, precipitation, irrigation, and crop transpiration.',
+    formula: 'Dr,i = Dr,i−1 − (P − RO) − I + ETc + DP'
+  },
+  'Nutrient Profiling': {
+    desc: 'Radar chart profiling nitrogen, phosphorus, potassium, pH, and organic carbon balances.',
+    done: 'Zonal aggregation of soil test diagnostics and fertilizer log inputs.',
+    formula: 'Nutrient_Score = f(SoilTest, FertilizerApplied)'
+  },
+  'Detailed Soil Chemistry Diagnostics': {
+    desc: 'Detailed macronutrient and chemical recommendation guide based on plot soil testing.',
+    done: 'Agronomic diagnostic engine analyzing macronutrient levels and suggesting topdressing rates.',
+    formula: 'Recommendation = Target_N_P_K - Soil_N_P_K'
+  },
+  'Geospatial Mismatch Audits': {
+    desc: 'Discrepancy logs matching farm coordinate claims against official forest registers.',
+    done: 'Overlap analysis intersecting estate vector boundaries with protected area and official forest reserves databases.',
+    formula: 'Mismatch_Area = Intersection(Estate_Boundary, Protected_Forest_Register)'
+  },
+  'Ingested Overpass Quality Control Ledger': {
+    desc: 'Audit log showing pre-processing steps and cloud mask quality check results.',
+    done: 'Automated QC pipeline evaluating cloud cover percentages and sensor health flags per overpass.',
+    formula: 'Pass_QC = (Cloud_Cover < Cloud_Threshold) && (Sensor_Status == OK)'
+  },
+  'Deforestation Compliance Ledger': {
+    desc: 'Deforestation warning patches mapping post-2020 tree canopy loss for compliance audits.',
+    done: 'Tabular log of detected canopy loss events with location, area, and compliance status.',
+    formula: 'Compliance = (Forest_Loss_Area < Compliance_Threshold)'
+  },
+  'Analytical Report Ledger': {
+    desc: 'Exportable GIS reports ledger certifying spatial audits and sustainability compliance.',
+    done: 'Generated PDF certificates containing maps, timeline trends, and compliance checklists.',
+    formula: 'Report_Hash = SHA255(Report_Content)'
+  },
+  'Operational Telemetry Logs': {
+    desc: 'Live system telemetry logs recording Sentinel-2 ingestion pings.',
+    done: 'Continuous background workers logging Sentinel API query results.',
+    formula: 'Ping_Latency = Ingestion_Time - Acquisition_Time'
+  },
+  'Help Accordions': {
+    desc: 'Answers to frequently asked questions about indices, Sentinel-2 passes, and system integration.',
+    done: 'Knowledge base of platform-wide remote sensing methodologies.',
+    formula: 'FAQ Search Index'
+  },
+  'Contact Support Form': {
+    desc: 'Direct operational support desk form for GIS specialists and spatial auditors.',
+    done: 'Ticketing system interface routing inquiries to agricultural technical support.',
+    formula: 'Ticket_ID = UUID()'
+  }
+};
+
 const getIndexFiveClasses = (val, type) => {
   if (type === 'NDVI' || type === 'CVI' || type === 'EVI' || type === 'Chlorophyll') {
     if (val > 0.8)  return { color: '#14532D', label: 'Exceptional (0.8+)' };
@@ -265,9 +659,46 @@ const BAR_CHART_OPTIONS = {
   }
 };
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 const AgroMonitor = ({ onBack, onSignOut }) => {
-  const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
+  const [activeSidebarItem, setActiveSidebarItem] = useState('analytics');
   const [activeTab, setActiveTab] = useState('monitor');
+
+  const renderInfoTooltip = (title) => {
+    let lookupKey = title;
+    const lowerTitle = title.toLowerCase().trim();
+
+    // Explicit mapping of common variants
+    if (lowerTitle.includes('agb')) lookupKey = 'SAR AGB Proxy (VH)';
+    else if (lowerTitle.includes('lulc') || lowerTitle.includes('land cover')) lookupKey = 'LULC Classification';
+    else if (lowerTitle.includes('eudr') || lowerTitle.includes('deforestation')) lookupKey = 'EUDR Deforestation';
+    else if (lowerTitle.includes('biodiversity') || lowerTitle.includes('diversification')) lookupKey = 'Species Diversification';
+    else if (lowerTitle.includes('carbon') || lowerTitle.includes('stabilization')) lookupKey = 'Soil Stabilization';
+    else if (lowerTitle.includes('survival')) lookupKey = 'Seedling Survival';
+    else if (lowerTitle.includes('growth')) lookupKey = 'Growth Stage Mapping';
+    else if (lowerTitle.includes('surface temp') || lowerTitle.includes('lst')) lookupKey = 'Surface Temp (LST)';
+    else if (lowerTitle.includes('soil moisture') || lowerTitle.includes('smi')) lookupKey = 'Soil Moisture';
+    else if (lowerTitle.includes('water stress') || lowerTitle.includes('lswi') || lowerTitle.includes('ndmi')) lookupKey = 'Water Stress (NDMI)';
+    else if (lowerTitle.includes('ndre') || lowerTitle.includes('red-edge')) lookupKey = 'Red-Edge NDVI (NDRE)';
+
+    // Fallback search in keys
+    let info = TOOLTIP_DESCRIPTIONS[lookupKey];
+    if (!info) {
+      const foundKey = Object.keys(TOOLTIP_DESCRIPTIONS).find(k =>
+        k.toLowerCase().includes(lowerTitle) || lowerTitle.includes(k.toLowerCase())
+      );
+      if (foundKey) info = TOOLTIP_DESCRIPTIONS[foundKey];
+    }
+
+    // Use portal-based tooltip — never clipped by any parent overflow or z-index
+    const { desc = null, done = null, formula = null } = info || {};
+    return <InfoTooltipPortal title={title} desc={desc} done={done} formula={formula} />;
+  };
+
 
   // Layout Resizing States
   const [sidebarWidth, setSidebarWidth] = useState(240);
@@ -464,6 +895,72 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [filterPlot, setFilterPlot] = useState('All');
   const [filterDate, setFilterDate] = useState('All');
 
+  // Analytics subpage state
+  const [activeAnalyticsSubpage, setActiveAnalyticsSubpage] = useState('overview');
+
+  // Land Restoration new layers states
+  const [restoreShowInSar, setRestoreShowInSar] = useState(false);
+  const [restoreInSarOpacity, setRestoreInSarOpacity] = useState(70);
+  const [restoreShowGedi, setRestoreShowGedi] = useState(false);
+  const [restoreGediOpacity, setRestoreGediOpacity] = useState(70);
+  const [restoreShowNdwi, setRestoreShowNdwi] = useState(false);
+  const [restoreNdwiOpacity, setRestoreNdwiOpacity] = useState(70);
+  const [restoreShowLulc, setRestoreShowLulc] = useState(false);
+  const [restoreLulcOpacity, setRestoreLulcOpacity] = useState(70);
+  const [restoreShowEudr, setRestoreShowEudr] = useState(false);
+  const [restoreEudrOpacity, setRestoreEudrOpacity] = useState(70);
+  const [restoreLulcExpanded, setRestoreLulcExpanded] = useState(true);
+  const [restoreEudrExpanded, setRestoreEudrExpanded] = useState(true);
+  const [restoreLulcSource, setRestoreLulcSource] = useState('worldcover');
+  const [restoreLulcYear, setRestoreLulcYear] = useState(2020);
+  const [restoreShowLulcChange, setRestoreShowLulcChange] = useState(false);
+
+
+  // Alerts Command Center redesigned states
+  const [alertsFilterSeverity, setAlertsFilterSeverity] = useState('All');
+  const [alertsFilterPlot, setAlertsFilterPlot] = useState('All');
+  const [alertsFilterCategory, setAlertsFilterCategory] = useState('All');
+  const [alertsFilterActiveOnly, setAlertsFilterActiveOnly] = useState(true);
+  const [selectedAlertPlot, setSelectedAlertPlot] = useState(null); // null = no selection, 'PLOT-BETA' = detail view
+  const [alertsSearch, setAlertsSearch] = useState('');
+
+  // Dropdown layout states
+  const [showEstateDropdown, setShowEstateDropdown] = useState(false);
+  const [showPlotDropdown, setShowPlotDropdown] = useState(false);
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+
+  // Intelligence layers new states
+  const [intelShowCvi, setIntelShowCvi] = useState(false);
+  const [intelCviOpacity, setIntelCviOpacity] = useState(70);
+  const [intelShowCar, setIntelShowCar] = useState(false);
+  const [intelCarOpacity, setIntelCarOpacity] = useState(70);
+  const [intelShowNdre, setIntelShowNdre] = useState(false);
+  const [intelNdreOpacity, setIntelNdreOpacity] = useState(70);
+  const [intelShowWdi, setIntelShowWdi] = useState(false);
+  const [intelWdiOpacity, setIntelWdiOpacity] = useState(70);
+  const [intelShowDprvi, setIntelShowDprvi] = useState(false);
+  const [intelDprviOpacity, setIntelDprviOpacity] = useState(70);
+  const [intelShowRvi, setIntelShowRvi] = useState(false);
+  const [intelRviOpacity, setIntelRviOpacity] = useState(70);
+  const [intelShowFlood, setIntelShowFlood] = useState(false);
+  const [intelFloodOpacity, setIntelFloodOpacity] = useState(70);
+  const [intelShowUas, setIntelShowUas] = useState(false);
+  const [intelUasOpacity, setIntelUasOpacity] = useState(70);
+
+  // Crop Health missing layers states
+  const [healthShowSmi, setHealthShowSmi] = useState(false);
+  const [healthSmiOpacity, setHealthSmiOpacity] = useState(80);
+  const [healthShowNdre, setHealthShowNdre] = useState(false);
+  const [healthNdreOpacity, setHealthNdreOpacity] = useState(80);
+
+  // Climate missing layers states
+  const [climateShowFlood, setClimateShowFlood] = useState(false);
+  const [climateFloodOpacity, setClimateFloodOpacity] = useState(80);
+
+  // Land Restoration missing layers states
+  const [restoreShowAgb, setRestoreShowAgb] = useState(false);
+  const [restoreAgbOpacity, setRestoreAgbOpacity] = useState(70);
+
   // Land Restoration states
   const [selectedRestoreZone, setSelectedRestoreZone] = useState(RESTORATION_ZONES[0]);
   const [restoreIndex, setRestoreIndex] = useState('progress');
@@ -508,7 +1005,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     { id: 'ALT-2026-001', estate: 'East Ridge Estate', plot: 'PLOT-BETA', category: 'Water Stress', severity: 'Critical', desc: 'LSWI moisture index dropped below 0.30 target. Root-zone dry spell requires immediate +30% irrigation flow.', date: 'May 29, 2026', time: '14:22', status: 'Active' },
     { id: 'ALT-2026-002', estate: 'East Ridge Estate', plot: 'PLOT-BETA', category: 'Pest Infestation', severity: 'Critical', desc: 'Stem borer outbreak warning near East Ridge boundary. Recommended insecticide spray buffer zone of 150m.', date: 'May 28, 2026', time: '09:45', status: 'Active' },
     { id: 'ALT-2026-003', estate: 'South Slope Estate', plot: 'PLOT-GAMMA', category: 'Growth Deficit', severity: 'Warning', desc: 'NDVI vegetation vigor index showing abnormal 3-week plateau during Grand Growth phase.', date: 'May 26, 2026', time: '11:15', status: 'Active' },
-    { id: 'ALT-2026-004', estate: 'West Valley Estate', plot: 'PLOT-ALPHA', category: 'Cloud Cover', severity: 'Info', desc: 'Sentinel-2 imagery shows 12% localized cloud cover. Index computations adjusted.', date: 'May 22, 2026', time: '16:05', status: 'Acknowledged' }
+    { id: 'ALT-2026-004', estate: 'West Valley Estate', plot: 'PLOT-ALPHA', category: 'Cloud Cover', severity: 'Info', desc: 'Sentinel-2 imagery shows 12% localized cloud cover. Index computations adjusted.', date: 'May 22, 2026', time: '16:05', status: 'Acknowledged' },
+    { id: 'ALT-2026-005', estate: 'East Ridge Estate', plot: 'PLOT-BETA', category: 'Water Stress', severity: 'Critical', desc: 'Evapotranspiration deficit detected. Actual transpiration (ETa) is 45% below demand (ETc).', date: 'May 29, 2026', time: '10:12', status: 'Active' },
+    { id: 'ALT-2026-006', estate: 'South Slope Estate', plot: 'PLOT-GAMMA', category: 'Growth Deficit', severity: 'Info', desc: 'Refined Lee speckle filter applied to Sentinel-1 radar pass. Noise cleared successfully.', date: 'May 25, 2026', time: '08:30', status: 'Acknowledged' },
+    { id: 'ALT-2026-007', estate: 'West Valley Estate', plot: 'PLOT-ALPHA', category: 'Water Stress', severity: 'Warning', desc: 'WDI thermal-optical crop water stress index exceeds 0.60 warning threshold.', date: 'May 27, 2026', time: '13:50', status: 'Active' },
+    { id: 'ALT-2026-008', estate: 'East Ridge Estate', plot: 'PLOT-BETA', category: 'Growth Deficit', severity: 'Warning', desc: 'DpRVI radar canopy index indicates localized canopy structure loss or thinning.', date: 'May 24, 2026', time: '15:10', status: 'Active' },
+    { id: 'ALT-2026-009', estate: 'West Valley Estate', plot: 'PLOT-ALPHA', category: 'Pest Infestation', severity: 'Warning', desc: 'Early stress ndre signature indicates possible mild pathogen pressure in Zone-A.', date: 'May 21, 2026', time: '10:00', status: 'Acknowledged' }
   ]);
 
   // Settings and User Management States
@@ -642,6 +1144,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     } else if (layer === 'ndvi') {
       fillColor = getIndexFiveClasses(plot.ndvi, 'NDVI').color;
       fillOpacity = healthNdviOpacity / 100;
+    } else if (layer === 'ndre') {
+      fillColor = getIndexFiveClasses(plot.ndvi * 0.85, 'NDVI').color;
+      fillOpacity = healthNdreOpacity / 100;
+    } else if (layer === 'smi') {
+      const dbChange = plot.id === 'PLOT-BETA' ? 6.2 : plot.id === 'PLOT-ALPHA' ? 3.5 : 1.5;
+      fillColor = dbChange > 6 ? '#1E3A8A' : dbChange > 3 ? '#2563EB' : dbChange > 1 ? '#60A5FA' : dbChange > -1 ? '#86EFAC' : dbChange > -3 ? '#EAB308' : '#DC2626';
+      fillOpacity = healthSmiOpacity / 100;
     }
     
     return {
@@ -746,6 +1255,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       const val = plot.rainfall;
       fillColor = val > 25 ? '#1d4ed8' : val > 18 ? '#3b82f6' : '#93c5fd';
       fillOpacity = climateRainfallOpacity / 100;
+    } else if (layer === 'flood') {
+      fillColor = plot.id === 'PLOT-BETA' ? '#1e3a8a' : 'transparent';
+      fillOpacity = climateFloodOpacity / 100;
     }
     
     return {
@@ -777,6 +1289,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     if (layer === 'lswi') setIntelShowLswi(!intelShowLswi);
     if (layer === 'vhi') setIntelShowVhi(!intelShowVhi);
     if (layer === 'suitability') setIntelShowSuitability(!intelShowSuitability);
+    if (layer === 'cvi') setIntelShowCvi(!intelShowCvi);
+    if (layer === 'car') setIntelShowCar(!intelShowCar);
+    if (layer === 'ndre') setIntelShowNdre(!intelShowNdre);
+    if (layer === 'wdi') setIntelShowWdi(!intelShowWdi);
+    if (layer === 'dprvi') setIntelShowDprvi(!intelShowDprvi);
+    if (layer === 'rvi') setIntelShowRvi(!intelShowRvi);
+    if (layer === 'flood') setIntelShowFlood(!intelShowFlood);
+    if (layer === 'uas') setIntelShowUas(!intelShowUas);
   };
 
   const handleHealthToggle = (layer) => {
@@ -784,6 +1304,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     if (layer === 'chlorophyll') setHealthShowChlorophyll(!healthShowChlorophyll);
     if (layer === 'water') setHealthShowWater(!healthShowWater);
     if (layer === 'pest') setHealthShowPest(!healthShowPest);
+    if (layer === 'ndre') setHealthShowNdre(!healthShowNdre);
+    if (layer === 'smi') setHealthShowSmi(!healthShowSmi);
   };
 
   const handleYieldToggle = (layer) => {
@@ -798,6 +1320,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     if (layer === 'soilTemp') setClimateShowSoilTemp(!climateShowSoilTemp);
     if (layer === 'lst') setClimateShowLst(!climateShowLst);
     if (layer === 'vpd') setClimateShowVaporDeficit(!climateShowVaporDeficit);
+    if (layer === 'flood') setClimateShowFlood(!climateShowFlood);
   };
 
   const handleRestoreToggle = (layer) => {
@@ -805,6 +1328,11 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     if (layer === 'survival') setRestoreShowSurvival(!restoreShowSurvival);
     if (layer === 'carbon') setRestoreShowCarbon(!restoreShowCarbon);
     if (layer === 'biodiversity') setRestoreShowBiodiversity(!restoreShowBiodiversity);
+    if (layer === 'insar') setRestoreShowInSar(!restoreShowInSar);
+    if (layer === 'gedi') setRestoreShowGedi(!restoreShowGedi);
+    if (layer === 'ndwi') setRestoreShowNdwi(!restoreShowNdwi);
+    if (layer === 'lulc') setRestoreShowLulc(!restoreShowLulc);
+    if (layer === 'eudr') setRestoreShowEudr(!restoreShowEudr);
   };
 
   const getRestorePlotStyleOutline = () => ({
@@ -835,6 +1363,29 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       const val = zone.progress;
       fillColor = val > 85 ? '#15803d' : val > 70 ? '#22c55e' : val > 55 ? '#eab308' : '#ef4444';
       fillOpacity = restoreProgressOpacity / 100;
+    } else if (layer === 'insar') {
+      const val = zone.insar;
+      fillColor = val > 0.7 ? '#15803d' : val >= 0.4 ? '#eab308' : '#dc2626';
+      fillOpacity = restoreInSarOpacity / 100;
+    } else if (layer === 'gedi') {
+      const val = zone.gedi;
+      fillColor = val > 15 ? '#14532d' : val > 10 ? '#15803d' : val > 5 ? '#22c55e' : '#eab308';
+      fillOpacity = restoreGediOpacity / 100;
+    } else if (layer === 'ndwi') {
+      const val = zone.ndwi;
+      fillColor = val > 0.3 ? '#1e3a8a' : val > 0.15 ? '#2563eb' : val > 0.0 ? '#60a5fa' : '#ea580c';
+      fillOpacity = restoreNdwiOpacity / 100;
+    } else if (layer === 'lulc') {
+      const val = zone.lulc;
+      fillColor = val === 'Forest' ? '#15803d' : val === 'Shrubland' ? '#86efac' : val === 'Cropland' ? '#fde047' : val === 'Bare Soil' ? '#ca8a04' : val === 'Water' ? '#3b82f6' : '#94a3b8';
+      fillOpacity = restoreLulcOpacity / 100;
+    } else if (layer === 'eudr') {
+      const val = zone.eudr;
+      fillColor = val === 'Compliant' ? '#16a34a' : val === 'Warning' ? '#eab308' : '#dc2626';
+      fillOpacity = restoreEudrOpacity / 100;
+    } else if (layer === 'agb') {
+      fillColor = zone.id === 'ZONE-ALPHA' ? '#14532D' : zone.id === 'ZONE-BETA' ? '#16A34A' : '#86EFAC';
+      fillOpacity = restoreAgbOpacity / 100;
     }
     
     return {
@@ -873,6 +1424,31 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     } else if (layer === 'growth') {
       fillColor = (plot.id === 'PLOT-ALPHA') ? '#15803d' : (plot.id === 'PLOT-BETA') ? '#86efac' : '#fbbf24';
       fillOpacity = intelGrowthOpacity / 100;
+    } else if (layer === 'cvi') {
+      fillColor = getIndexFiveClasses(plot.ndvi * 1.05, 'NDVI').color;
+      fillOpacity = intelCviOpacity / 100;
+    } else if (layer === 'car') {
+      fillColor = getIndexFiveClasses(plot.ndvi * 0.9, 'NDVI').color;
+      fillOpacity = intelCarOpacity / 100;
+    } else if (layer === 'ndre') {
+      fillColor = getIndexFiveClasses(plot.ndvi * 0.85, 'NDVI').color;
+      fillOpacity = intelNdreOpacity / 100;
+    } else if (layer === 'wdi') {
+      fillColor = getIndexFiveClasses(plot.ndmi * 1.1, 'LSWI').color;
+      fillOpacity = intelWdiOpacity / 100;
+    } else if (layer === 'dprvi') {
+      fillColor = (plot.id === 'PLOT-ALPHA') ? '#15803d' : (plot.id === 'PLOT-BETA') ? '#eab308' : '#0284C7';
+      fillOpacity = intelDprviOpacity / 100;
+    } else if (layer === 'rvi') {
+      const val = plot.id === 'PLOT-ALPHA' ? 0.72 : plot.id === 'PLOT-BETA' ? 0.45 : 0.62;
+      fillColor = val > 0.70 ? '#14532D' : val > 0.50 ? '#16A34A' : val > 0.30 ? '#86EFAC' : val > 0.15 ? '#EAB308' : '#EF4444';
+      fillOpacity = intelRviOpacity / 100;
+    } else if (layer === 'flood') {
+      fillColor = plot.id === 'PLOT-BETA' ? '#1e3a8a' : 'transparent';
+      fillOpacity = intelFloodOpacity / 100;
+    } else if (layer === 'uas') {
+      fillColor = plot.id === 'PLOT-BETA' ? '#dc2626' : 'transparent';
+      fillOpacity = intelUasOpacity / 100;
     }
     
     return {
@@ -893,6 +1469,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     if (intelShowLswi) activeLayers.push('lswi');
     if (intelShowVhi) activeLayers.push('vhi');
     if (intelShowSuitability) activeLayers.push('suitability');
+    if (intelShowCvi) activeLayers.push('cvi');
+    if (intelShowCar) activeLayers.push('car');
+    if (intelShowNdre) activeLayers.push('ndre');
+    if (intelShowWdi) activeLayers.push('wdi');
+    if (intelShowDprvi) activeLayers.push('dprvi');
+    if (intelShowRvi) activeLayers.push('rvi');
+    if (intelShowFlood) activeLayers.push('flood');
+    if (intelShowUas) activeLayers.push('uas');
 
     return plots.map(plot => {
       const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
@@ -978,6 +1562,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     if (healthShowChlorophyll) activeLayers.push('chlorophyll');
     if (healthShowWater) activeLayers.push('water');
     if (healthShowPest) activeLayers.push('pest');
+    if (healthShowNdre) activeLayers.push('ndre');
+    if (healthShowSmi) activeLayers.push('smi');
 
     return plots.map(plot => {
       const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
@@ -1150,6 +1736,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     if (restoreShowSurvival) activeLayers.push('survival');
     if (restoreShowCarbon) activeLayers.push('carbon');
     if (restoreShowBiodiversity) activeLayers.push('biodiversity');
+    if (restoreShowInSar) activeLayers.push('insar');
+    if (restoreShowGedi) activeLayers.push('gedi');
+    if (restoreShowNdwi) activeLayers.push('ndwi');
+    if (restoreShowLulc) activeLayers.push('lulc');
+    if (restoreShowEudr) activeLayers.push('eudr');
+    if (restoreShowAgb) activeLayers.push('agb');
 
     return zones.map(zone => {
       const keyPrefix = `${zone.id}${suffix ? '-' + suffix : ''}`;
@@ -1237,6 +1829,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     if (climateShowSoilTemp) activeLayers.push('soilTemp');
     if (climateShowLst) activeLayers.push('lst');
     if (climateShowVaporDeficit) activeLayers.push('vpd');
+    if (climateShowFlood) activeLayers.push('flood');
 
     return plots.map(plot => {
       const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
@@ -1335,12 +1928,25 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
   const handleSidebarClick = (item) => {
     setActiveSidebarItem(item);
-    if (item === 'dashboard') setActiveTab('monitor');
+    if (item === 'analytics') setActiveTab('monitor');
   };
 
   const handleTabClick = (tab) => {
     setActiveTab(tab);
-    setActiveSidebarItem('dashboard');
+    setActiveSidebarItem('analytics');
+  };
+
+  const handlePlotFilterChange = (plotId) => {
+    setFilterPlot(plotId);
+    handlePlotChange(plotId);
+  };
+
+  const handleAcknowledgeAlert = (alertId) => {
+    setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: 'Acknowledged' } : a));
+  };
+
+  const handleAcknowledgeAllPlotAlerts = (plotId) => {
+    setAlerts(prev => prev.map(a => a.plot === plotId ? { ...a, status: 'Acknowledged' } : a));
   };
 
   const handleProfileSave = (e) => {
@@ -1528,18 +2134,18 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const restorationPlotsDataA = useMemo(() => {
     const base = currentTimelineA.ndvi;
     return [
-      { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, biodiversity: '92%' },
-      { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, biodiversity: '84%' },
-      { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, biodiversity: '76%' }
+      { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, insar: 0.85, gedi: 18, ndwi: 0.35, lulc: 'Forest', eudr: 'Compliant' },
+      { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, insar: 0.62, gedi: 12, ndwi: 0.22, lulc: 'Shrubland', eudr: 'Warning' },
+      { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, insar: 0.38, gedi: 4, ndwi: -0.15, lulc: 'Cropland', eudr: 'Deforested' }
     ];
   }, [currentTimelineA]);
 
   const restorationPlotsDataB = useMemo(() => {
     const base = currentTimelineB.ndvi;
     return [
-      { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, biodiversity: '92%' },
-      { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, biodiversity: '84%' },
-      { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, biodiversity: '76%' }
+      { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, insar: 0.85, gedi: 18, ndwi: 0.35, lulc: 'Forest', eudr: 'Compliant' },
+      { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, insar: 0.62, gedi: 12, ndwi: 0.22, lulc: 'Shrubland', eudr: 'Warning' },
+      { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, insar: 0.38, gedi: 4, ndwi: -0.15, lulc: 'Cropland', eudr: 'Deforested' }
     ];
   }, [currentTimelineB]);
 
@@ -1699,7 +2305,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         <div className="flex divide-x divide-gray-100 bg-gray-50/30 min-h-0 flex-1">
           {/* Mini Calendar (Enlarged) */}
           {!hideCalendarAndSlider && showCalendarTool && (
-            <div className="p-4 shrink-0 w-[440px] bg-white flex flex-col justify-between overflow-y-auto">
+            <div className="p-4 shrink-0 w-[352px] bg-white flex flex-col justify-between overflow-y-auto">
               <div>
 
 
@@ -1907,6 +2513,106 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     return { labels, datasets };
   }, [filterPlot, currentTimeline]);
 
+  const ndmiTrendsData = useMemo(() => {
+    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    const datasets = [];
+
+    const alphaData = [0.38, 0.40, 0.42, 0.44, currentTimeline.ndmi + 0.02, 0.46];
+    const betaData = [0.30, 0.32, 0.31, 0.33, currentTimeline.ndmi - 0.10, 0.35];
+    const gammaData = [0.35, 0.36, 0.37, 0.38, currentTimeline.ndmi - 0.04, 0.40];
+    const avgData = labels.map((_, i) => parseFloat(((alphaData[i] + betaData[i] + gammaData[i]) / 3).toFixed(2)));
+
+    const showAlpha = filterPlot === 'All' || filterPlot === 'PLOT-ALPHA';
+    const showBeta = filterPlot === 'All' || filterPlot === 'PLOT-BETA';
+    const showGamma = filterPlot === 'All' || filterPlot === 'PLOT-GAMMA';
+
+    if (showAlpha) {
+      datasets.push({ label: 'West Valley Plot', data: alphaData, borderColor: '#16A34A', tension: 0.4, fill: true, backgroundColor: 'rgba(22, 163, 74, 0.03)', pointRadius: 4, pointBackgroundColor: '#16A34A' });
+    }
+    if (showBeta) {
+      datasets.push({ label: 'East Ridge Plot', data: betaData, borderColor: '#EAB308', tension: 0.4, fill: true, backgroundColor: 'rgba(234, 179, 8, 0.03)', pointRadius: 4, pointBackgroundColor: '#EAB308' });
+    }
+    if (showGamma) {
+      datasets.push({ label: 'South Slope Plot', data: gammaData, borderColor: '#0284C7', tension: 0.4, fill: true, backgroundColor: 'rgba(2, 132, 199, 0.03)', pointRadius: 4, pointBackgroundColor: '#0284C7' });
+    }
+
+    if (filterPlot !== 'All') {
+      datasets.push({ label: 'System Average', data: avgData, borderColor: '#64748B', borderDash: [6, 4], tension: 0.4, fill: false, pointRadius: 0 });
+    }
+
+    return { labels, datasets };
+  }, [filterPlot, currentTimeline]);
+
+  const rviTrendsData = useMemo(() => {
+    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    const datasets = [];
+
+    const alphaData = [0.45, 0.52, 0.60, 0.68, 0.72, 0.75];
+    const betaData = [0.35, 0.40, 0.42, 0.44, 0.45, 0.48];
+    const gammaData = [0.40, 0.45, 0.50, 0.58, 0.62, 0.65];
+    const avgData = labels.map((_, i) => parseFloat(((alphaData[i] + betaData[i] + gammaData[i]) / 3).toFixed(2)));
+
+    const showAlpha = filterPlot === 'All' || filterPlot === 'PLOT-ALPHA';
+    const showBeta = filterPlot === 'All' || filterPlot === 'PLOT-BETA';
+    const showGamma = filterPlot === 'All' || filterPlot === 'PLOT-GAMMA';
+
+    if (showAlpha) {
+      datasets.push({ label: 'West Valley Plot', data: alphaData, borderColor: '#16A34A', tension: 0.4, fill: true, backgroundColor: 'rgba(22, 163, 74, 0.03)', pointRadius: 4, pointBackgroundColor: '#16A34A' });
+    }
+    if (showBeta) {
+      datasets.push({ label: 'East Ridge Plot', data: betaData, borderColor: '#EAB308', tension: 0.4, fill: true, backgroundColor: 'rgba(234, 179, 8, 0.03)', pointRadius: 4, pointBackgroundColor: '#EAB308' });
+    }
+    if (showGamma) {
+      datasets.push({ label: 'South Slope Plot', data: gammaData, borderColor: '#0284C7', tension: 0.4, fill: true, backgroundColor: 'rgba(2, 132, 199, 0.03)', pointRadius: 4, pointBackgroundColor: '#0284C7' });
+    }
+
+    if (filterPlot !== 'All') {
+      datasets.push({ label: 'System Average', data: avgData, borderColor: '#64748B', borderDash: [6, 4], tension: 0.4, fill: false, pointRadius: 0 });
+    }
+
+    return { labels, datasets };
+  }, [filterPlot]);
+
+  const soilTempTrendsData = useMemo(() => {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const expected = [24.5, 25.0, 25.5, 24.8, 25.2, 26.0, 26.5];
+    let actual = [24.0, 24.8, 25.2, 24.5, 25.0, 25.8, 26.2];
+    if (filterPlot === 'PLOT-ALPHA') {
+      actual = [23.8, 24.2, 24.8, 24.2, 24.5, 25.2, 25.5];
+    } else if (filterPlot === 'PLOT-BETA') {
+      actual = [26.5, 27.2, 28.0, 27.5, 28.2, 29.0, 29.5];
+    } else if (filterPlot === 'PLOT-GAMMA') {
+      actual = [24.2, 24.9, 25.4, 24.7, 25.1, 25.9, 26.3];
+    }
+    return {
+      labels,
+      datasets: [
+        { label: 'Optimal Soil Temp Base [°C]', data: expected, borderColor: '#64748B', borderDash: [5, 5], fill: false, tension: 0.1, pointRadius: 0 },
+        { label: 'Actual Soil Temp [°C]', data: actual, borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.05)', fill: true, tension: 0.1, pointRadius: 3 }
+      ]
+    };
+  }, [filterPlot]);
+
+  const vpdTrendsData = useMemo(() => {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const criticalThreshold = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0];
+    let actual = [1.2, 1.4, 1.6, 1.3, 1.5, 1.8, 1.9];
+    if (filterPlot === 'PLOT-ALPHA') {
+      actual = [1.0, 1.1, 1.3, 1.2, 1.2, 1.4, 1.5];
+    } else if (filterPlot === 'PLOT-BETA') {
+      actual = [2.1, 2.3, 2.4, 2.2, 2.3, 2.5, 2.6];
+    } else if (filterPlot === 'PLOT-GAMMA') {
+      actual = [1.3, 1.5, 1.7, 1.4, 1.6, 1.9, 2.0];
+    }
+    return {
+      labels,
+      datasets: [
+        { label: 'Critical Stress Threshold [kPa]', data: criticalThreshold, borderColor: '#EF4444', borderDash: [4, 4], fill: false, tension: 0, pointRadius: 0 },
+        { label: 'Atmospheric VPD [kPa]', data: actual, borderColor: '#8B5CF6', backgroundColor: 'rgba(139, 92, 246, 0.05)', fill: true, tension: 0.2, pointRadius: 4 }
+      ]
+    };
+  }, [filterPlot]);
+
   const moistureRetentionData = useMemo(() => {
     const allPlots = [
       { id: 'PLOT-ALPHA', label: 'Plot Alpha', value: parseFloat((currentTimeline.ndmi + 0.02).toFixed(2)), color: '#16A34A' },
@@ -2021,6 +2727,51 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       }]
     };
   }, [filterPlot, filterEstate]);
+
+  const gddReferenceData = useMemo(() => {
+    const labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8'];
+    const expected = [15, 30, 45, 60, 75, 90, 105, 120];
+    const actual = [14, 28, 42, 58, 76, filterPlot === 'PLOT-BETA' ? 82 : 92, filterPlot === 'PLOT-BETA' ? 95 : 110, filterPlot === 'PLOT-BETA' ? 108 : 124];
+    return {
+      labels,
+      datasets: [
+        { label: 'Expected GDD Curve', data: expected, borderColor: '#64748B', borderDash: [5, 5], fill: false, tension: 0.1, pointRadius: 0 },
+        { label: 'Actual Plot GDD', data: actual, borderColor: '#16A34A', backgroundColor: 'rgba(22, 163, 74, 0.05)', fill: true, tension: 0.1, pointRadius: 3 }
+      ]
+    };
+  }, [filterPlot]);
+
+  const gddCompletionData = useMemo(() => {
+    return {
+      labels: ['West Valley Plot', 'East Ridge Plot', 'South Slope Plot'],
+      datasets: [{
+        label: 'GDD Completion %',
+        data: [92, filterPlot === 'PLOT-BETA' ? 76 : 85, 89],
+        backgroundColor: ['#16A34A', '#EAB308', '#0284C7'],
+        borderRadius: 8
+      }]
+    };
+  }, [filterPlot]);
+
+  const etTimeSeriesData = useMemo(() => {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const baseETc = [4.2, 4.5, 4.8, 4.6, 4.7, 4.9, 5.0];
+    let baseETa = [4.1, 4.3, 4.6, 4.2, 4.0, 4.1, 4.2];
+    if (filterPlot === 'PLOT-ALPHA') {
+      baseETa = [4.2, 4.4, 4.7, 4.6, 4.6, 4.8, 4.9];
+    } else if (filterPlot === 'PLOT-BETA') {
+      baseETa = [3.2, 3.1, 3.0, 2.9, 2.8, 2.7, 2.5];
+    } else if (filterPlot === 'PLOT-GAMMA') {
+      baseETa = [3.9, 4.1, 4.3, 4.1, 3.9, 4.0, 4.1];
+    }
+    return {
+      labels,
+      datasets: [
+        { label: 'Crop Water Demand (ETc) [mm/day]', data: baseETc, borderColor: '#3B82F6', borderDash: [4, 4], fill: false, tension: 0.2, pointRadius: 3 },
+        { label: 'Actual Transpiration (ETa) [mm/day]', data: baseETa, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.05)', fill: true, tension: 0.2, pointRadius: 4 }
+      ]
+    };
+  }, [filterPlot]);
 
   const alertsByCategoryData = useMemo(() => {
     const categories = ['Water Stress', 'Pest Infestation', 'Growth Deficit', 'Cloud Cover'];
@@ -2322,7 +3073,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             { id: 'monitor',      label: 'Monitor',      icon: <Activity size={15} /> },
             { id: 'reports',      label: 'Reports',      icon: <FileText size={15} /> },
             { id: 'verification', label: 'Verification', icon: <Shield size={15} /> },
-            { id: 'ai-assistant', label: 'AI Assistant', icon: <Sparkles size={15} /> }
+            { id: 'ai-assistant', label: 'AI Scenario Modeler', icon: <Sparkles size={15} /> }
           ].map(tab => (
             <button
               key={tab.id}
@@ -2447,7 +3198,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="space-y-1">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-3">Main</div>
                 {[
-                  { id: 'dashboard',           label: 'Dashboard',           icon: <LayoutDashboard size={17} /> },
+                  { id: 'analytics',           label: 'Analytics Hub',       icon: <LayoutDashboard size={17} /> },
                   { id: 'intelligence-layers', label: 'Intelligence Layers', icon: <MapIcon size={17} /> },
                   { id: 'crop-health',         label: 'Crop Health',         icon: <Activity size={17} /> },
                   { id: 'crop-yield',          label: 'Crop Yield',          icon: <TrendingUp size={17} /> },
@@ -2581,210 +3332,571 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           {/* ══════════════════════════════════════════════════════════════
               DASHBOARD — MONITOR
           ══════════════════════════════════════════════════════════════ */}
-          {activeSidebarItem === 'dashboard' && activeTab === 'monitor' && (
-            <div className="p-10 space-y-10 animate-in fade-in duration-300">
-
-              {/* Page header */}
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                  <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Agro Analytics Dashboard</h2>
-                  <p className="text-sm text-gray-500 font-medium mt-2 max-w-lg">
-                    Direct analytical metrics derived from Sentinel-2 & Landsat-8 imagery pass dates.
-                  </p>
-                </div>
-                <div className="bg-white px-5 py-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 shrink-0">
-                  <CalendarIcon size={16} className="text-green-600" />
-                  <span className="text-sm font-bold text-gray-700">
-                    Date last update: {currentTimeline.label}
-                  </span>
-                </div>
-              </div>
-
-              {/* Search & Filters */}
-              <div className="bg-white px-6 py-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4 lg:flex-row lg:items-center justify-between">
-                <div className="relative flex-1 max-w-md w-full">
-                  <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search blocks, parameters, anomalies..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 pl-11 pr-4 text-sm font-medium outline-none focus:border-green-500 focus:bg-white transition-all text-gray-700"
-                  />
-                </div>
-                
-                {/* Active Filter Dropdowns */}
-                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                  {/* Estate Filter */}
-                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-                    <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-wider">Estate</span>
-                    <select
-                      value={filterEstate}
-                      onChange={e => handleEstateChange(e.target.value)}
-                      className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
-                    >
-                      <option value="All">All Estates</option>
-                      <option value="West Valley Estate">West Valley Estate</option>
-                      <option value="East Ridge Estate">East Ridge Estate</option>
-                      <option value="South Slope Estate">South Slope Estate</option>
-                    </select>
+          {activeSidebarItem === 'analytics' && activeTab === 'monitor' && (() => {
+            const ANALYTICS_SUBPAGES = [
+              { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={15} /> },
+              { id: 'vigor-health', label: 'Vigor & Phenology', icon: <TrendingUp size={15} /> },
+              { id: 'moisture-et', label: 'Moisture & ET', icon: <Droplets size={15} /> },
+              { id: 'soil-nutrients', label: 'Soil & Nutrients', icon: <Sun size={15} /> },
+            ];
+            return (
+              <div className="p-10 space-y-10 animate-in fade-in duration-300">
+                {/* Page header */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Agro Analytics Hub</h2>
+                    <p className="text-sm text-gray-500 font-medium mt-2 max-w-lg">
+                      Direct analytical metrics derived from Sentinel-2 & Landsat-8 imagery pass dates.
+                    </p>
                   </div>
-
-                  {/* Plot Filter */}
-                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-                    <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-wider">Plot</span>
-                    <select
-                      value={filterPlot}
-                      onChange={e => handlePlotChange(e.target.value)}
-                      className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
-                    >
-                      <option value="All">All Plots</option>
-                      <option value="PLOT-ALPHA">West Valley Plot (PLOT-ALPHA)</option>
-                      <option value="PLOT-BETA">East Ridge Plot (PLOT-BETA)</option>
-                      <option value="PLOT-GAMMA">South Slope Plot (PLOT-GAMMA)</option>
-                    </select>
+                  <div className="bg-white px-5 py-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 shrink-0">
+                    <CalendarIcon size={16} className="text-green-600" />
+                    <span className="text-sm font-bold text-gray-700">
+                      Date last update: {currentTimeline.label}
+                    </span>
                   </div>
+                </div>
 
-                  {/* Date Filter */}
-                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-                    <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-wider">Date</span>
-                    <select
-                      value={filterDate}
-                      onChange={e => setFilterDate(e.target.value)}
-                      className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
-                    >
-                      <option value="All">All Pass Dates</option>
-                      {TIMELINE_DATA.map(t => (
-                        <option key={t.date} value={t.date}>{t.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Clear Button */}
-                  {(filterEstate !== 'All' || filterPlot !== 'All' || filterDate !== 'All') && (
+                {/* Subtabs Menu */}
+                <div className="flex border-b border-gray-200">
+                  {ANALYTICS_SUBPAGES.map(sub => (
                     <button
-                      onClick={() => { setFilterEstate('All'); setFilterPlot('All'); setFilterDate('All'); }}
-                      className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100/70 rounded-xl"
+                      key={sub.id}
+                      onClick={() => setActiveAnalyticsSubpage(sub.id)}
+                      className={`flex items-center gap-2 px-6 py-3 border-b-2 font-bold text-sm transition-all outline-none ${
+                        activeAnalyticsSubpage === sub.id
+                          ? 'border-green-600 text-green-600'
+                          : 'border-transparent text-gray-400 hover:text-gray-600'
+                      }`}
                     >
-                      <X size={14} /> Clear Filters
+                      {sub.icon}
+                      {sub.label}
                     </button>
-                  )}
+                  ))}
                 </div>
-              </div>
 
-              {/* KPI Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                  { label: 'Total Layers',  value: dashboardMetrics.layers, subtext: 'Active GIS Layers',       icon: <Layers size={22} className="text-blue-600" />,  accent: '#EFF6FF', border: '#BFDBFE' },
-                  { label: 'Active Users',  value: dashboardMetrics.users,  subtext: 'Online Spatial Auditors',  icon: <User size={22} className="text-green-600" />,    accent: '#F0FDF4', border: '#BBF7D0' },
-                  { label: 'Projects',      value: dashboardMetrics.projects, subtext: 'In-Progress Audits',       icon: <Activity size={22} className="text-amber-500" />, accent: '#FFFBEB', border: '#FDE68A' },
-                  { label: 'Alerts',        value: dashboardMetrics.alerts,   subtext: 'Critical Moisture Stress', icon: <AlertTriangle size={22} className="text-red-500" />, accent: '#FFF1F2', border: '#FECDD3' }
-                ].map((kpi, i) => (
-                  <div key={i}
-                    className="bg-white p-7 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group cursor-default"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-3">
-                          {kpi.label}
-                        </span>
-                        <span className="text-4xl font-bold tracking-tight text-gray-900 block mb-2">
-                          {kpi.value}
-                        </span>
-                        <span className="text-xs text-gray-400 font-medium block uppercase tracking-wide">
-                          {kpi.subtext}
-                        </span>
-                      </div>
-                      <div
-                        className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border group-hover:scale-105 transition-all"
-                        style={{ backgroundColor: kpi.accent, borderColor: kpi.border }}
+                {/* Search & Filters */}
+                <div className="bg-white px-6 py-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4 lg:flex-row lg:items-center justify-between">
+                  <div className="relative flex-1 max-w-md w-full">
+                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search blocks, parameters, anomalies..."
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 pl-11 pr-4 text-sm font-medium outline-none focus:border-green-500 focus:bg-white transition-all text-gray-700"
+                    />
+                  </div>
+                  
+                  {/* Active Filter Dropdowns */}
+                  <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                    {/* Estate Filter */}
+                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                      <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-wider">Estate</span>
+                      <select
+                        value={filterEstate}
+                        onChange={e => handleEstateChange(e.target.value)}
+                        className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
                       >
-                        {kpi.icon}
+                        <option value="All">All Estates</option>
+                        <option value="West Valley Estate">West Valley Estate</option>
+                        <option value="East Ridge Estate">East Ridge Estate</option>
+                        <option value="South Slope Estate">South Slope Estate</option>
+                      </select>
+                    </div>
+
+                    {/* Plot Filter */}
+                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                      <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-wider">Plot</span>
+                      <select
+                        value={filterPlot}
+                        onChange={e => handlePlotFilterChange(e.target.value)}
+                        className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
+                      >
+                        <option value="All">All Plots</option>
+                        <option value="PLOT-ALPHA">West Valley Plot (PLOT-ALPHA)</option>
+                        <option value="PLOT-BETA">East Ridge Plot (PLOT-BETA)</option>
+                        <option value="PLOT-GAMMA">South Slope Plot (PLOT-GAMMA)</option>
+                      </select>
+                    </div>
+
+                    {/* Date Filter */}
+                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                      <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-wider">Date</span>
+                      <select
+                        value={filterDate}
+                        onChange={e => setFilterDate(e.target.value)}
+                        className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
+                      >
+                        <option value="All">All Pass Dates</option>
+                        {TIMELINE_DATA.map(t => (
+                          <option key={t.date} value={t.date}>{t.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Clear Button */}
+                    {(filterEstate !== 'All' || filterPlot !== 'All' || filterDate !== 'All') && (
+                      <button
+                        onClick={() => { setFilterEstate('All'); setFilterPlot('All'); setFilterDate('All'); }}
+                        className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100/70 rounded-xl"
+                      >
+                        <X size={14} /> Clear Filters
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Subpage Contents */}
+                {activeAnalyticsSubpage === 'overview' && (
+                  <div className="space-y-10 animate-in fade-in duration-200">
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {[
+                        { label: 'Total Layers',  value: dashboardMetrics.layers, subtext: 'Active GIS Layers',       icon: <Layers size={22} className="text-blue-600" />,  accent: '#EFF6FF', border: '#BFDBFE' },
+                        { label: 'Active Users',  value: dashboardMetrics.users,  subtext: 'Online Spatial Auditors',  icon: <User size={22} className="text-green-600" />,    accent: '#F0FDF4', border: '#BBF7D0' },
+                        { label: 'Projects',      value: dashboardMetrics.projects, subtext: 'In-Progress Audits',       icon: <Activity size={22} className="text-amber-500" />, accent: '#FFFBEB', border: '#FDE68A' },
+                        { label: 'Alerts',        value: dashboardMetrics.alerts,   subtext: 'Critical Moisture Stress', icon: <AlertTriangle size={22} className="text-red-500" />, accent: '#FFF1F2', border: '#FECDD3' }
+                      ].map((kpi, i) => (
+                        <div key={i}
+                          className="bg-white p-7 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group cursor-default"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-3">
+                                {kpi.label} {renderInfoTooltip(kpi.label)}
+                              </span>
+                              <span className="text-4xl font-bold tracking-tight text-gray-900 block mb-2">
+                                {kpi.value}
+                              </span>
+                              <span className="text-xs text-gray-400 font-medium block uppercase tracking-wide">
+                                {kpi.subtext}
+                              </span>
+                            </div>
+                            <div
+                              className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border group-hover:scale-105 transition-all"
+                              style={{ backgroundColor: kpi.accent, borderColor: kpi.border }}
+                            >
+                              {kpi.icon}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Land Classification Chart (Doughnut) */}
+                    <div className="grid grid-cols-1 gap-8">
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Trees size={18} className="text-green-700" />
+                            Land Classification Area {renderInfoTooltip("Land Classification Area")}</h3>
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            ESA WorldCover
+                          </span>
+                        </div>
+                        <div className="h-[320px] flex items-center justify-center">
+                          <div className="w-[280px] h-[280px]">
+                            <Doughnut
+                              data={landClassificationData}
+                              options={{
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'bottom', labels: { font: { size: 12, weight: '600' }, padding: 16, usePointStyle: true } } }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* LAND USE & COMPLIANCE SECTION */}
+                      <div className="space-y-3 pt-4 border-t border-gray-100">
+                        <div 
+                          onClick={() => setRestoreLulcExpanded(!restoreLulcExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {restoreLulcExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Land Use & Compliance
+                        </div>
+                        {restoreLulcExpanded && (
+                          <div className="space-y-3">
+                            {/* LULC Classification Card */}
+                            <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LULC Classification {renderInfoTooltip("LULC Classification")}</div>
+                                  <span className="text-[10px] text-gray-400 font-medium">ESA WorldCover pixel maps</span>
+                                </div>
+                                <button
+                                  onClick={() => handleRestoreToggle('lulc')}
+                                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                    restoreShowLulc ? 'bg-green-600' : 'bg-gray-200'
+                                  }`}
+                                  style={{ backgroundColor: restoreShowLulc ? '#16A34A' : '#E5E7EB' }}
+                                >
+                                  <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                    restoreShowLulc ? 'translate-x-4' : 'translate-x-0'
+                                  }`} />
+                                </button>
+                              </div>
+                              {restoreShowLulc && (
+                                <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                    <span>Opacity</span>
+                                    <span>{restoreLulcOpacity}%</span>
+                                  </div>
+                                  <input type="range" min="10" max="100" value={restoreLulcOpacity}
+                                    onChange={e => setRestoreLulcOpacity(parseInt(e.target.value))}
+                                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                                    {[
+                                      { label: 'Forest', color: '#15803d' },
+                                      { label: 'Shrubland', color: '#86efac' },
+                                      { label: 'Cropland', color: '#fde047' },
+                                      { label: 'Bare Soil', color: '#ca8a04' },
+                                      { label: 'Water', color: '#3b82f6' },
+                                      { label: 'Builtup', color: '#94a3b8' }
+                                    ].map((item, i) => (
+                                      <div key={i} className="flex items-center gap-1.5">
+                                        <div className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                        <span className="text-[9px] font-semibold text-gray-500 leading-none">{item.label}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* EUDR Deforestation Card */}
+                            <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">EUDR Deforestation {renderInfoTooltip("EUDR Deforestation")}</div>
+                                  <span className="text-[10px] text-gray-400 font-medium">EU Deforestation Regulation audit</span>
+                                </div>
+                                <button
+                                  onClick={() => handleRestoreToggle('eudr')}
+                                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                    restoreShowEudr ? 'bg-green-600' : 'bg-gray-200'
+                                  }`}
+                                  style={{ backgroundColor: restoreShowEudr ? '#16A34A' : '#E5E7EB' }}
+                                >
+                                  <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                    restoreShowEudr ? 'translate-x-4' : 'translate-x-0'
+                                  }`} />
+                                </button>
+                              </div>
+                              {restoreShowEudr && (
+                                <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                    <span>Opacity</span>
+                                    <span>{restoreEudrOpacity}%</span>
+                                  </div>
+                                  <input type="range" min="10" max="100" value={restoreEudrOpacity}
+                                    onChange={e => setRestoreEudrOpacity(parseInt(e.target.value))}
+                                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                  <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                    {[
+                                      { label: 'Compliant (Deforestation-Free)', color: '#16a34a' },
+                                      { label: 'EUDR Warning Buffer', color: '#eab308' },
+                                      { label: 'Non-Compliant Anomaly', color: '#dc2626' }
+                                    ].map((item, i) => (
+                                      <div key={i} className="flex items-center gap-2">
+                                        <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                        <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
 
-              {/* Charts Grid */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                {activeAnalyticsSubpage === 'vigor-health' && (
+                  <div className="space-y-10 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                      {/* Crop Yield & Health Trends */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <TrendingUp size={18} className="text-green-600" />
+                            Geospatial Vegetation Vigor & Health Trends {renderInfoTooltip("Geospatial Vegetation Vigor & Health Trends")}</h3>
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            NDVI Normalized
+                          </span>
+                        </div>
+                        <div className="h-[300px]">
+                          <Line
+                            data={yieldTrendsData}
+                            options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0.2, max: 1.0 } } }}
+                          />
+                        </div>
+                      </div>
 
-                {/* Crop Yield & Health Trends */}
-                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                      <TrendingUp size={18} className="text-green-600" />
-                      Geospatial Vegetation Vigor & Health Trends
-                    </h3>
-                    <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                      NDVI Normalized
-                    </span>
-                  </div>
-                  <div className="h-[320px]">
-                    <Line
-                      data={yieldTrendsData}
-                      options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0.2, max: 1.0 } } }}
-                    />
-                  </div>
-                </div>
+                      {/* GDD Reference Curve */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Activity size={18} className="text-green-600" />
+                            Seasonal Trajectory vs GDD Reference Curve {renderInfoTooltip("Seasonal Trajectory vs GDD Reference Curve")}</h3>
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            GDD Model
+                          </span>
+                        </div>
+                        <div className="h-[300px]">
+                          <Line
+                            data={gddReferenceData}
+                            options={CHART_DEFAULTS}
+                          />
+                        </div>
+                      </div>
 
-                {/* Soil Moisture NDMI */}
-                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                      <Droplets size={18} className="text-blue-600" />
-                      Moisture Retention (NDMI)
-                    </h3>
-                    <span className="text-xs bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                      Active Sat Pass
-                    </span>
-                  </div>
-                  <div className="h-[320px]">
-                    <Bar
-                      data={moistureRetentionData}
-                      options={{ ...CHART_DEFAULTS, plugins: { legend: { display: filterPlot !== 'All' } }, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0.0, max: 0.8 } } }}
-                    />
-                  </div>
-                </div>
+                      {/* Radar Vegetation Index (RVI) Growth Trends */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <TrendingUp size={18} className="text-green-600" />
+                            Radar Vegetation Index (RVI) Growth Trends {renderInfoTooltip("Radar Vegetation Index (RVI)")}</h3>
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            SAR RVI
+                          </span>
+                        </div>
+                        <div className="h-[300px]">
+                          <Line
+                            data={rviTrendsData}
+                            options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0.0, max: 1.0 } } }}
+                          />
+                        </div>
+                      </div>
 
-                {/* Nutrient Radar */}
-                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
-                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                    <Sun size={18} className="text-amber-500" />
-                    Nutrient Profiling
-                  </h3>
-                  <div className="h-[320px] flex items-center justify-center">
-                    <Radar
-                      data={nutrientData}
-                      options={{
-                        scales: { r: { angleLines: { display: false }, suggestedMin: 0, suggestedMax: 100, ticks: { display: false }, pointLabels: { font: { size: 11, weight: '600' } } } },
-                        plugins: { legend: { display: false } }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Land Classification */}
-                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
-                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                    <Trees size={18} className="text-green-700" />
-                    Land Classification Area
-                  </h3>
-                  <div className="h-[320px] flex items-center justify-center">
-                    <div className="w-[280px] h-[280px]">
-                      <Doughnut
-                        data={landClassificationData}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: { legend: { position: 'bottom', labels: { font: { size: 12, weight: '600' }, padding: 16, usePointStyle: true } } }
-                        }}
-                      />
+                      {/* GDD Completion Rate */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Activity size={18} className="text-green-600" />
+                            Plot-by-Plot Growing Degree Days (GDD) Completion Rate {renderInfoTooltip("Plot-by-Plot Growing Degree Days (GDD) Completion Rate")}</h3>
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            Thermal Units
+                          </span>
+                        </div>
+                        <div className="h-[300px]">
+                          <Bar
+                            data={gddCompletionData}
+                            options={CHART_DEFAULTS}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
+                {activeAnalyticsSubpage === 'moisture-et' && (
+                  <div className="space-y-10 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                      {/* ET Time Series Chart */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Droplets size={18} className="text-blue-600" />
+                            FAO-56 Evapotranspiration Model {renderInfoTooltip("FAO-56 Evapotranspiration Model")}</h3>
+                          <span className="text-xs bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            ETc vs ETa
+                          </span>
+                        </div>
+                        <div className="h-[300px]">
+                          <Line
+                            data={etTimeSeriesData}
+                            options={CHART_DEFAULTS}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Canopy Moisture Retention (NDMI) Trends */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Droplets size={18} className="text-blue-600" />
+                            Canopy Moisture Retention (NDMI) Trends {renderInfoTooltip("Moisture Retention (NDMI)")}</h3>
+                          <span className="text-xs bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            NDMI
+                          </span>
+                        </div>
+                        <div className="h-[300px]">
+                          <Line
+                            data={ndmiTrendsData}
+                            options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0.1, max: 0.7 } } }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Soil Temperature Trends */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Sun size={18} className="text-amber-500" />
+                            Soil Temperature Trends {renderInfoTooltip("Soil Temp")}</h3>
+                          <span className="text-xs bg-amber-50 text-amber-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            Soil Temp
+                          </span>
+                        </div>
+                        <div className="h-[300px]">
+                          <Line
+                            data={soilTempTrendsData}
+                            options={CHART_DEFAULTS}
+                          />
+                        </div>
+                      </div>
+
+                      {/* VPD Stress Trends */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Activity size={18} className="text-purple-600" />
+                            Vapor Pressure Deficit (VPD) Stress Trends {renderInfoTooltip("VPD Stress")}</h3>
+                          <span className="text-xs bg-purple-50 text-purple-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            VPD Index
+                          </span>
+                        </div>
+                        <div className="h-[300px]">
+                          <Line
+                            data={vpdTrendsData}
+                            options={CHART_DEFAULTS}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Evapotranspiration Historical Log Table */}
+                    <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                      <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                        <Clock size={18} className="text-gray-600" />
+                        7-Day Evapotranspiration Historical Log {renderInfoTooltip("7-Day Evapotranspiration Historical Log")}</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-gray-200 text-gray-400 uppercase tracking-wider font-extrabold text-[10px]">
+                              <th className="py-3 px-4">Date</th>
+                              <th className="py-3 px-4">Ref ETo (mm)</th>
+                              <th className="py-3 px-4">Crop Kc</th>
+                              <th className="py-3 px-4">Demand ETc (mm)</th>
+                              <th className="py-3 px-4">Actual ETa (mm)</th>
+                              <th className="py-3 px-4">Deficit (mm)</th>
+                              <th className="py-3 px-4">Soil Moisture %</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
+                            {[
+                              { date: 'May 30', eto: '4.8', kc: '0.95', etc: '4.56', eta: filterPlot === 'PLOT-BETA' ? '2.50' : '4.40', deficit: filterPlot === 'PLOT-BETA' ? '2.06' : '0.16', sm: filterPlot === 'PLOT-BETA' ? '32%' : '44%' },
+                              { date: 'May 29', eto: '5.0', kc: '0.95', etc: '4.75', eta: filterPlot === 'PLOT-BETA' ? '2.40' : '4.60', deficit: filterPlot === 'PLOT-BETA' ? '2.35' : '0.15', sm: filterPlot === 'PLOT-BETA' ? '33%' : '45%' },
+                              { date: 'May 28', eto: '4.7', kc: '0.95', etc: '4.46', eta: filterPlot === 'PLOT-BETA' ? '2.30' : '4.35', deficit: filterPlot === 'PLOT-BETA' ? '2.16' : '0.11', sm: filterPlot === 'PLOT-BETA' ? '35%' : '47%' },
+                              { date: 'May 27', eto: '4.9', kc: '0.95', etc: '4.65', eta: filterPlot === 'PLOT-BETA' ? '2.50' : '4.55', deficit: filterPlot === 'PLOT-BETA' ? '2.15' : '0.10', sm: filterPlot === 'PLOT-BETA' ? '37%' : '48%' },
+                              { date: 'May 26', eto: '4.6', kc: '0.95', etc: '4.37', eta: filterPlot === 'PLOT-BETA' ? '2.60' : '4.25', deficit: filterPlot === 'PLOT-BETA' ? '1.77' : '0.12', sm: filterPlot === 'PLOT-BETA' ? '38%' : '49%' },
+                              { date: 'May 25', eto: '4.5', kc: '0.95', etc: '4.27', eta: filterPlot === 'PLOT-BETA' ? '2.70' : '4.20', deficit: filterPlot === 'PLOT-BETA' ? '1.57' : '0.07', sm: filterPlot === 'PLOT-BETA' ? '40%' : '51%' },
+                              { date: 'May 24', eto: '4.4', kc: '0.95', etc: '4.18', eta: filterPlot === 'PLOT-BETA' ? '2.80' : '4.10', deficit: filterPlot === 'PLOT-BETA' ? '1.38' : '0.08', sm: filterPlot === 'PLOT-BETA' ? '41%' : '52%' }
+                            ].map((row, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50/50">
+                                <td className="py-3 px-4 font-bold">{row.date}</td>
+                                <td className="py-3 px-4">{row.eto}</td>
+                                <td className="py-3 px-4">{row.kc}</td>
+                                <td className="py-3 px-4">{row.etc}</td>
+                                <td className="py-3 px-4">
+                                  <span className={parseFloat(row.deficit) > 1.0 ? 'text-red-650 font-bold' : 'text-green-600'}>
+                                    {row.eta}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 font-semibold text-red-500">{row.deficit}</td>
+                                <td className="py-3 px-4">{row.sm}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeAnalyticsSubpage === 'soil-nutrients' && (
+                  <div className="space-y-10 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                      {/* Nutrient Profiling (Radar) */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5 xl:col-span-1">
+                        <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                          <Sun size={18} className="text-amber-500" />
+                          Nutrient Profiling {renderInfoTooltip("Nutrient Profiling")}</h3>
+                        <div className="h-[320px] flex items-center justify-center">
+                          <Radar
+                            data={nutrientData}
+                            options={{
+                              scales: { r: { angleLines: { display: false }, suggestedMin: 0, suggestedMax: 100, ticks: { display: false }, pointLabels: { font: { size: 11, weight: '600' } } } },
+                              plugins: { legend: { display: false } }
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Detailed Soil Chemistry Diagnostics */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5 xl:col-span-2">
+                        <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                          <Activity size={18} className="text-green-600" />
+                          Detailed Soil Chemistry Diagnostics {renderInfoTooltip("Detailed Soil Chemistry Diagnostics")}</h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                          {/* Parameters Table/List */}
+                          <div className="space-y-3">
+                            <h4 className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">Diagnostic Metrics</h4>
+                            {[
+                              { name: 'Soil pH', value: filterPlot === 'PLOT-BETA' ? '5.4 (Strongly Acidic)' : '6.5 (Optimal)', status: filterPlot === 'PLOT-BETA' ? 'Warning' : 'Good', color: filterPlot === 'PLOT-BETA' ? 'text-yellow-600' : 'text-green-600' },
+                              { name: 'Organic Carbon', value: filterPlot === 'PLOT-BETA' ? '1.1% (Low)' : '2.4% (Healthy)', status: filterPlot === 'PLOT-BETA' ? 'Warning' : 'Good', color: filterPlot === 'PLOT-BETA' ? 'text-yellow-600' : 'text-green-600' },
+                              { name: 'Total Nitrogen (N)', value: filterPlot === 'PLOT-BETA' ? '0.08% (Deficient)' : '0.18% (Adequate)', status: filterPlot === 'PLOT-BETA' ? 'Critical' : 'Good', color: filterPlot === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600' },
+                              { name: 'Available Phosphorus (P)', value: '14 ppm (Moderate)', status: 'Warning', color: 'text-yellow-600' },
+                              { name: 'Exchangeable Potassium (K)', value: '185 ppm (High)', status: 'Good', color: 'text-green-600' }
+                            ].map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                <span className="text-xs font-bold text-gray-500">{item.name}</span>
+                                <span className={`text-xs font-bold ${item.color}`}>{item.value}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Actionable Recommendations */}
+                          <div className="space-y-3">
+                            <h4 className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">Agronomic Recommendations</h4>
+                            <div className="bg-green-50/50 border border-green-100 p-4 rounded-xl space-y-3">
+                              {filterPlot === 'PLOT-BETA' ? (
+                                <>
+                                  <p className="text-xs text-green-800 leading-relaxed font-semibold">
+                                    🔴 <span className="font-bold text-red-700">Acidic soil and low nitrogen detected:</span>
+                                  </p>
+                                  <ul className="text-xs text-green-700 space-y-2 font-medium list-disc pl-4">
+                                    <li>Apply 2.5 tons/ha of calcitic agricultural limestone to buffer pH to 6.2.</li>
+                                    <li>Inject urea or ammonium sulfate split doses (+45 kg N/ha) during early vegetative growth.</li>
+                                    <li>Establish mucuna cover crop in inter-rows to capture atmospheric nitrogen.</li>
+                                  </ul>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-xs text-green-800 leading-relaxed font-semibold">
+                                    🟢 <span className="font-bold text-green-800">Soil profiles are highly stable:</span>
+                                  </p>
+                                  <ul className="text-xs text-green-700 space-y-2 font-medium list-disc pl-4">
+                                    <li>Maintain current cover cropping cycles to preserve organic carbon levels.</li>
+                                    <li>Apply routine maintenance doses of nitrogen-phosphorus blends before the rainy season.</li>
+                                    <li>Monitor soil pH bi-annually.</li>
+                                  </ul>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ══════════════════════════════════════════════════════════════
               MAP ANALYTICS
@@ -2880,7 +3992,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Farm Boundaries</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Farm Boundaries {renderInfoTooltip("Farm Boundaries")}</div>
                               <span className="text-[10px] text-gray-400">Plot perimeter outlines</span>
                             </div>
                             <button
@@ -2916,7 +4028,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Growth Stage</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Growth Stage {renderInfoTooltip("Growth Stage")}</div>
                               <span className="text-[10px] text-gray-400">Crop development cycle</span>
                             </div>
                             <button
@@ -3021,7 +4133,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">LSWI (Water Status)</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LSWI (Water Status) {renderInfoTooltip("LSWI (Water Status)")}</div>
                               <span className="text-[10px] text-gray-400">Canopy moisture index</span>
                             </div>
                             <button
@@ -3062,6 +4174,184 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+
+                        {/* Canopy Closure (CVI) Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Canopy Closure (CVI) {renderInfoTooltip("Canopy Closure (CVI)")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Foliage coverage density</span>
+                            </div>
+                            <button
+                              onClick={() => handleIntelToggle('cvi')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                intelShowCvi ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: intelShowCvi ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                intelShowCvi ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {intelShowCvi && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{intelCviOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={intelCviOpacity}
+                                onChange={e => setIntelCviOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'High closure (>85%)', color: '#15803d' },
+                                  { label: 'Good (70-85%)', color: '#22c55e' },
+                                  { label: 'Low (<70%)', color: '#eab308' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Leaf Chlorophyll Density (CAR/RECI) Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Leaf Chlorophyll Density (CAR/RECI) {renderInfoTooltip("Leaf Chlorophyll Density (CAR/RECI)")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Nitrogen & chlorophyll concentration</span>
+                            </div>
+                            <button
+                              onClick={() => handleIntelToggle('car')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                intelShowCar ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: intelShowCar ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                intelShowCar ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {intelShowCar && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{intelCarOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={intelCarOpacity}
+                                onChange={e => setIntelCarOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'High concentration', color: '#15803d' },
+                                  { label: 'Optimal', color: '#22c55e' },
+                                  { label: 'Deficient', color: '#eab308' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Radar Canopy Structure (DpRVI) Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Radar Canopy Structure (DpRVI) {renderInfoTooltip("Radar Canopy Structure (DpRVI)")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Volumetric microwave backscatter</span>
+                            </div>
+                            <button
+                              onClick={() => handleIntelToggle('dprvi')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                intelShowDprvi ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: intelShowDprvi ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                intelShowDprvi ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {intelShowDprvi && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{intelDprviOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={intelDprviOpacity}
+                                onChange={e => setIntelDprviOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'High structural complexity', color: '#15803d' },
+                                  { label: 'Moderate', color: '#eab308' },
+                                  { label: 'Low vegetation', color: '#0284c7' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Radar Vegetation Index (RVI) Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Radar Vegetation Index (RVI) {renderInfoTooltip("Radar Vegetation Index (RVI)")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Volumetric canopy volume scattering</span>
+                            </div>
+                            <button
+                              onClick={() => handleIntelToggle('rvi')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                intelShowRvi ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: intelShowRvi ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                intelShowRvi ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {intelShowRvi && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{intelRviOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={intelRviOpacity}
+                                onChange={e => setIntelRviOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Dense Canopy (>0.70)', color: '#14532D' },
+                                  { label: 'Healthy (0.50–0.70)', color: '#16A34A' },
+                                  { label: 'Moderate (0.30–0.50)', color: '#86EFAC' },
+                                  { label: 'Sparse (0.15–0.30)', color: '#EAB308' },
+                                  { label: 'Bare / Very Sparse (<0.15)', color: '#EF4444' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                           </div>
                         )}
                       </div>
@@ -3081,7 +4371,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">VHI (Stress)</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">VHI (Stress) {renderInfoTooltip("VHI (Stress)")}</div>
                               <span className="text-[10px] text-gray-400">Vegetation Health Index</span>
                             </div>
                             <button
@@ -3127,7 +4417,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Planting Suitability</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Planting Suitability {renderInfoTooltip("Planting Suitability")}</div>
                               <span className="text-[10px] text-gray-400">Optimal cultivation conditions</span>
                             </div>
                             <button
@@ -3165,6 +4455,180 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+
+                        {/* Early Stress Detection (NDRE) Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Early Stress Detection (NDRE) {renderInfoTooltip("Early Stress Detection (NDRE)")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Red-edge band early stress signature</span>
+                            </div>
+                            <button
+                              onClick={() => handleIntelToggle('ndre')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                intelShowNdre ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: intelShowNdre ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                intelShowNdre ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {intelShowNdre && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{intelNdreOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={intelNdreOpacity}
+                                onChange={e => setIntelNdreOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Healthy', color: '#15803d' },
+                                  { label: 'Mild Stress', color: '#eab308' },
+                                  { label: 'Severe stress warning', color: '#ef4444' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Crop Water Stress (WDI) Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Crop Water Stress (WDI) {renderInfoTooltip("Crop Water Stress (WDI)")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Thermal-optical water deficit index</span>
+                            </div>
+                            <button
+                              onClick={() => handleIntelToggle('wdi')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                intelShowWdi ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: intelShowWdi ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                intelShowWdi ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {intelShowWdi && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{intelWdiOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={intelWdiOpacity}
+                                onChange={e => setIntelWdiOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Waterlogged', color: '#1E3A8A' },
+                                  { label: 'Adequate moisture', color: '#2563eb' },
+                                  { label: 'Deficit stress', color: '#ea580c' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* SAR Flood Mask Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">SAR Flood Mask {renderInfoTooltip("SAR Flood Mask")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Sentinel-1 radar standing water mapping</span>
+                            </div>
+                            <button
+                              onClick={() => handleIntelToggle('flood')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                intelShowFlood ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: intelShowFlood ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                intelShowFlood ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {intelShowFlood && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{intelFloodOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={intelFloodOpacity}
+                                onChange={e => setIntelFloodOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Flooded / Waterlogged', color: '#1e3a8a' },
+                                  { label: 'Dry Surface', color: 'transparent' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0 border border-gray-200" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* UAS Spatial Anomaly Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">UAS Spatial Anomaly {renderInfoTooltip("UAS Spatial Anomaly")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">UAS high resolution drone stress map</span>
+                            </div>
+                            <button
+                              onClick={() => handleIntelToggle('uas')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                intelShowUas ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: intelShowUas ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                intelShowUas ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {intelShowUas && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{intelUasOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={intelUasOpacity}
+                                onChange={e => setIntelUasOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'High Anomaly / Stress', color: '#dc2626' },
+                                  { label: 'Normal / Healthy', color: 'transparent' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0 border border-gray-200" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                           </div>
                         )}
                       </div>
@@ -3180,7 +4644,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 intelShowVhi ? 'VHI (Stress)' :
                 intelShowLswi ? 'LSWI (Water Status)' :
                 intelShowEvi ? 'EVI (Vegetation Vigor)' :
-                intelShowGrowth ? 'Growth Stage' : 'No Active Layer',
+                intelShowGrowth ? 'Growth Stage' :
+                intelShowCvi ? 'Canopy Closure (CVI)' :
+                intelShowCar ? 'Leaf Chlorophyll Density (CAR/RECI)' :
+                intelShowNdre ? 'Early Stress Detection (NDRE)' :
+                intelShowWdi ? 'Crop Water Stress (WDI)' :
+                intelShowDprvi ? 'Radar Canopy Structure (DpRVI)' : 'No Active Layer',
                 null,
                 true
               )}
@@ -3278,7 +4747,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Farm Boundaries</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Farm Boundaries {renderInfoTooltip("Farm Boundaries")}</div>
                               <span className="text-[10px] text-gray-400">Plot perimeter outlines</span>
                             </div>
                             <button
@@ -3328,7 +4797,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">NDVI (Vegetation Health)</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDVI (Vegetation Health) {renderInfoTooltip("NDVI (Vegetation Health)")}</div>
                               <span className="text-[10px] text-gray-400">Chlorophyll absorption density</span>
                             </div>
                             <button
@@ -3374,7 +4843,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Chlorophyll VCI</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Chlorophyll VCI {renderInfoTooltip("Chlorophyll VCI")}</div>
                               <span className="text-[10px] text-gray-400">Leaf nitrogen index</span>
                             </div>
                             <button
@@ -3415,6 +4884,50 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+
+                        {/* Red-Edge NDVI (NDRE) Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Red-Edge NDVI (NDRE) {renderInfoTooltip("Red-Edge NDVI (NDRE)")}</div>
+                              <span className="text-[10px] text-gray-400">Early stress vegetation index</span>
+                            </div>
+                            <button
+                              onClick={() => handleHealthToggle('ndre')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                healthShowNdre ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: healthShowNdre ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                healthShowNdre ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {healthShowNdre && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{healthNdreOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={healthNdreOpacity}
+                                onChange={e => setHealthNdreOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Healthy', color: '#15803d' },
+                                  { label: 'Mild Stress', color: '#eab308' },
+                                  { label: 'Severe Stress Warning', color: '#ef4444' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                           </div>
                         )}
                       </div>
@@ -3434,7 +4947,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Water Stress (NDMI)</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Water Stress (NDMI) {renderInfoTooltip("Water Stress (NDMI)")}</div>
                               <span className="text-[10px] text-gray-400">Canopy water content</span>
                             </div>
                             <button
@@ -3480,7 +4993,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Pest Risk (Inundation)</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Pest Risk (Inundation) {renderInfoTooltip("Pest Risk (Inundation)")}</div>
                               <span className="text-[10px] text-gray-400">Vulnerability warning</span>
                             </div>
                             <button
@@ -3519,6 +5032,53 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+
+                        {/* SAR Soil Moisture (SMI) Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">SAR Soil Moisture (SMI) {renderInfoTooltip("SAR Soil Moisture (SMI)")}</div>
+                              <span className="text-[10px] text-gray-400">Volumetric soil moisture changes</span>
+                            </div>
+                            <button
+                              onClick={() => handleHealthToggle('smi')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                healthShowSmi ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: healthShowSmi ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                healthShowSmi ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {healthShowSmi && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{healthSmiOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={healthSmiOpacity}
+                                onChange={e => setHealthSmiOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Waterlogged (>+6 dB)', color: '#1E3A8A' },
+                                  { label: 'Adequate (+3 to +6 dB)', color: '#2563EB' },
+                                  { label: 'Slightly Moist (+1 to +3 dB)', color: '#60A5FA' },
+                                  { label: 'Near-Reference (-1 to +1 dB)', color: '#86EFAC' },
+                                  { label: 'Drying (-3 to -1 dB)', color: '#EAB308' },
+                                  { label: 'Severely Dry (<-3 dB)', color: '#DC2626' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                           </div>
                         )}
                       </div>
@@ -3533,7 +5093,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 healthShowPest ? 'Pest Risk' :
                 healthShowWater ? 'Water Stress' :
                 healthShowChlorophyll ? 'Chlorophyll' :
-                healthShowNdvi ? 'NDVI' : 'No Active Layer'
+                healthShowNdvi ? 'NDVI' :
+                healthShowNdre ? 'Red-Edge NDVI (NDRE)' :
+                healthShowSmi ? 'SAR Soil Moisture (SMI)' : 'No Active Layer'
               )}
             </div>
           )}
@@ -3632,7 +5194,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Farm Boundaries</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Farm Boundaries {renderInfoTooltip("Farm Boundaries")}</div>
                               <span className="text-[10px] text-gray-400">Plot perimeter outlines</span>
                             </div>
                             <button
@@ -3682,7 +5244,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Estimated Yield</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Estimated Yield Rate (t/HA) {renderInfoTooltip("Estimated Yield Rate (t/HA)")}</div>
                               <span className="text-[10px] text-gray-400">Yield in Tonnes/HA</span>
                             </div>
                             <button
@@ -3727,7 +5289,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Biomass Output</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Dry Biomass Accumulation (kg/m²) {renderInfoTooltip("Dry Biomass Accumulation (kg/m²)")}</div>
                               <span className="text-[10px] text-gray-400">Vegetation density mass</span>
                             </div>
                             <button
@@ -3786,7 +5348,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Harvest Status</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Canopy Harvest Readiness (%) {renderInfoTooltip("Canopy Harvest Readiness (%)")}</div>
                               <span className="text-[10px] text-gray-400">Maturity readiness ratio</span>
                             </div>
                             <button
@@ -3830,7 +5392,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Growth Index</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Growth Stage Mapping {renderInfoTooltip("Growth Stage Mapping")}</div>
                               <span className="text-[10px] text-gray-400">VCI condition score</span>
                             </div>
                             <button
@@ -3881,10 +5443,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
               {/* ══ BOTTOM PANEL ══ */}
               {renderMapBottomPanel(
-                yieldShowReadiness ? 'Harvest Status' :
-                yieldShowGrowth ? 'Growth Index' :
-                yieldShowBiomass ? 'Biomass Output' :
-                yieldShowYield ? 'Est. Yield' : 'No Active Layer'
+                yieldShowReadiness ? 'Canopy Harvest Readiness (%)' :
+                yieldShowGrowth ? 'Growth Stage Mapping' :
+                yieldShowBiomass ? 'Dry Biomass Accumulation (kg/m²)' :
+                yieldShowYield ? 'Estimated Yield Rate (t/HA)' : 'No Active Layer'
               )}
             </div>
           )}
@@ -3980,7 +5542,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Farm Boundaries</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Farm Boundaries {renderInfoTooltip("Farm Boundaries")}</div>
                               <span className="text-[10px] text-gray-400">Plot perimeter outlines</span>
                             </div>
                             <button
@@ -4030,7 +5592,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Canopy Density</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Canopy Density {renderInfoTooltip("Canopy Density")}</div>
                               <span className="text-[10px] text-gray-400">Reforestation Growth %</span>
                             </div>
                             <button
@@ -4075,7 +5637,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Seedling Survival</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Seedling Survival {renderInfoTooltip("Seedling Survival")}</div>
                               <span className="text-[10px] text-gray-400">Survival rate percentage</span>
                             </div>
                             <button
@@ -4119,7 +5681,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Soil Carbon Offset</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Soil Carbon Offset {renderInfoTooltip("Soil Carbon Offset")}</div>
                               <span className="text-[10px] text-gray-400">Carbon stock (tCO2e)</span>
                             </div>
                             <button
@@ -4163,7 +5725,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Biodiversity</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Biodiversity {renderInfoTooltip("Biodiversity")}</div>
                               <span className="text-[10px] text-gray-400">Species richness score</span>
                             </div>
                             <button
@@ -4202,12 +5764,380 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
+
+                        {/* InSAR Coherence (γ) Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">InSAR Coherence (γ) {renderInfoTooltip("InSAR Coherence (\u03b3)")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Radar phase stability index</span>
+                            </div>
+                            <button
+                              onClick={() => handleRestoreToggle('insar')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                restoreShowInSar ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: restoreShowInSar ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                restoreShowInSar ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {restoreShowInSar && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{restoreInSarOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={restoreInSarOpacity}
+                                onChange={e => setRestoreInSarOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Stable (>0.7 coherence)', color: '#15803d' },
+                                  { label: 'Minor Change (0.4–0.7)', color: '#eab308' },
+                                  { label: 'Deforestation (<0.4)', color: '#dc2626' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* GEDI Canopy Height Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">GEDI Canopy Height {renderInfoTooltip("GEDI Canopy Height")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">NASA LiDAR tree height</span>
+                            </div>
+                            <button
+                              onClick={() => handleRestoreToggle('gedi')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                restoreShowGedi ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: restoreShowGedi ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                restoreShowGedi ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {restoreShowGedi && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{restoreGediOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={restoreGediOpacity}
+                                onChange={e => setRestoreGediOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Tall Canopy (>15m)', color: '#14532d' },
+                                  { label: 'Med Canopy (10–15m)', color: '#15803d' },
+                                  { label: 'Shrubland (5–10m)', color: '#22c55e' },
+                                  { label: 'Low Veg (<5m)', color: '#eab308' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* NDWI Canopy Water Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDWI Canopy Water {renderInfoTooltip("NDWI Canopy Water")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Normalized Difference Water Index</span>
+                            </div>
+                            <button
+                              onClick={() => handleRestoreToggle('ndwi')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                restoreShowNdwi ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: restoreShowNdwi ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                restoreShowNdwi ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {restoreShowNdwi && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{restoreNdwiOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={restoreNdwiOpacity}
+                                onChange={e => setRestoreNdwiOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Open Water (>0.3)', color: '#1e3a8a' },
+                                  { label: 'High Moisture (0.15–0.3)', color: '#2563eb' },
+                                  { label: 'Moderate (0.0–0.15)', color: '#60a5fa' },
+                                  { label: 'Deficit (<0.0)', color: '#ea580c' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* SAR AGB Proxy Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">SAR AGB Proxy {renderInfoTooltip("SAR AGB Proxy")}</div>
+                              <span className="text-[10px] text-gray-400 font-medium">Aboveground Biomass estimation</span>
+                            </div>
+                            <button
+                              onClick={() => handleRestoreToggle('agb')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                restoreShowAgb ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: restoreShowAgb ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                restoreShowAgb ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {restoreShowAgb && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{restoreAgbOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={restoreAgbOpacity}
+                                onChange={e => setRestoreAgbOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'High Biomass (>40 t/ha)', color: '#14532d' },
+                                  { label: 'Medium Biomass (20-40 t/ha)', color: '#16a34a' },
+                                  { label: 'Low Biomass (<20 t/ha)', color: '#86efac' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* LAND USE LAND COVER (LULC) SECTION */}
+                      <div className="space-y-3 pt-4 border-t border-gray-100">
+                        <div 
+                          onClick={() => setRestoreLulcExpanded(!restoreLulcExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {restoreLulcExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Land Use Land Cover
+                        </div>
+                        {restoreLulcExpanded && (
+                          <div className="space-y-3">
+                            <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LULC Overlay {renderInfoTooltip("LULC Classification")}</div>
+                                  <span className="text-[10px] text-gray-400">Classify land cover type</span>
+                                </div>
+                                <button
+                                  onClick={() => handleRestoreToggle('lulc')}
+                                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                    restoreShowLulc ? 'bg-green-600' : 'bg-gray-200'
+                                  }`}
+                                  style={{ backgroundColor: restoreShowLulc ? '#16A34A' : '#E5E7EB' }}
+                                >
+                                  <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                    restoreShowLulc ? 'translate-x-4' : 'translate-x-0'
+                                  }`} />
+                                </button>
+                              </div>
+                              {restoreShowLulc && (
+                                <div className="space-y-3.5 pt-2 border-t border-gray-50">
+                                  {/* Opacity */}
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                      <span>Opacity</span>
+                                      <span>{restoreLulcOpacity}%</span>
+                                    </div>
+                                    <input type="range" min="10" max="100" value={restoreLulcOpacity}
+                                      onChange={e => setRestoreLulcOpacity(parseInt(e.target.value))}
+                                      className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                  </div>
+
+                                  {/* LULC Source Selection */}
+                                  <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">LULC Source</label>
+                                    <select
+                                      value={restoreLulcSource}
+                                      onChange={e => setRestoreLulcSource(e.target.value)}
+                                      className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs font-semibold text-gray-700 outline-none focus:border-green-500"
+                                    >
+                                      <option value="worldcover">ESA WorldCover (10m, annual)</option>
+                                      <option value="dynamic_world">Dynamic World (10m, near-RT)</option>
+                                      <option value="landsat">Landsat Archive (30m, 5-yr)</option>
+                                      <option value="custom">Custom SAR+Optical (10m, quarterly)</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Change Detection Sub-Toggle */}
+                                  <div className="flex items-center justify-between pt-1">
+                                    <span className="text-[10px] font-bold text-gray-600 flex items-center gap-1">
+                                      SAR Change Magnitude {renderInfoTooltip("SAR LULC Change Magnitude")}
+                                    </span>
+                                    <button
+                                      onClick={() => setRestoreShowLulcChange(!restoreShowLulcChange)}
+                                      className={`w-7 h-4 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                        restoreShowLulcChange ? 'bg-amber-500' : 'bg-gray-200'
+                                      }`}
+                                    >
+                                      <div className={`w-3 h-3 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                        restoreShowLulcChange ? 'translate-x-3' : 'translate-x-0'
+                                      }`} />
+                                    </button>
+                                  </div>
+
+                                  {/* Timeline Slider */}
+                                  {(restoreLulcSource === 'worldcover' || restoreLulcSource === 'landsat') && (
+                                    <div className="space-y-2 pt-1 border-t border-gray-100">
+                                      <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                        <span>Timeline View</span>
+                                        <span className="text-green-600 font-black">{restoreLulcYear}</span>
+                                      </div>
+                                      <input 
+                                        type="range" 
+                                        min={restoreLulcSource === 'landsat' ? 1990 : 2020} 
+                                        max={restoreLulcSource === 'landsat' ? 2020 : 2025} 
+                                        step={restoreLulcSource === 'landsat' ? 5 : 1}
+                                        value={restoreLulcYear}
+                                        onChange={e => setRestoreLulcYear(parseInt(e.target.value))}
+                                        className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" 
+                                      />
+                                      <span className="text-[9px] text-gray-400 block italic leading-tight">Drag to observe historical LULC change</span>
+                                    </div>
+                                  )}
+
+                                  {/* Legend */}
+                                  <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-gray-100">
+                                    {[
+                                      { label: 'Forest', color: '#15803d' },
+                                      { label: 'Shrubland', color: '#86efac' },
+                                      { label: 'Cropland', color: '#fde047' },
+                                      { label: 'Bare Soil', color: '#ca8a04' },
+                                      { label: 'Water', color: '#3b82f6' },
+                                      { label: 'Other/Built', color: '#94a3b8' }
+                                    ].map((item, i) => (
+                                      <div key={i} className="flex items-center gap-1.5">
+                                        <div className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                        <span className="text-[9px] font-semibold text-gray-500">{item.label}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* EUDR DEFORESTATION SECTION */}
+                      <div className="space-y-3 pt-4 border-t border-gray-100">
+                        <div 
+                          onClick={() => setRestoreEudrExpanded(!restoreEudrExpanded)}
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+                        >
+                          {restoreEudrExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} EUDR Deforestation
+                        </div>
+                        {restoreEudrExpanded && (
+                          <div className="space-y-3">
+                            <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">EUDR Compliance {renderInfoTooltip("EUDR Deforestation")}</div>
+                                  <span className="text-[10px] text-gray-400">Cut-off date Dec 31, 2020</span>
+                                </div>
+                                <button
+                                  onClick={() => handleRestoreToggle('eudr')}
+                                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                    restoreShowEudr ? 'bg-green-600' : 'bg-gray-200'
+                                  }`}
+                                  style={{ backgroundColor: restoreShowEudr ? '#16A34A' : '#E5E7EB' }}
+                                >
+                                  <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                    restoreShowEudr ? 'translate-x-4' : 'translate-x-0'
+                                  }`} />
+                                </button>
+                              </div>
+                              {restoreShowEudr && (
+                                <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                    <span>Opacity</span>
+                                    <span>{restoreEudrOpacity}%</span>
+                                  </div>
+                                  <input type="range" min="10" max="100" value={restoreEudrOpacity}
+                                    onChange={e => setRestoreEudrOpacity(parseInt(e.target.value))}
+                                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                                  
+                                  {/* EUDR Info Checklist */}
+                                  <div className="bg-slate-900 text-white rounded-xl p-2.5 space-y-1">
+                                    <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Audit Parameters</div>
+                                    <div className="text-[10px] font-medium leading-relaxed">
+                                      <div className="flex justify-between border-b border-white/10 pb-1">
+                                        <span>Cut-off Date:</span>
+                                        <span className="font-bold text-green-400">31 Dec 2020</span>
+                                      </div>
+                                      <div className="flex justify-between pt-1">
+                                        <span>Estate Status:</span>
+                                        <span className="font-bold text-green-400">Compliant</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                    {[
+                                      { label: 'Compliant (No forest loss)', color: '#16a34a' },
+                                      { label: 'Warning (Near forest loss)', color: '#eab308' },
+                                      { label: 'Non-Compliant (Deforestation detected)', color: '#dc2626' }
+                                    ].map((item, i) => (
+                                      <div key={i} className="flex items-center gap-2">
+                                        <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                        <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
                 )}
+
+
 
               </div>
 
@@ -4216,614 +6146,393 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 restoreShowBiodiversity ? 'Biodiversity' :
                 restoreShowCarbon ? 'Soil Carbon' :
                 restoreShowSurvival ? 'Seedling Survival' :
-                restoreShowProgress ? 'Canopy Density' : 'No Active Layer'
+                restoreShowProgress ? 'Canopy Density' :
+                restoreShowInSar ? 'InSAR Coherence (γ)' :
+                restoreShowGedi ? 'GEDI Canopy Height' :
+                restoreShowNdwi ? 'NDWI Canopy Water' :
+                restoreShowLulc ? 'LULC Classification' :
+                restoreShowEudr ? 'EUDR Deforestation' : 'No Active Layer'
               )}
             </div>
           )}
+
 
           {/* ══════════════════════════════════════════════════════════════
               ALERTS COMMAND CENTER
           ══════════════════════════════════════════════════════════════ */}
           {activeSidebarItem === 'alerts' && (
-            <div className="p-10 space-y-8 animate-in fade-in duration-300">
+            <div className="flex flex-col h-full animate-in fade-in duration-300 relative" style={{ minHeight: 0 }}>
+              <style>{`
+                @keyframes pulseBorderRed {
+                  0%, 100% { border-color: rgba(239, 68, 68, 0.3); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.15); }
+                  50% { border-color: rgba(239, 68, 68, 0.85); box-shadow: 0 0 14px 4px rgba(239, 68, 68, 0.2); }
+                }
+                @keyframes pulseBorderAmber {
+                  0%, 100% { border-color: rgba(245, 158, 11, 0.3); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.15); }
+                  50% { border-color: rgba(245, 158, 11, 0.85); box-shadow: 0 0 14px 4px rgba(245, 158, 11, 0.2); }
+                }
+                .pulse-critical { animation: pulseBorderRed 2s infinite ease-in-out; border-width: 2px; }
+                .pulse-warning  { animation: pulseBorderAmber 2s infinite ease-in-out; border-width: 2px; }
+                .alerts-list-scroll::-webkit-scrollbar { width: 4px; }
+                .alerts-list-scroll::-webkit-scrollbar-track { background: transparent; }
+                .alerts-list-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+                .alerts-detail-scroll::-webkit-scrollbar { width: 4px; }
+                .alerts-detail-scroll::-webkit-scrollbar-track { background: transparent; }
+                .alerts-detail-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+              `}</style>
 
-              {/* ── PAGE HEADER ── */}
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5' }}>
-                      <AlertTriangle size={20} className="text-red-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-3xl font-bold text-gray-900 tracking-tight leading-none">Alerts Command Center</h2>
-                      <p className="text-xs font-bold text-red-500 uppercase tracking-widest mt-1">Live Anomaly Intelligence · Farmintelytics Agro Node</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-500 font-medium max-w-xl leading-relaxed">
-                    Full real-time breakdown of all detected crop stress events, environmental anomalies, and satellite-flagged incidents — at a single glance.
-                  </p>
-                </div>
-
-                {/* Live Status Banner */}
-                <div className="flex flex-col gap-2 shrink-0">
-                  <div className="bg-white px-5 py-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                    <div>
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block">System Status</span>
-                      <span className="text-sm font-bold text-gray-900">{alerts.filter(a => a.status === 'Active').length} Active · {alerts.filter(a => a.status === 'Acknowledged').length} Acknowledged</span>
-                    </div>
-                  </div>
-                  <div className="bg-red-50 border border-red-100 px-5 py-2.5 rounded-2xl flex items-center gap-2.5">
-                    <Flame size={14} className="text-red-500" />
-                    <span className="text-xs font-bold text-red-700">{alerts.filter(a => a.severity === 'Critical' && a.status === 'Active').length} Critical alerts require immediate action</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── KPI STRIP ── */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  {
-                    label: 'Total Incidents',
-                    value: alerts.length,
-                    subtext: 'Historical & Active',
-                    icon: <Database size={22} className="text-blue-600" />,
-                    accent: '#EFF6FF', border: '#BFDBFE',
-                    percent: 100, progressColor: '#3B82F6'
-                  },
-                  {
-                    label: 'Critical Anomalies',
-                    value: alerts.filter(a => a.status === 'Active' && a.severity === 'Critical').length,
-                    subtext: 'Immediate Action',
-                    icon: <AlertTriangle size={22} className="text-red-600" />,
-                    accent: '#FEF2F2', border: '#FCA5A5',
-                    percent: alerts.length ? Math.round((alerts.filter(a => a.status === 'Active' && a.severity === 'Critical').length / alerts.length) * 100) : 0,
-                    progressColor: '#EF4444'
-                  },
-                  {
-                    label: 'Active Warnings',
-                    value: alerts.filter(a => a.status === 'Active' && a.severity === 'Warning').length,
-                    subtext: 'Under Investigation',
-                    icon: <Activity size={22} className="text-amber-500" />,
-                    accent: '#FFFBEB', border: '#FDE68A',
-                    percent: alerts.length ? Math.round((alerts.filter(a => a.status === 'Active' && a.severity === 'Warning').length / alerts.length) * 100) : 0,
-                    progressColor: '#F59E0B'
-                  },
-                  {
-                    label: 'Acknowledged',
-                    value: alerts.filter(a => a.status === 'Acknowledged').length,
-                    subtext: 'Addressed & Logged',
-                    icon: <CheckCircle2 size={22} className="text-green-600" />,
-                    accent: '#F0FDF4', border: '#BBF7D0',
-                    percent: alerts.length ? Math.round((alerts.filter(a => a.status === 'Acknowledged').length / alerts.length) * 100) : 0,
-                    progressColor: '#10B981'
-                  }
-                ].map((kpi, idx) => (
-                  <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[148px] group cursor-default">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">{kpi.label}</span>
-                        <span className="text-4xl font-extrabold text-gray-900 block tabular-nums">{kpi.value}</span>
-                      </div>
-                      <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-inner transition-transform group-hover:scale-110 duration-300" style={{ backgroundColor: kpi.accent, border: `1px solid ${kpi.border}` }}>
-                        {kpi.icon}
-                      </div>
-                    </div>
-                    <div className="mt-4 space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px] font-bold text-gray-400">
-                        <span>{kpi.subtext}</span>
-                        <span style={{ color: kpi.progressColor }}>{kpi.percent}%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${kpi.percent}%`, backgroundColor: kpi.progressColor }} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* ── PLOT ALERT MATRIX + CATEGORY BREAKDOWN ── */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                {/* Per-Plot Alert Matrix */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-5 lg:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <Target size={16} className="text-green-600" />
-                      Plot-Level Alert Matrix
-                    </h3>
-                    <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-3 py-1 rounded-full uppercase tracking-wider">Live Composite</span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {[
-                      {
-                        plot: 'PLOT-ALPHA', name: 'West Valley Plot', estate: 'West Valley Estate',
-                        alertCount: alerts.filter(a => a.plot === 'PLOT-ALPHA').length,
-                        critical: alerts.filter(a => a.plot === 'PLOT-ALPHA' && a.severity === 'Critical').length,
-                        warning: alerts.filter(a => a.plot === 'PLOT-ALPHA' && a.severity === 'Warning').length,
-                        info: alerts.filter(a => a.plot === 'PLOT-ALPHA' && a.severity === 'Info').length,
-                        status: alerts.filter(a => a.plot === 'PLOT-ALPHA' && a.status === 'Active').length === 0 ? 'Clear' : 'Active',
-                        ndvi: (currentTimeline.ndvi + 0.04).toFixed(2),
-                        color: '#16A34A'
-                      },
-                      {
-                        plot: 'PLOT-BETA', name: 'East Ridge Plot', estate: 'East Ridge Estate',
-                        alertCount: alerts.filter(a => a.plot === 'PLOT-BETA').length,
-                        critical: alerts.filter(a => a.plot === 'PLOT-BETA' && a.severity === 'Critical').length,
-                        warning: alerts.filter(a => a.plot === 'PLOT-BETA' && a.severity === 'Warning').length,
-                        info: alerts.filter(a => a.plot === 'PLOT-BETA' && a.severity === 'Info').length,
-                        status: alerts.filter(a => a.plot === 'PLOT-BETA' && a.status === 'Active').length === 0 ? 'Clear' : 'Active',
-                        ndvi: (currentTimeline.ndvi - 0.15).toFixed(2),
-                        color: '#EAB308'
-                      },
-                      {
-                        plot: 'PLOT-GAMMA', name: 'South Slope Plot', estate: 'South Slope Estate',
-                        alertCount: alerts.filter(a => a.plot === 'PLOT-GAMMA').length,
-                        critical: alerts.filter(a => a.plot === 'PLOT-GAMMA' && a.severity === 'Critical').length,
-                        warning: alerts.filter(a => a.plot === 'PLOT-GAMMA' && a.severity === 'Warning').length,
-                        info: alerts.filter(a => a.plot === 'PLOT-GAMMA' && a.severity === 'Info').length,
-                        status: alerts.filter(a => a.plot === 'PLOT-GAMMA' && a.status === 'Active').length === 0 ? 'Clear' : 'Active',
-                        ndvi: (currentTimeline.ndvi - 0.05).toFixed(2),
-                        color: '#0284C7'
-                      }
-                    ].map((row, i) => (
-                      <div key={i} className="flex items-center gap-4 p-4 bg-gray-50/60 border border-gray-100 rounded-xl hover:bg-gray-50 transition-all">
-                        {/* Plot dot */}
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-xs shadow-sm shrink-0" style={{ backgroundColor: row.color }}>
-                          {i === 0 ? 'α' : i === 1 ? 'β' : 'γ'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-bold text-gray-900">{row.plot}</span>
-                            <span className="text-[10px] font-semibold text-gray-400">·</span>
-                            <span className="text-[10px] font-semibold text-gray-500">{row.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-gray-400 font-semibold">{row.estate}</span>
-                            <span className="text-[10px] text-gray-300">·</span>
-                            <span className="text-[10px] font-bold text-green-600">NDVI {row.ndvi}</span>
-                          </div>
-                        </div>
-                        {/* Alert chips */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {row.critical > 0 && (
-                            <span className="text-[10px] font-bold bg-red-50 text-red-700 border border-red-100 px-2 py-0.5 rounded-full">{row.critical} Critical</span>
-                          )}
-                          {row.warning > 0 && (
-                            <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full">{row.warning} Warning</span>
-                          )}
-                          {row.info > 0 && (
-                            <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full">{row.info} Info</span>
-                          )}
-                          {row.alertCount === 0 && (
-                            <span className="text-[10px] font-bold bg-green-50 text-green-700 border border-green-100 px-2 py-0.5 rounded-full">All Clear</span>
-                          )}
-                        </div>
-                        {/* Status dot */}
-                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${row.status === 'Clear' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Mini NDVI Health bar per plot */}
-                  <div className="pt-4 border-t border-gray-100 grid grid-cols-3 gap-4">
-                    {[
-                      { label: 'W. Valley', ndvi: currentTimeline.ndvi + 0.04, color: '#16A34A' },
-                      { label: 'E. Ridge', ndvi: currentTimeline.ndvi - 0.15, color: '#EAB308' },
-                      { label: 'S. Slope', ndvi: currentTimeline.ndvi - 0.05, color: '#0284C7' }
-                    ].map((p, i) => (
-                      <div key={i} className="text-center space-y-1.5">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">{p.label}</span>
-                        <div className="relative h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, Math.max(0, p.ndvi * 120)).toFixed(0)}%`, backgroundColor: p.color }} />
-                        </div>
-                        <span className="text-xs font-bold" style={{ color: p.color }}>NDVI {p.ndvi.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Category Heatmap */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-5">
-                  <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    <Gauge size={16} className="text-green-600" />
-                    Category Breakdown
-                  </h3>
-                  <div className="space-y-3">
-                    {[
-                      {
-                        label: 'Water Stress',
-                        count: alerts.filter(a => a.category === 'Water Stress').length,
-                        icon: <Droplets size={14} className="text-blue-600" />,
-                        bg: '#EFF6FF', barColor: '#3B82F6', textColor: 'text-blue-700'
-                      },
-                      {
-                        label: 'Pest Infestation',
-                        count: alerts.filter(a => a.category === 'Pest Infestation').length,
-                        icon: <Shield size={14} className="text-red-600" />,
-                        bg: '#FEF2F2', barColor: '#EF4444', textColor: 'text-red-700'
-                      },
-                      {
-                        label: 'Growth Deficit',
-                        count: alerts.filter(a => a.category === 'Growth Deficit').length,
-                        icon: <TrendingDown size={14} className="text-amber-600" />,
-                        bg: '#FFFBEB', barColor: '#F59E0B', textColor: 'text-amber-700'
-                      },
-                      {
-                        label: 'Cloud Cover',
-                        count: alerts.filter(a => a.category === 'Cloud Cover').length,
-                        icon: <CloudRain size={14} className="text-slate-600" />,
-                        bg: '#F8FAFC', barColor: '#64748B', textColor: 'text-slate-600'
-                      }
-                    ].map((cat, i) => (
-                      <div key={i} className="p-3.5 rounded-xl border border-gray-100 space-y-2 hover:shadow-sm transition-all" style={{ backgroundColor: cat.bg }}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {cat.icon}
-                            <span className={`text-xs font-bold ${cat.textColor}`}>{cat.label}</span>
-                          </div>
-                          <span className={`text-base font-extrabold ${cat.textColor} tabular-nums`}>{cat.count}</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-white/60 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${alerts.length ? (cat.count / alerts.length) * 100 : 0}%`, backgroundColor: cat.barColor }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Trend mini-chart */}
-                  <div className="pt-4 border-t border-gray-100 space-y-2">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">28-Day Incident Trend</span>
-                    <div className="h-[80px]">
-                      <Line
-                        data={{
-                          labels: ['May 02','May 08','May 14','May 20','May 26','May 30'],
-                          datasets: [{
-                            data: [2, 5, 3, 7, 6, 4],
-                            borderColor: '#EF4444',
-                            backgroundColor: 'rgba(239,68,68,0.07)',
-                            fill: true, tension: 0.45,
-                            borderWidth: 1.5, pointRadius: 2,
-                            pointBackgroundColor: '#EF4444'
-                          }]
-                        }}
-                        options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── TIMELINE FEED + CHARTS ROW ── */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                {/* Live Incident Timeline */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <Radio size={15} className="text-red-500 animate-pulse" />
-                      Incident Timeline Feed
-                    </h3>
-                    <span className="text-[10px] font-bold bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full uppercase tracking-wider">Live</span>
-                  </div>
-
-                  <div className="space-y-0 relative">
-                    {/* Vertical line */}
-                    <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gray-100" />
-
-                    {[...alerts].sort((a, b) => new Date(b.date) - new Date(a.date)).map((alert, i) => {
-                      const dotColor = alert.severity === 'Critical' ? '#EF4444' : alert.severity === 'Warning' ? '#F59E0B' : '#3B82F6';
-                      let catIcon = <AlertTriangle size={10} />;
-                      if (alert.category === 'Water Stress') catIcon = <Droplets size={10} />;
-                      else if (alert.category === 'Pest Infestation') catIcon = <Shield size={10} />;
-                      else if (alert.category === 'Growth Deficit') catIcon = <TrendingDown size={10} />;
-                      else if (alert.category === 'Cloud Cover') catIcon = <CloudRain size={10} />;
-
-                      return (
-                        <div key={alert.id} className="flex gap-4 py-3.5 group">
-                          {/* Dot */}
-                          <div className="relative z-10 w-10 h-10 shrink-0 flex items-center justify-center">
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-110 ${alert.status === 'Active' ? 'animate-none' : 'opacity-50'}`}
-                              style={{ backgroundColor: dotColor }}
-                            >
-                              {catIcon}
-                            </div>
-                          </div>
-                          {/* Content */}
-                          <div className="flex-1 min-w-0 pt-1.5">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="text-xs font-bold text-gray-900">{alert.category}</span>
-                              <span
-                                className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
-                                style={{ backgroundColor: alert.severity === 'Critical' ? '#FEF2F2' : alert.severity === 'Warning' ? '#FFFBEB' : '#EFF6FF', color: dotColor }}
-                              >
-                                {alert.severity}
-                              </span>
-                              {alert.status === 'Acknowledged' && (
-                                <span className="text-[9px] font-bold text-green-700 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full uppercase">✓ Acknowledged</span>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-gray-500 font-semibold leading-relaxed line-clamp-2">{alert.desc.substring(0, 90)}...</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] text-gray-400 font-semibold">{alert.plot} · {alert.date} at {alert.time}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Category Chart + Frequency Trend stacked */}
-                <div className="space-y-5">
-                  {/* Bar Chart */}
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-3">
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <BarChart4 size={15} className="text-green-600" />
-                      Anomalies by Category
-                    </h3>
-                    <div className="h-[160px]">
-                      <Bar data={alertsByCategoryData} options={BAR_CHART_OPTIONS} />
-                    </div>
-                  </div>
-
-                  {/* Frequency Trend */}
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-3">
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <LineChart size={15} className="text-green-600" />
-                      Incident Frequency (28 days)
-                    </h3>
-                    <div className="h-[140px]">
-                      <Line
-                        data={{
-                          labels: ['May 02', 'May 06', 'May 10', 'May 14', 'May 18', 'May 22', 'May 26', 'May 30'],
-                          datasets: [{
-                            label: 'Total Incidents',
-                            data: [2, 5, 3, 8, 4, 6, 9, 4],
-                            borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.05)',
-                            fill: true, tension: 0.4, borderWidth: 2,
-                            pointBackgroundColor: '#10B981', pointBorderColor: '#fff', pointHoverRadius: 5
-                          }]
-                        }}
-                        options={{ ...CHART_DEFAULTS, plugins: { legend: { display: false } } }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── FULL ALERT LEDGER ── */}
-              <div className="space-y-5">
-                {/* Ledger Header + Filters */}
-                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-center gap-2.5">
-                    <ListFilter size={16} className="text-green-600" />
-                    <span className="text-sm font-bold text-gray-800">Full Incident Ledger</span>
-                    <span className="text-xs font-bold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">{alerts.length} total</span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    {/* Severity */}
-                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-                      <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-wider">Severity</span>
-                      <select
-                        value={filterAlertSeverity}
-                        onChange={e => setFilterAlertSeverity(e.target.value)}
-                        className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
-                      >
-                        <option value="All">All Severities</option>
-                        <option value="Critical">Critical</option>
-                        <option value="Warning">Warning</option>
-                        <option value="Info">Info</option>
-                      </select>
-                    </div>
-
-                    {/* Status */}
-                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-                      <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-wider">Status</span>
-                      <select
-                        value={filterAlertStatus}
-                        onChange={e => setFilterAlertStatus(e.target.value)}
-                        className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
-                      >
-                        <option value="All">All Statuses</option>
-                        <option value="Active">Active</option>
-                        <option value="Acknowledged">Acknowledged</option>
-                      </select>
-                    </div>
-
-                    {(filterAlertSeverity !== 'All' || filterAlertStatus !== 'Active') && (
-                      <button
-                        onClick={() => { setFilterAlertSeverity('All'); setFilterAlertStatus('All'); }}
-                        className="text-xs font-bold text-red-600 hover:text-red-800 px-3 py-2 bg-red-50 hover:bg-red-100 rounded-xl flex items-center gap-1.5 transition-all"
-                      >
-                        <X size={12} /> Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Alert Cards */}
-                <div className="space-y-4">
-                  {alerts.filter(alert => {
-                    const matchSeverity = filterAlertSeverity === 'All' || alert.severity === filterAlertSeverity;
-                    const matchStatus = filterAlertStatus === 'All' || alert.status === filterAlertStatus;
-                    return matchSeverity && matchStatus;
-                  }).length === 0 ? (
-                    <div className="bg-white border border-gray-100 rounded-2xl p-14 text-center flex flex-col items-center gap-4">
-                      <div className="w-14 h-14 bg-green-50 border border-green-100 rounded-2xl flex items-center justify-center">
-                        <CheckCircle2 size={28} className="text-green-500" />
-                      </div>
-                      <div>
-                        <h4 className="text-base font-bold text-gray-900">All Clear!</h4>
-                        <p className="text-xs text-gray-400 font-medium mt-1">No alerts match your current filter criteria.</p>
-                      </div>
-                    </div>
-                  ) : (
-                    alerts.filter(alert => {
-                      const matchSeverity = filterAlertSeverity === 'All' || alert.severity === filterAlertSeverity;
-                      const matchStatus = filterAlertStatus === 'All' || alert.status === filterAlertStatus;
-                      return matchSeverity && matchStatus;
-                    }).map((alert, alertIdx) => {
-                      let catIcon = <AlertTriangle size={18} />;
-                      if (alert.category === 'Water Stress') catIcon = <Droplets size={18} />;
-                      else if (alert.category === 'Pest Infestation') catIcon = <Shield size={18} />;
-                      else if (alert.category === 'Growth Deficit') catIcon = <TrendingDown size={18} />;
-                      else if (alert.category === 'Cloud Cover') catIcon = <CloudRain size={18} />;
-
-                      const severityColors = {
-                        Critical: { bg: '#FEF2F2', border: '#FCA5A5', text: '#B91C1C', bar: '#EF4444', leftBorder: '#EF4444' },
-                        Warning: { bg: '#FFFBEB', border: '#FDE68A', text: '#92400E', bar: '#F59E0B', leftBorder: '#F59E0B' },
-                        Info: { bg: '#EFF6FF', border: '#BFDBFE', text: '#1E40AF', bar: '#3B82F6', leftBorder: '#3B82F6' }
-                      }[alert.severity] || {};
-
-                      const actionLabels = {
-                        'Water Stress': 'Increase irrigation by 30% immediately.',
-                        'Pest Infestation': 'Establish 150m chemical buffer zone.',
-                        'Growth Deficit': 'Ground truth inspection within 48h.',
-                        'Cloud Cover': 'Interpolation from adjacent pass dates.'
-                      };
-
-                      return (
-                        <div
-                          key={alert.id}
-                          className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ${
-                            alert.status === 'Acknowledged' ? 'opacity-75' : ''
-                          }`}
-                          style={{
-                            borderLeft: alert.status === 'Active' ? `4px solid ${severityColors.leftBorder}` : '1px solid #F3F4F6',
-                            borderColor: alert.status === 'Active' ? undefined : '#F3F4F6'
-                          }}
-                        >
-                          {/* Top colored stripe for critical */}
-                          {alert.severity === 'Critical' && alert.status === 'Active' && (
-                            <div className="h-0.5 w-full" style={{ backgroundColor: '#EF4444', opacity: 0.3 }} />
-                          )}
-
-                          <div className="p-6">
-                            <div className="flex flex-col md:flex-row gap-5">
-                              {/* Icon Column */}
-                              <div className="shrink-0">
-                                <div
-                                  className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm"
-                                  style={{ backgroundColor: severityColors.bg, border: `1px solid ${severityColors.border}` }}
-                                >
-                                  <span style={{ color: severityColors.bar }}>{catIcon}</span>
-                                </div>
-                              </div>
-
-                              {/* Main Content */}
-                              <div className="flex-1 min-w-0">
-                                {/* Row 1: ID, severity, status */}
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                  <span className="text-xs font-bold text-gray-400 font-mono">{alert.id}</span>
-                                  <span
-                                    className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full border"
-                                    style={{ backgroundColor: severityColors.bg, borderColor: severityColors.border, color: severityColors.bar }}
-                                  >
-                                    {alert.severity}
-                                  </span>
-                                  {alert.status === 'Active' ? (
-                                    <span className="text-[10px] font-bold bg-red-50 text-red-700 border border-red-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
-                                      Active
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-bold bg-green-50 text-green-700 border border-green-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                                      <CheckCircle2 size={9} />
-                                      Acknowledged
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Row 2: Category + Title */}
-                                <h4 className="text-base font-bold text-gray-900 mb-1">{alert.category} — {alert.estate}</h4>
-
-                                {/* Row 3: Plot, date/time */}
-                                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 font-semibold mb-3">
-                                  <span className="flex items-center gap-1">
-                                    <MapPin size={11} className="text-green-600" />
-                                    <span className="font-bold text-green-700">{alert.plot}</span>
-                                  </span>
-                                  <span className="w-px h-3.5 bg-gray-200" />
-                                  <span className="flex items-center gap-1">
-                                    <Clock size={11} />
-                                    {alert.date} at {alert.time}
-                                  </span>
-                                </div>
-
-                                {/* Description */}
-                                <p className="text-xs text-gray-500 leading-relaxed font-medium bg-gray-50/60 rounded-xl px-4 py-3 border border-gray-100 mb-3">
-                                  {alert.desc}
-                                </p>
-
-                                {/* Recommended Action */}
-                                <div className="flex items-start gap-2.5 bg-amber-50/60 border border-amber-100 rounded-xl px-4 py-2.5">
-                                  <Zap size={12} className="text-amber-600 mt-0.5 shrink-0" />
-                                  <span className="text-[11px] font-bold text-amber-800">
-                                    Recommended: {actionLabels[alert.category] || 'Ground truth inspection required.'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Actions Column */}
-                              <div className="flex flex-col gap-2 shrink-0 justify-center">
-                                <button
-                                  onClick={() => {
-                                    setActiveSidebarItem('crop-health');
-                                    const matchingPlot = healthPlotsData.find(p => p.id === alert.plot);
-                                    if (matchingPlot) setSelectedHealthPlot(matchingPlot);
-                                  }}
-                                  className="flex items-center gap-2 bg-gray-50 hover:bg-green-50 text-gray-600 hover:text-green-700 border border-gray-200 hover:border-green-200 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm whitespace-nowrap"
-                                >
-                                  <Navigation size={12} />
-                                  Map View
-                                </button>
-
-                                <button
-                                  onClick={() => {
-                                    setAlerts(prev => prev.map(a =>
-                                      a.id === alert.id
-                                        ? { ...a, status: a.status === 'Active' ? 'Acknowledged' : 'Active' }
-                                        : a
-                                    ));
-                                  }}
-                                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm border whitespace-nowrap ${
-                                    alert.status === 'Acknowledged'
-                                      ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                                      : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'
-                                  }`}
-                                >
-                                  <CheckSquare size={12} />
-                                  {alert.status === 'Active' ? 'Acknowledge' : 'Re-Activate'}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Agronomic Footer Banner */}
-                <div className="p-6 rounded-2xl border bg-gradient-to-br from-green-50/60 to-emerald-50/30 border-green-100/80 flex items-start gap-4">
-                  <div className="w-9 h-9 rounded-xl bg-green-100 border border-green-200 flex items-center justify-center shrink-0 mt-0.5">
-                    <Shield size={16} className="text-green-700" />
+              {/* ── TOP HEADER BAR ── */}
+              <div className="px-8 pt-7 pb-5 border-b border-gray-100 flex items-center justify-between gap-4 shrink-0 bg-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm animate-pulse" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5' }}>
+                    <AlertTriangle size={18} className="text-red-600" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-green-800 mb-1">Agronomic Response Protocol</h4>
-                    <p className="text-xs text-green-700 leading-relaxed font-medium">
-                      All anomalies are auto-detected using daily Sentinel-2 L2A composites benchmarked against 6-month NDVI/NDMI baselines.
-                      <span className="font-bold"> Critical alerts mandate ground truth or irrigation response within 24 hours</span> to avoid yield loss.
-                      Acknowledged incidents are archived in the MRV compliance ledger for audit.
-                    </p>
+                    <h2 className="text-xl font-bold text-gray-900 tracking-tight leading-none">Alerts Command Center</h2>
+                    <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-0.5">Live Anomaly Intelligence · Farmintelytics Agro Node</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                    <div>
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Operational Status</span>
+                      <span className="text-xs font-bold text-gray-800">{alerts.filter(a => a.status === 'Active').length} Active Anomalies</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
+              {/* ── MAIN TWO-COLUMN BODY ── */}
+              <div className="flex flex-1 min-h-0 overflow-hidden">
+
+                {/* ═══ LEFT COLUMN: Search + Plot Issue List ═══ */}
+                <div className="w-[300px] shrink-0 bg-gray-50 border-r border-gray-150 flex flex-col">
+
+                  {/* Search bar */}
+                  <div className="p-4 border-b border-gray-150 space-y-3">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      <input
+                        id="alerts-search-input"
+                        type="text"
+                        value={alertsSearch}
+                        onChange={e => setAlertsSearch(e.target.value)}
+                        placeholder="Search plots..."
+                        className="w-full pl-8 pr-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-xl outline-none focus:border-red-300 focus:ring-2 focus:ring-red-50 transition-all placeholder-gray-400"
+                      />
+                      {alertsSearch && (
+                        <button onClick={() => setAlertsSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Severity mini-filters */}
+                    <div className="flex items-center gap-1.5">
+                      {['All', 'Critical', 'Warning', 'Info'].map(sev => {
+                        const activeColor = sev === 'Critical' ? 'bg-red-600 text-white' : sev === 'Warning' ? 'bg-amber-500 text-white' : sev === 'Info' ? 'bg-blue-500 text-white' : 'bg-gray-800 text-white';
+                        return (
+                          <button
+                            key={sev}
+                            onClick={() => setAlertsFilterSeverity(sev)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${alertsFilterSeverity === sev ? activeColor : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-100'}`}
+                          >
+                            {sev}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Plots with issues list */}
+                  <div className="flex-1 overflow-y-auto alerts-list-scroll p-3 space-y-2">
+                    {(() => {
+                      const PLOT_DEFS = [
+                        { id: 'PLOT-ALPHA', name: 'West Valley Plot', estate: 'West Valley Estate', ndvi: 0.72 },
+                        { id: 'PLOT-BETA',  name: 'East Ridge Plot',  estate: 'East Ridge Estate',  ndvi: 0.51 },
+                        { id: 'PLOT-GAMMA', name: 'South Slope Plot', estate: 'South Slope Estate', ndvi: 0.68 }
+                      ];
+
+                      const searchLower = alertsSearch.toLowerCase();
+
+                      const plotsWithIssues = PLOT_DEFS
+                        .map(p => {
+                          const rawAlerts = alerts.filter(a => a.plot === p.id);
+                          const active = rawAlerts.filter(a => {
+                            if (a.status !== 'Active') return false;
+                            if (alertsFilterSeverity !== 'All' && a.severity !== alertsFilterSeverity) return false;
+                            return true;
+                          });
+                          const critCount = rawAlerts.filter(a => a.status === 'Active' && a.severity === 'Critical').length;
+                          const warnCount = rawAlerts.filter(a => a.status === 'Active' && a.severity === 'Warning').length;
+                          const infoCount = rawAlerts.filter(a => a.status === 'Active' && a.severity === 'Info').length;
+                          return { ...p, active, critCount, warnCount, infoCount, total: active.length };
+                        })
+                        // Only show plots that have active issues
+                        .filter(p => p.total > 0)
+                        // Apply search
+                        .filter(p => !searchLower || p.name.toLowerCase().includes(searchLower) || p.id.toLowerCase().includes(searchLower) || p.estate.toLowerCase().includes(searchLower));
+
+                      if (plotsWithIssues.length === 0) {
+                        return (
+                          <div className="flex flex-col items-center justify-center h-full py-12 text-center px-4">
+                            <div className="w-12 h-12 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mb-3">
+                              <CheckCircle2 size={20} className="text-green-600" />
+                            </div>
+                            <p className="text-xs font-bold text-gray-500">No issues found</p>
+                            <p className="text-[10px] text-gray-400 mt-1">All plots are operating normally</p>
+                          </div>
+                        );
+                      }
+
+                      return plotsWithIssues.map(p => {
+                        const isCrit = p.critCount > 0;
+                        const isWarn = p.warnCount > 0 && !isCrit;
+                        const isSelected = selectedAlertPlot === p.id;
+
+                        const borderClass = isCrit ? 'border-red-200 pulse-critical' : isWarn ? 'border-amber-200 pulse-warning' : 'border-blue-200';
+                        const dotColor = isCrit ? 'bg-red-500' : isWarn ? 'bg-amber-500' : 'bg-blue-400';
+                        const badgeBg = isCrit ? 'bg-red-50 text-red-700 border-red-200' : isWarn ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200';
+                        const ndviColor = p.ndvi > 0.7 ? '#10B981' : p.ndvi > 0.5 ? '#F59E0B' : '#EF4444';
+
+                        return (
+                          <button
+                            key={p.id}
+                            id={`alert-plot-row-${p.id.toLowerCase()}`}
+                            onClick={() => setSelectedAlertPlot(isSelected ? null : p.id)}
+                            className={`w-full text-left bg-white rounded-xl border p-3.5 transition-all hover:shadow-md active:scale-[0.98] ${borderClass} ${isSelected ? 'ring-2 ring-gray-900 ring-offset-1 shadow-md' : 'shadow-sm hover:border-gray-300'}`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${dotColor} ${isCrit || isWarn ? 'animate-pulse' : ''}`} />
+                                <div className="min-w-0">
+                                  <div className="text-xs font-extrabold text-gray-900 leading-tight truncate">{p.name}</div>
+                                  <div className="text-[10px] text-gray-400 font-bold mt-0.5 truncate">{p.id} · {p.estate}</div>
+                                </div>
+                              </div>
+                              <div className={`shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full border ${badgeBg}`}>
+                                {p.total} {p.total === 1 ? 'issue' : 'issues'}
+                              </div>
+                            </div>
+
+                            {/* Mini severity badges */}
+                            <div className="flex items-center gap-1.5 mt-2.5 pl-4.5">
+                              {p.critCount > 0 && <span className="text-[9px] font-black bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-full">{p.critCount} Critical</span>}
+                              {p.warnCount > 0 && <span className="text-[9px] font-black bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">{p.warnCount} Warning</span>}
+                              {p.infoCount > 0 && <span className="text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full">{p.infoCount} Info</span>}
+                            </div>
+
+                            {/* NDVI micro bar */}
+                            <div className="mt-2.5 pl-4.5">
+                              <div className="flex justify-between items-center text-[9px] font-bold text-gray-400 mb-1">
+                                <span>NDVI</span>
+                                <span style={{ color: ndviColor }}>{p.ndvi}</span>
+                              </div>
+                              <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width: `${p.ndvi * 100}%`, backgroundColor: ndviColor }} />
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  {/* Bottom protocol banner */}
+                  <div className="p-3 border-t border-gray-150 bg-gradient-to-br from-green-50/60 to-emerald-50/30">
+                    <div className="flex items-start gap-2">
+                      <Shield size={13} className="text-green-700 shrink-0 mt-0.5" />
+                      <p className="text-[9.5px] text-green-700 leading-relaxed font-medium">
+                        <span className="font-black">Agronomic Response Protocol</span> — Critical alerts mandate ground truth or irrigation response within 24 hours.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ═══ RIGHT COLUMN: Full Detail Report ═══ */}
+                <div className="flex-1 min-w-0 overflow-y-auto alerts-detail-scroll bg-white">
+                  {selectedAlertPlot === null ? (
+                    /* Empty state – no plot selected */
+                    <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                      <div className="w-20 h-20 rounded-2xl bg-gray-50 border border-gray-150 flex items-center justify-center mb-5 shadow-sm">
+                        <AlertTriangle size={32} className="text-gray-300" />
+                      </div>
+                      <h3 className="text-base font-bold text-gray-700 mb-1.5">Select a plot to view the full incident report</h3>
+                      <p className="text-sm text-gray-400 font-medium max-w-sm leading-relaxed">
+                        Click any plot row on the left to load its chronological anomaly log, response protocols, and remediation actions.
+                      </p>
+                    </div>
+                  ) : (
+                    /* Detail report */
+                    (() => {
+                      const PLOT_META = {
+                        'PLOT-ALPHA': { name: 'West Valley Plot (PLOT-ALPHA)', estate: 'West Valley Estate', ndvi: 0.72 },
+                        'PLOT-BETA':  { name: 'East Ridge Plot (PLOT-BETA)',  estate: 'East Ridge Estate',  ndvi: 0.51 },
+                        'PLOT-GAMMA': { name: 'South Slope Plot (PLOT-GAMMA)', estate: 'South Slope Estate', ndvi: 0.68 }
+                      };
+                      const meta = PLOT_META[selectedAlertPlot];
+                      const plotAlerts = alerts.filter(a => a.plot === selectedAlertPlot);
+                      const activePlotAlerts = plotAlerts.filter(a => a.status === 'Active');
+                      const critCount = activePlotAlerts.filter(a => a.severity === 'Critical').length;
+                      const warnCount = activePlotAlerts.filter(a => a.severity === 'Warning').length;
+                      const ndviColor = meta.ndvi > 0.7 ? '#10B981' : meta.ndvi > 0.5 ? '#F59E0B' : '#EF4444';
+
+                      return (
+                        <div className="p-7 space-y-6 animate-in slide-in-from-right duration-300">
+                          {/* Detail header */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                {critCount > 0 ? (
+                                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                                ) : warnCount > 0 ? (
+                                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                ) : (
+                                  <span className="w-2.5 h-2.5 rounded-full bg-blue-400 shrink-0" />
+                                )}
+                                <h3 className="text-xl font-extrabold text-gray-950 tracking-tight leading-tight">{meta.name}</h3>
+                              </div>
+                              <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">{meta.estate}</span>
+                            </div>
+                            <button
+                              id="alerts-close-detail"
+                              onClick={() => setSelectedAlertPlot(null)}
+                              className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-all"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          {/* Stats row */}
+                          <div className="grid grid-cols-4 gap-3">
+                            {[
+                              { label: 'Active Incidents', value: activePlotAlerts.length, color: 'text-red-600', bg: 'bg-red-50 border-red-100' },
+                              { label: 'Critical', value: critCount, color: 'text-red-700', bg: 'bg-red-50 border-red-100' },
+                              { label: 'Warning', value: warnCount, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-100' },
+                              { label: 'Acknowledged', value: plotAlerts.length - activePlotAlerts.length, color: 'text-green-700', bg: 'bg-green-50 border-green-100' }
+                            ].map((s, i) => (
+                              <div key={i} className={`${s.bg} border rounded-xl p-3 text-center`}>
+                                <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
+                                <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mt-0.5">{s.label}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* NDVI bar */}
+                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2">
+                            <div className="flex justify-between items-center text-xs font-bold">
+                              <span className="text-gray-500">Current Crop Vigor (NDVI)</span>
+                              <span style={{ color: ndviColor }}>{meta.ndvi}</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${meta.ndvi * 100}%`, backgroundColor: ndviColor }} />
+                            </div>
+                            <div className="flex justify-between text-[9px] text-gray-400 font-bold">
+                              <span>0.0 — Poor</span>
+                              <span>0.5 — Moderate</span>
+                              <span>1.0 — Excellent</span>
+                            </div>
+                          </div>
+
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => {
+                                setActiveSidebarItem('intelligence-layers');
+                                setSelectedPlot(selectedAlertPlot);
+                              }}
+                              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-xs font-bold text-gray-700 transition-all shadow-sm active:scale-95"
+                            >
+                              <MapPin size={13} className="text-green-600" /> Locate on Map
+                            </button>
+                            {activePlotAlerts.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  setAlerts(prev => prev.map(a => a.plot === selectedAlertPlot ? { ...a, status: 'Acknowledged' } : a));
+                                }}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-xs font-bold text-white transition-all shadow-md shadow-green-600/10 active:scale-95"
+                              >
+                                <CheckCircle2 size={13} /> Acknowledge All Issues
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Timeline */}
+                          <div className="space-y-3">
+                            <h4 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                              <span>Chronological Incident Log</span>
+                              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-[9px]">{plotAlerts.length} entries</span>
+                            </h4>
+
+                            <div className="relative border-l border-gray-200 pl-6 ml-2 space-y-5">
+                              {plotAlerts.map((alert) => {
+                                const isActive = alert.status === 'Active';
+                                const isCrit = alert.severity === 'Critical';
+                                let severityColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                                let dotColor = isCrit ? 'bg-red-500' : alert.severity === 'Warning' ? 'bg-amber-500' : 'bg-blue-400';
+                                if (isCrit) severityColor = 'bg-red-50 text-red-700 border-red-200';
+                                else if (alert.severity === 'Warning') severityColor = 'bg-amber-50 text-amber-700 border-amber-200';
+
+                                return (
+                                  <div key={alert.id} className="relative">
+                                    {/* Dot */}
+                                    <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-2 border-white bg-white flex items-center justify-center shadow-sm ring-1 ring-gray-100">
+                                      {isActive ? (
+                                        <div className={`w-2.5 h-2.5 rounded-full ${dotColor} ${isCrit || alert.severity === 'Warning' ? 'animate-pulse' : ''}`} />
+                                      ) : (
+                                        <Check size={8} className="text-gray-500 font-bold" />
+                                      )}
+                                    </div>
+
+                                    <div className={`p-4 rounded-2xl border transition-colors ${isActive ? 'bg-white border-gray-150 hover:bg-gray-50/50' : 'bg-gray-50/30 border-gray-100'}`}>
+                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-xs font-black text-gray-800 tabular-nums">{alert.id}</span>
+                                          <span className="text-[10px] text-gray-300">•</span>
+                                          <span className="text-xs text-gray-400 font-semibold">{alert.date} at {alert.time}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full border ${severityColor}`}>{alert.severity}</span>
+                                          <span className="text-[9px] font-extrabold bg-gray-100 text-gray-700 border border-gray-200 px-2 py-0.5 rounded-full uppercase">{alert.category}</span>
+                                          {!isActive && <span className="text-[9px] font-extrabold bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full uppercase">Acked</span>}
+                                        </div>
+                                      </div>
+
+                                      <p className="text-xs text-gray-700 font-semibold leading-relaxed">{alert.desc}</p>
+
+                                      <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-start gap-2">
+                                        <span className="font-extrabold text-[9px] text-green-700 uppercase shrink-0 mt-0.5">Response Protocol:</span>
+                                        <p className="text-[10.5px] text-gray-500 font-medium italic leading-relaxed">
+                                          {alert.category === 'Water Stress' ? 'Initiate targeted drip irrigation sequence. Run multi-temporal NDVI pass after 48 hours.' :
+                                           alert.category === 'Pest Infestation' ? 'Deploy ground field surveyors to locate egg masses. Establish barrier pesticide rings.' :
+                                           alert.category === 'Growth Deficit' ? 'Verify nitrogen balance maps. Apply top-dressing fertilizer if RECI index falls below 0.45.' :
+                                           'Inspect cloud-free sentinel pass files. If SCL mask fails, flag Landsat-OLI backup files.'}
+                                        </p>
+                                      </div>
+
+                                      {isActive && (
+                                        <div className="mt-3 flex justify-end">
+                                          <button
+                                            onClick={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, status: 'Acknowledged' } : a))}
+                                            className="text-[10px] font-bold text-green-600 hover:text-green-700 border border-green-200 hover:bg-green-50 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+                                          >
+                                            <Check size={11} /> Mark Acknowledged
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -4924,7 +6633,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Farm Boundaries</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Farm Boundaries {renderInfoTooltip("Farm Boundaries")}</div>
                               <span className="text-[10px] text-gray-400">Plot perimeter outlines</span>
                             </div>
                             <button
@@ -5018,7 +6727,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Soil Temp</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Soil Temp {renderInfoTooltip("Soil Temp")}</div>
                               <span className="text-[10px] text-gray-400">Root zone sensor temp</span>
                             </div>
                             <button
@@ -5076,7 +6785,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">Surface Temp (LST)</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Surface Temp (LST) {renderInfoTooltip("Surface Temp (LST)")}</div>
                               <span className="text-[10px] text-gray-400">Land surface temperature</span>
                             </div>
                             <button
@@ -5121,7 +6830,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight">VPD Stress</div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">VPD Stress {renderInfoTooltip("VPD Stress")}</div>
                               <span className="text-[10px] text-gray-400">Vapor Pressure Deficit</span>
                             </div>
                             <button
@@ -5163,6 +6872,58 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           </div>
                         )}
                       </div>
+
+                      {/* MONITORING & TELEMETRY SECTION */}
+                      <div className="space-y-3">
+                        <div 
+                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest select-none"
+                        >
+                          Monitoring & Telemetry
+                        </div>
+                        
+                        {/* SAR Flood Mask Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">SAR Flood Mask (Sentinel-1) {renderInfoTooltip("SAR Flood Mask")}</div>
+                              <span className="text-[10px] text-gray-400">All-weather standing water detection</span>
+                            </div>
+                            <button
+                              onClick={() => handleClimateToggle('flood')}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                climateShowFlood ? 'bg-green-600' : 'bg-gray-200'
+                              }`}
+                              style={{ backgroundColor: climateShowFlood ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                                climateShowFlood ? 'translate-x-4' : 'translate-x-0'
+                              }`} />
+                            </button>
+                          </div>
+                          {climateShowFlood && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{climateFloodOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={climateFloodOpacity}
+                                onChange={e => setClimateFloodOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                                {[
+                                  { label: 'Flooded / Waterlogged', color: '#1e3a8a' },
+                                  { label: 'Dry Surface', color: 'transparent' }
+                                ].map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm shrink-0 border border-gray-200" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -5174,7 +6935,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 climateShowVaporDeficit ? 'VPD Stress' :
                 climateShowLst ? 'Surface Temp' :
                 climateShowSoilTemp ? 'Soil Temp' :
-                climateShowRainfall ? 'Precipitation' : 'No Active Layer'
+                climateShowRainfall ? 'Precipitation' :
+                climateShowFlood ? 'SAR Flood Mask' : 'No Active Layer'
               )}
             </div>
           )}
@@ -5182,7 +6944,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           {/* ══════════════════════════════════════════════════════════════
               VERIFICATION
           ══════════════════════════════════════════════════════════════ */}
-          {activeSidebarItem === 'dashboard' && activeTab === 'verification' && (
+          {activeSidebarItem === 'analytics' && activeTab === 'verification' && (
             <div className="p-10 space-y-10 animate-in fade-in duration-300">
               <div>
                 <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Verification & MRV Audit Ledger</h2>
@@ -5232,8 +6994,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <div>
                     <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
                       <Shield size={18} className="text-green-600" />
-                      Verification Checklist — <span className="text-green-600">{selectedVerifyPlot}</span>
-                    </h3>
+                      Verification Checklist — <span className="text-green-600">{selectedVerifyPlot}</span> {renderInfoTooltip("Verification Checklist")}</h3>
                     <p className="text-sm text-gray-400 font-medium mt-1.5">Run interactive validation scans against satellite and cadastral data.</p>
                   </div>
                   <button
@@ -5313,8 +7074,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <div className="flex items-center justify-between">
                     <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
                       <Globe size={18} className="text-green-600" />
-                      Carbon Accounting & Geospatial Registry
-                    </h3>
+                      Carbon Accounting & Geospatial Registry {renderInfoTooltip("Carbon Accounting & Geospatial Registry")}</h3>
                     <span className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 uppercase">
                       VCS Verified
                     </span>
@@ -5372,8 +7132,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <div className="flex items-center justify-between">
                     <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
                       <Shield size={18} className="text-green-600" />
-                      Traceability & Environmental Impact
-                    </h3>
+                      Traceability & Environmental Impact {renderInfoTooltip("Traceability & Environmental Impact")}</h3>
                     <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 uppercase">
                       Deforestation Free
                     </span>
@@ -5393,15 +7152,55 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       </div>
                     </div>
 
-                    <div className="relative">
+                     <div className="relative space-y-3">
                       <div className="absolute -left-[30px] top-0.5 w-4 h-4 rounded-full bg-green-500 border border-green-600 flex items-center justify-center shadow-sm">
                         <Check size={8} className="text-white" />
                       </div>
                       <div>
                         <span className="text-xs font-bold text-gray-800 block">EUDR Compliance Scan</span>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Deforestation compliance verified. Continuous canopy monitoring registers no forest-clearing events.</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Deforestation compliance verified. Continuous multi-sensor canopy monitoring registers no forest-clearing events.</p>
+                      </div>
+
+                      {/* Side-by-Side Co-Evidence Display */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                        {/* Optical Co-Evidence Card */}
+                        <div className="bg-emerald-950/90 text-white rounded-xl p-3 border border-emerald-500/20 space-y-2 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">Optical NIR Evidence</span>
+                            <span className="text-[8px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded border border-green-500/30">PASS</span>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="text-[10px] font-bold text-gray-200">Sentinel-2 Canopy Vigour</div>
+                            <div className="text-[9px] text-gray-300 leading-tight">
+                              NDVI: <span className="font-mono text-green-400 font-bold">0.72</span> (Threshold &gt; 0.50)
+                            </div>
+                            <div className="text-[9px] text-gray-400 leading-relaxed">Sustained optical canopy coverage baseline validated.</div>
+                          </div>
+                        </div>
+
+                        {/* SAR Co-Evidence Card */}
+                        <div className="bg-emerald-950/90 text-white rounded-xl p-3 border border-emerald-500/20 space-y-2 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">SAR InSAR Evidence</span>
+                            <span className="text-[8px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded border border-green-500/30">PASS</span>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="text-[10px] font-bold text-gray-200">Sentinel-1 Coherence (γ)</div>
+                            <div className="text-[9px] text-gray-300 leading-tight">
+                              Coherence: <span className="font-mono text-green-400 font-bold">0.81</span> (Threshold &gt; 0.40)
+                            </div>
+                            <div className="text-[9px] text-gray-400 leading-relaxed">Zero phase stability decorrelation detected across pairs.</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Combined Confidence Banner */}
+                      <div className="bg-emerald-950/40 border border-emerald-500/20 rounded-xl p-2.5 flex items-center justify-between text-[9px] text-emerald-300 font-bold">
+                        <span>Combined Confidence Score:</span>
+                        <span className="bg-emerald-400/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-400/20">VERY HIGH CONFIDENCE (92% Accuracy)</span>
                       </div>
                     </div>
+
 
                     <div className="relative">
                       <div className={`absolute -left-[30px] top-0.5 w-4 h-4 rounded-full border border-white flex items-center justify-center shadow-sm ${
@@ -5427,7 +7226,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           {/* ══════════════════════════════════════════════════════════════
               REPORTS
           ══════════════════════════════════════════════════════════════ */}
-          {activeSidebarItem === 'dashboard' && activeTab === 'reports' && (
+          {activeSidebarItem === 'analytics' && activeTab === 'reports' && (
             <div className="p-10 space-y-10 animate-in fade-in duration-300">
               <div>
                 <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Analytical Ledger Reports</h2>
@@ -5672,7 +7471,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
                     <FileText size={18} className="text-green-600" />
                     Verified Sustainability & Environmental Reports
-                  </h3>
+                    {renderInfoTooltip("Verified Sustainability & Environmental Reports")}</h3>
                   <p className="text-xs text-gray-400 font-semibold mt-1.5">
                     Pre-compiled carbon offsets, land restoration metrics, and environmental compliance logs verified by remote sensing nodes.
                   </p>
@@ -5822,7 +7621,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           {/* ══════════════════════════════════════════════════════════════
               AI ASSISTANT
           ══════════════════════════════════════════════════════════════ */}
-          {activeSidebarItem === 'dashboard' && activeTab === 'ai-assistant' && (
+          {activeSidebarItem === 'analytics' && activeTab === 'ai-assistant' && (
             <div className="flex flex-col flex-1 h-full bg-white overflow-hidden animate-in fade-in duration-300">
               
               {/* Header (Only shown if chat has started) */}
