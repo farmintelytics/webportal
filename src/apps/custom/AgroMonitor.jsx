@@ -6246,7 +6246,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="flex flex-1 min-h-0 overflow-hidden">
 
                 {/* ═══ LEFT COLUMN: Search + Plot Issue List ═══ */}
-                <div className="w-[300px] shrink-0 bg-gray-50 border-r border-gray-150 flex flex-col">
+                <div className="w-[270px] shrink-0 bg-gray-50 border-r border-gray-150 flex flex-col">
 
                   {/* Search bar */}
                   <div className="p-4 border-b border-gray-150 space-y-3">
@@ -6330,17 +6330,15 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         const isWarn = p.warnCount > 0 && !isCrit;
                         const isSelected = selectedAlertPlot === p.id;
 
-                        const borderClass = isCrit ? 'border-l-red-500' : isWarn ? 'border-l-amber-500' : 'border-l-blue-400';
                         const dotColor = isCrit ? 'bg-red-500' : isWarn ? 'bg-amber-500' : 'bg-blue-400';
                         const badgeBg = isCrit ? 'bg-red-50 text-red-700 border-red-200' : isWarn ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200';
-                        const ndviColor = p.ndvi > 0.7 ? '#10B981' : p.ndvi > 0.5 ? '#F59E0B' : '#EF4444';
 
                         return (
                           <button
                             key={p.id}
                             id={`alert-plot-row-${p.id.toLowerCase()}`}
                             onClick={() => setSelectedAlertPlot(isSelected ? null : p.id)}
-                            className={`w-full text-left bg-white rounded-xl border-t border-r border-b border-gray-200 border-l-4 p-3.5 transition-all hover:shadow-md active:scale-[0.98] ${borderClass} ${isSelected ? 'ring-2 ring-gray-900 ring-offset-1 shadow-md' : 'shadow-sm hover:border-gray-300'}`}
+                            className={`w-full text-left bg-white rounded-xl border border-gray-200 p-3.5 transition-all hover:shadow-md active:scale-[0.98] ${isSelected ? 'ring-2 ring-gray-900 ring-offset-1 shadow-md' : 'shadow-sm hover:border-gray-300'}`}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-start gap-2.5 min-w-0">
@@ -6361,32 +6359,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               {p.warnCount > 0 && <span className="text-[9px] font-black bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">{p.warnCount} Warning</span>}
                               {p.infoCount > 0 && <span className="text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full">{p.infoCount} Info</span>}
                             </div>
-
-                            {/* NDVI micro bar */}
-                            <div className="mt-2.5 pl-4.5">
-                              <div className="flex justify-between items-center text-[9px] font-bold text-gray-400 mb-1">
-                                <span>NDVI</span>
-                                <span style={{ color: ndviColor }}>{p.ndvi}</span>
-                              </div>
-                              <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full" style={{ width: `${p.ndvi * 100}%`, backgroundColor: ndviColor }} />
-                              </div>
-                            </div>
                           </button>
                         );
                       });
                     })()}
                   </div>
 
-                  {/* Bottom protocol banner */}
-                  <div className="p-3 border-t border-gray-150 bg-gradient-to-br from-green-50/60 to-emerald-50/30">
-                    <div className="flex items-start gap-2">
-                      <Shield size={13} className="text-green-700 shrink-0 mt-0.5" />
-                      <p className="text-[9.5px] text-green-700 leading-relaxed font-medium">
-                        <span className="font-black">Agronomic Response Protocol</span> — Critical alerts mandate ground truth or irrigation response within 24 hours.
-                      </p>
-                    </div>
-                  </div>
+
                 </div>
 
                 {/* ═══ RIGHT COLUMN: Full Detail Report ═══ */}
@@ -6540,15 +6519,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                                       <p className="text-xs text-gray-700 font-semibold leading-relaxed">{alert.desc}</p>
 
-                                      <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-start gap-2">
-                                        <span className="font-extrabold text-[9px] text-green-700 uppercase shrink-0 mt-0.5">Response Protocol:</span>
-                                        <p className="text-[10.5px] text-gray-500 font-medium italic leading-relaxed">
-                                          {alert.category === 'Water Stress' ? 'Initiate targeted drip irrigation sequence. Run multi-temporal NDVI pass after 48 hours.' :
-                                           alert.category === 'Pest Infestation' ? 'Deploy ground field surveyors to locate egg masses. Establish barrier pesticide rings.' :
-                                           alert.category === 'Growth Deficit' ? 'Verify nitrogen balance maps. Apply top-dressing fertilizer if RECI index falls below 0.45.' :
-                                           'Inspect cloud-free sentinel pass files. If SCL mask fails, flag Landsat-OLI backup files.'}
-                                        </p>
-                                      </div>
+
 
                                       {isActive && (
                                         <div className="mt-3 flex justify-end">
