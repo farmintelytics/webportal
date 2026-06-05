@@ -1,88 +1,117 @@
 # Mock GIS Utility simulating PostGIS and remote sensing ingest pipelines.
+#
+# ── FRONTEND ALIGNMENT NOTE ──────────────────────────────────────────────────
+# Plot names, IDs, area_ha and estate fields exactly match AgroMonitor.jsx:
+#   PLOT-ALPHA  → "West Valley Plot"   12.5 HA   West Valley Estate
+#   PLOT-BETA   → "East Ridge Plot"     8.2 HA   West Valley Estate
+#   PLOT-GAMMA  → "South Slope Plot"   15.0 HA   North Ridge Estate
+#
+# Restoration zones match RESTORATION_ZONES constant in AgroMonitor.jsx:
+#   ZONE-ALPHA  → "Canopy Reforestation"          6.4 HA   John Musa
+#   ZONE-BETA   → "Agroforestry Zone"             5.8 HA   Alice Peters
+#   ZONE-GAMMA  → "Riparian Buffer Restoration"   8.1 HA   David Kalu
+#
+# Boundary coordinates are GeoJSON [lng, lat] order.
+# The frontend helper geoJsonToLeaflet() in src/api/agromonitorApi.js
+# converts them to Leaflet [lat, lng] before passing to <Polygon>.
+# ─────────────────────────────────────────────────────────────────────────────
 
 MOCK_PLOTS = {
     "PLOT-ALPHA": {
         "plot_id": "PLOT-ALPHA",
-        "name": "West Valley Plot",
+        "name": "West Valley Plot",       # matches frontend plotsData name
         "estate": "West Valley Estate",
         "area_ha": 12.5,
         "historical_yield_base": 18.5,
+        # Coordinates match PLOT_ALPHA_COORDS in AgroMonitor.jsx (lng/lat order)
         "boundary": {
             "type": "Polygon",
-            "coordinates": [[[7.145, 3.355], [7.150, 3.355], [7.150, 3.360], [7.145, 3.360], [7.145, 3.355]]]
+            "coordinates": [[[3.355, 7.145], [3.355, 7.150], [3.360, 7.150], [3.360, 7.145], [3.355, 7.145]]]
         },
         "sentinel_bands": {"blue": 0.05, "red": 0.08, "nir": 0.65, "swir1": 0.20, "swir2": 0.12}
     },
     "PLOT-BETA": {
         "plot_id": "PLOT-BETA",
-        "name": "East Valley Plot",
+        "name": "East Ridge Plot",        # matches frontend plotsData name
         "estate": "West Valley Estate",
         "area_ha": 8.2,
         "historical_yield_base": 14.2,
+        # Coordinates match PLOT_BETA_COORDS in AgroMonitor.jsx (lng/lat order)
         "boundary": {
             "type": "Polygon",
-            "coordinates": [[[7.150, 3.350], [7.155, 3.350], [7.155, 3.355], [7.150, 3.355], [7.150, 3.350]]]
+            "coordinates": [[[3.362, 7.145], [3.362, 7.150], [3.367, 7.150], [3.367, 7.145], [3.362, 7.145]]]
         },
         "sentinel_bands": {"blue": 0.06, "red": 0.14, "nir": 0.40, "swir1": 0.22, "swir2": 0.16}
     },
     "PLOT-GAMMA": {
         "plot_id": "PLOT-GAMMA",
-        "name": "North Ridge Plot",
+        "name": "South Slope Plot",       # matches frontend plotsData name
         "estate": "North Ridge Estate",
         "area_ha": 15.0,
         "historical_yield_base": 16.0,
+        # Coordinates match PLOT_GAMMA_COORDS in AgroMonitor.jsx (lng/lat order)
         "boundary": {
             "type": "Polygon",
-            "coordinates": [[[7.140, 3.360], [7.145, 3.360], [7.145, 3.365], [7.140, 3.365], [7.140, 3.360]]]
+            "coordinates": [[[3.355, 7.138], [3.355, 7.143], [3.360, 7.143], [3.360, 7.138], [3.355, 7.138]]]
         },
         "sentinel_bands": {"blue": 0.04, "red": 0.07, "nir": 0.68, "swir1": 0.18, "swir2": 0.10}
     }
 }
 
+# ── Restoration zones ────────────────────────────────────────────────────────
+# Names, managers, area labels and progress values match RESTORATION_ZONES
+# and restorationPlotsDataA in AgroMonitor.jsx.
 MOCK_RESTORATION_ZONES = {
     "ZONE-ALPHA": {
         "zone_id": "ZONE-ALPHA",
         "name": "Canopy Reforestation",
+        "area": "6.4 HA",
         "project_type": "Canopy Density",
         "progress_pct": 88,
         "survival_rate_pct": 94,
         "tree_count": 1200,
         "carbon_offset_tco2e": 45.2,
         "biodiversity_score": "92%",
-        "manager": "John Musa",
+        "status": "Optimal Growth",
+        "manager": "John Musa",           # matches frontend manager field
+        # GeoJSON [lng, lat] — matches RESTORE_ZONE_A_COORDS swapped
         "boundary": {
             "type": "Polygon",
-            "coordinates": [[[7.135, 3.365], [7.140, 3.365], [7.140, 3.370], [7.135, 3.370], [7.135, 3.365]]]
+            "coordinates": [[[3.350, 7.141], [3.350, 7.144], [3.354, 7.144], [3.354, 7.141], [3.350, 7.141]]]
         }
     },
     "ZONE-BETA": {
         "zone_id": "ZONE-BETA",
-        "name": "Native Species Agroforestry",
+        "name": "Agroforestry Zone",
+        "area": "5.8 HA",
         "project_type": "Species Diversification",
-        "progress_pct": 72,
-        "survival_rate_pct": 86,
-        "tree_count": 850,
-        "carbon_offset_tco2e": 31.8,
+        "progress_pct": 74,
+        "survival_rate_pct": 89,
+        "tree_count": 980,
+        "carbon_offset_tco2e": 32.8,
         "biodiversity_score": "88%",
-        "manager": "Sarah Adams",
+        "status": "Active Care",
+        "manager": "Alice Peters",        # matches frontend manager field
         "boundary": {
             "type": "Polygon",
-            "coordinates": [[[7.145, 3.345], [7.150, 3.345], [7.150, 3.350], [7.145, 3.350], [7.145, 3.345]]]
+            "coordinates": [[[3.356, 7.141], [3.356, 7.144], [3.361, 7.144], [3.361, 7.141], [3.356, 7.141]]]
         }
     },
     "ZONE-GAMMA": {
         "zone_id": "ZONE-GAMMA",
-        "name": "Riparian Buffer Zone",
-        "project_type": "Riparian Buffer",
-        "progress_pct": 95,
-        "survival_rate_pct": 98,
-        "tree_count": 2100,
-        "carbon_offset_tco2e": 68.4,
-        "biodiversity_score": "96%",
-        "manager": "John Musa",
+        "name": "Riparian Buffer Restoration",
+        "area": "8.1 HA",
+        "project_type": "Soil Stabilization",
+        "progress_pct": 62,
+        "survival_rate_pct": 81,
+        "tree_count": 1550,
+        "carbon_offset_tco2e": 21.5,
+        "biodiversity_score": "81%",
+        "status": "Initial Phase",
+        "manager": "David Kalu",          # matches frontend manager field
         "boundary": {
             "type": "Polygon",
-            "coordinates": [[[7.155, 3.340], [7.160, 3.340], [7.160, 3.345], [7.155, 3.345], [7.155, 3.340]]]
+            "coordinates": [[[3.350, 7.135], [3.350, 7.139], [3.355, 7.139], [3.355, 7.135], [3.350, 7.135]]]
         }
     }
 }
