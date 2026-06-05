@@ -66,7 +66,8 @@ import {
   Target,
   Gauge,
   ListFilter,
-  Columns
+  Columns,
+  Wind
 } from 'lucide-react';
 import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap, Pane } from 'react-leaflet';
 import ReactDOM from 'react-dom';
@@ -852,7 +853,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const FloatingBasemapSelector = () => {
+  const renderFloatingBasemapSelector = () => {
     const BASEMAPS = [
       { id: 'sentinel-2',    label: 'Sentinel-2',      sub: '10m Optical · ESA',  emoji: '🛰️' },
       { id: 'landsat-8',     label: 'Landsat-8',       sub: '30m Thermal · USGS', emoji: '🌍' },
@@ -921,6 +922,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   ]);
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef(null);
+  const [selectedThemeReport, setSelectedThemeReport] = useState('');
+  const [glossarySearch, setGlossarySearch] = useState('');
 
   // Map play / calendar / user menu
   const [isPlaying, setIsPlaying]       = useState(false);
@@ -2478,48 +2481,48 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
   // Dynamic Dashboard Calculations
   const dashboardMetrics = useMemo(() => {
-    let layers = 128;
-    let users = 24;
-    let projects = 18;
+    let plots = 128;
+    let area = 1280;
+    let carbon = 42.5;
     let alerts = 7;
 
     const plot = filterPlot;
     const date = filterDate;
 
     if (plot === 'PLOT-ALPHA') {
-      layers = 42;
-      users = 8;
-      projects = 6;
+      plots = 42;
+      area = 420;
+      carbon = 42.8;
       alerts = 0;
     } else if (plot === 'PLOT-BETA') {
-      layers = 36;
-      users = 9;
-      projects = 5;
+      plots = 36;
+      area = 360;
+      carbon = 31.2;
       alerts = date === '2026-05-29' ? 8 : 4;
     } else if (plot === 'PLOT-GAMMA') {
-      layers = 50;
-      users = 7;
-      projects = 7;
+      plots = 50;
+      area = 500;
+      carbon = 38.5;
       alerts = 3;
     } else if (filterEstate === 'West Valley Estate') {
-      layers = 42; users = 8; projects = 6; alerts = 0;
+      plots = 42; area = 420; carbon = 42.8; alerts = 0;
     } else if (filterEstate === 'East Ridge Estate') {
-      layers = 36; users = 9; projects = 5; alerts = 4;
+      plots = 36; area = 360; carbon = 31.2; alerts = 4;
     } else if (filterEstate === 'South Slope Estate') {
-      layers = 50; users = 7; projects = 7; alerts = 3;
+      plots = 50; area = 500; carbon = 38.5; alerts = 3;
     }
 
     if (date !== 'All') {
       const dayIndex = TIMELINE_DATA.findIndex(t => t.date === date);
-      layers = Math.round(layers * (0.8 + (dayIndex * 0.1)));
-      users = Math.max(1, Math.round(users * (0.7 + (dayIndex * 0.08))));
+      plots = Math.round(plots * (0.8 + (dayIndex * 0.1)));
+      area = Math.max(10, Math.round(area * (0.7 + (dayIndex * 0.08))));
       if (plot === 'All') {
         const pass = TIMELINE_DATA[dayIndex];
         alerts = pass.ndvi < 0.65 ? 9 : pass.ndvi > 0.75 ? 2 : 5;
       }
     }
 
-    return { layers, users, projects, alerts };
+    return { plots, area, carbon, alerts };
   }, [filterEstate, filterPlot, filterDate]);
 
   const yieldTrendsData = useMemo(() => {
@@ -2843,7 +2846,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
   }, [selectedBasemap]);
 
-  const triggerReportGeneration = () => {
+  const triggerReportGeneration = (overridePlot, overrideIndex) => {
+    const targetPlot = overridePlot !== undefined ? overridePlot : reportPlot;
+    const targetIndex = overrideIndex !== undefined ? overrideIndex : reportIndex;
+
     setIsGeneratingReport(true);
     setReportProgress(0);
     setGeneratedReport(null);
@@ -2862,20 +2868,20 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             setIsGeneratingReport(false);
             setGeneratedReport({
               id: `REP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-              plot: reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot,
-              index: reportIndex,
+              plot: targetPlot,
+              index: targetIndex,
               date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
               meanVal: (() => {
-                if (reportPlot === 'WHOLE-FARM') {
-                  if (reportIndex === 'SOC') return '37.5 g/kg';
-                  if (reportIndex === 'AGB') return '312.7 tCO2e';
-                  if (reportIndex === 'NDVI') return '0.61';
-                  if (reportIndex === 'NDMI') return '0.38';
+                if (targetPlot === 'WHOLE-FARM') {
+                  if (targetIndex === 'SOC') return '37.5 g/kg';
+                  if (targetIndex === 'AGB') return '312.7 tCO2e';
+                  if (targetIndex === 'NDVI') return '0.61';
+                  if (targetIndex === 'NDMI') return '0.38';
                   return '0.33';
                 }
-                if (reportIndex === 'SOC') return reportPlot === 'PLOT-ALPHA' ? '42.8 g/kg' : reportPlot === 'PLOT-BETA' ? '31.2 g/kg' : '38.5 g/kg';
-                if (reportIndex === 'AGB') return reportPlot === 'PLOT-ALPHA' ? '124.5 tCO2e' : reportPlot === 'PLOT-BETA' ? '82.4 tCO2e' : '105.8 tCO2e';
-                return reportPlot === 'PLOT-ALPHA' ? '0.76' : reportPlot === 'PLOT-BETA' ? '0.45' : '0.62';
+                if (targetIndex === 'SOC') return targetPlot === 'PLOT-ALPHA' ? '42.8 g/kg' : targetPlot === 'PLOT-BETA' ? '31.2 g/kg' : '38.5 g/kg';
+                if (targetIndex === 'AGB') return targetPlot === 'PLOT-ALPHA' ? '124.5 tCO2e' : targetPlot === 'PLOT-BETA' ? '82.4 tCO2e' : '105.8 tCO2e';
+                return targetPlot === 'PLOT-ALPHA' ? '0.76' : targetPlot === 'PLOT-BETA' ? '0.45' : '0.62';
               })(),
               status: 'Approved & Signed'
             });
@@ -3341,7 +3347,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="space-y-1">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-3">Settings</div>
                 {[
-                  { id: 'help',      label: 'Help & Support',         icon: <Info size={17} /> }
+                  { id: 'help',      label: 'Glossary',         icon: <Info size={17} /> }
                 ].map(item => (
                   <button
                     key={item.id}
@@ -3490,10 +3496,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     {/* KPI Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                       {[
-                        { label: 'Total Layers',  value: dashboardMetrics.layers, subtext: 'Active GIS Layers',       icon: <Layers size={22} className="text-blue-600" />,  accent: '#EFF6FF', border: '#BFDBFE' },
-                        { label: 'Active Users',  value: dashboardMetrics.users,  subtext: 'Online Spatial Auditors',  icon: <User size={22} className="text-green-600" />,    accent: '#F0FDF4', border: '#BBF7D0' },
-                        { label: 'Projects',      value: dashboardMetrics.projects, subtext: 'In-Progress Audits',       icon: <Activity size={22} className="text-amber-500" />, accent: '#FFFBEB', border: '#FDE68A' },
-                        { label: 'Alerts',        value: dashboardMetrics.alerts,   subtext: 'Critical Moisture Stress', icon: <AlertTriangle size={22} className="text-red-500" />, accent: '#FFF1F2', border: '#FECDD3' }
+                        { label: 'Total Plots',   value: `${dashboardMetrics.plots}`,               subtext: 'Active Farm Plots',        icon: <Layers size={22} className="text-blue-600" />,  accent: '#EFF6FF', border: '#BFDBFE' },
+                        { label: 'Area Monitored', value: `${dashboardMetrics.area.toLocaleString()} ha`, subtext: 'Hectares Covered',    icon: <Globe size={22} className="text-green-600" />,    accent: '#F0FDF4', border: '#BBF7D0' },
+                        { label: 'Carbon Density', value: `${dashboardMetrics.carbon} t/ha`,             subtext: 'Average tCO2e/Hectare',    icon: <Leaf size={22} className="text-amber-500" />,   accent: '#FFFBEB', border: '#FDE68A' },
+                        { label: 'Alerts',         value: dashboardMetrics.alerts,                    subtext: 'Critical Moisture Stress', icon: <AlertTriangle size={22} className="text-red-500" />, accent: '#FFF1F2', border: '#FECDD3' }
                       ].map((kpi, i) => (
                         <div key={i}
                           className="bg-white p-7 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group cursor-default"
@@ -3521,133 +3527,70 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       ))}
                     </div>
 
-                    {/* Land Classification Chart (Doughnut) */}
-                    <div className="grid grid-cols-1 gap-8">
+                    {/* 4-Chart Overview Grid */}
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+                      {/* Vegetation Vigor & Health Trends */}
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
                         <div className="flex justify-between items-center">
                           <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                            <Trees size={18} className="text-green-700" />
-                            Land Classification Area {renderInfoTooltip("Land Classification Area")}</h3>
+                            <TrendingUp size={18} className="text-green-600" />
+                            Geospatial Vegetation Vigor & Health Trends {renderInfoTooltip("Geospatial Vegetation Vigor & Health Trends")}
+                          </h3>
                           <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                            ESA WorldCover
+                            NDVI
                           </span>
                         </div>
-                        <div className="h-[320px] flex items-center justify-center">
-                          <div className="w-[280px] h-[280px]">
-                            <Doughnut
-                              data={landClassificationData}
-                              options={{
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: { legend: { position: 'bottom', labels: { font: { size: 12, weight: '600' }, padding: 16, usePointStyle: true } } }
-                              }}
-                            />
-                          </div>
+                        <div className="h-[280px]">
+                          <Line data={yieldTrendsData} options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0.2, max: 1.0 } } }} />
                         </div>
                       </div>
-                      
-                      {/* LAND USE & COMPLIANCE SECTION */}
-                      <div className="space-y-3 pt-4 border-t border-gray-100">
-                        <div 
-                          onClick={() => setRestoreLulcExpanded(!restoreLulcExpanded)}
-                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
-                        >
-                          {restoreLulcExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Land Use & Compliance
-                        </div>
-                        {restoreLulcExpanded && (
-                          <div className="space-y-3">
-                            {/* LULC Classification Card */}
-                            <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LULC Classification {renderInfoTooltip("LULC Classification")}</div>
-                                  <span className="text-[10px] text-gray-400 font-medium">ESA WorldCover pixel maps</span>
-                                </div>
-                                <button
-                                  onClick={() => handleRestoreToggle('lulc')}
-                                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                    restoreShowLulc ? 'bg-green-600' : 'bg-gray-200'
-                                  }`}
-                                  style={{ backgroundColor: restoreShowLulc ? '#16A34A' : '#E5E7EB' }}
-                                >
-                                  <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                    restoreShowLulc ? 'translate-x-4' : 'translate-x-0'
-                                  }`} />
-                                </button>
-                              </div>
-                              {restoreShowLulc && (
-                                <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                    <span>Opacity</span>
-                                    <span>{restoreLulcOpacity}%</span>
-                                  </div>
-                                  <input type="range" min="10" max="100" value={restoreLulcOpacity}
-                                    onChange={e => setRestoreLulcOpacity(parseInt(e.target.value))}
-                                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                                  <div className="grid grid-cols-2 gap-1.5 pt-1">
-                                    {[
-                                      { label: 'Forest', color: '#15803d' },
-                                      { label: 'Shrubland', color: '#86efac' },
-                                      { label: 'Cropland', color: '#fde047' },
-                                      { label: 'Bare Soil', color: '#ca8a04' },
-                                      { label: 'Water', color: '#3b82f6' },
-                                      { label: 'Builtup', color: '#94a3b8' }
-                                    ].map((item, i) => (
-                                      <div key={i} className="flex items-center gap-1.5">
-                                        <div className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                        <span className="text-[9px] font-semibold text-gray-500 leading-none">{item.label}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
 
-                            {/* EUDR Deforestation Card */}
-                            <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">EUDR Deforestation {renderInfoTooltip("EUDR Deforestation")}</div>
-                                  <span className="text-[10px] text-gray-400 font-medium">EU Deforestation Regulation audit</span>
-                                </div>
-                                <button
-                                  onClick={() => handleRestoreToggle('eudr')}
-                                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                    restoreShowEudr ? 'bg-green-600' : 'bg-gray-200'
-                                  }`}
-                                  style={{ backgroundColor: restoreShowEudr ? '#16A34A' : '#E5E7EB' }}
-                                >
-                                  <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                    restoreShowEudr ? 'translate-x-4' : 'translate-x-0'
-                                  }`} />
-                                </button>
-                              </div>
-                              {restoreShowEudr && (
-                                <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                    <span>Opacity</span>
-                                    <span>{restoreEudrOpacity}%</span>
-                                  </div>
-                                  <input type="range" min="10" max="100" value={restoreEudrOpacity}
-                                    onChange={e => setRestoreEudrOpacity(parseInt(e.target.value))}
-                                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                                  <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                    {[
-                                      { label: 'Compliant (Deforestation-Free)', color: '#16a34a' },
-                                      { label: 'EUDR Warning Buffer', color: '#eab308' },
-                                      { label: 'Non-Compliant Anomaly', color: '#dc2626' }
-                                    ].map((item, i) => (
-                                      <div key={i} className="flex items-center gap-2">
-                                        <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                        <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
+                      {/* Moisture Retention (NDMI) Trends */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Droplets size={18} className="text-blue-500" />
+                            Canopy Moisture Retention (NDMI) Trends {renderInfoTooltip("Moisture Retention (NDMI)")}
+                          </h3>
+                          <span className="text-xs bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            NDMI
+                          </span>
+                        </div>
+                        <div className="h-[280px]">
+                          <Line data={ndmiTrendsData} options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0.1, max: 0.7 } } }} />
+                        </div>
+                      </div>
+
+                      {/* Soil Temperature Trends */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Thermometer size={18} className="text-orange-500" />
+                            Soil Temperature Trends {renderInfoTooltip("Soil Temperature Trends")}
+                          </h3>
+                          <span className="text-xs bg-orange-50 text-orange-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            LST °C
+                          </span>
+                        </div>
+                        <div className="h-[280px]">
+                          <Line data={soilTempTrendsData} options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 15, max: 35 } } }} />
+                        </div>
+                      </div>
+
+                      {/* Vapor Pressure Deficit Stress Trends */}
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
+                            <Wind size={18} className="text-purple-500" />
+                            Vapor Pressure Deficit (VPD) Stress Trends {renderInfoTooltip("Vapor Pressure Deficit (VPD)")}
+                          </h3>
+                          <span className="text-xs bg-purple-50 text-purple-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            VPD kPa
+                          </span>
+                        </div>
+                        <div className="h-[280px]">
+                          <Line data={vpdTrendsData} options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 3 } } }} />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3983,7 +3926,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   />
 
                   {/* Floating Basemap Selector (Top-Left) */}
-                  <FloatingBasemapSelector />
+                  {renderFloatingBasemapSelector()}
 
                   {/* Floating map layers trigger */}
                   <button
@@ -4738,7 +4681,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   />
 
                   {/* Floating Basemap Selector (Top-Left) */}
-                  <FloatingBasemapSelector />
+                  {renderFloatingBasemapSelector()}
 
                   {/* Floating map layers trigger */}
                   <button
@@ -5185,7 +5128,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   />
 
                   {/* Floating Basemap Selector (Top-Left) */}
-                  <FloatingBasemapSelector />
+                  {renderFloatingBasemapSelector()}
 
                   {/* Floating map layers trigger */}
                   <button
@@ -5533,7 +5476,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   />
 
                   {/* Floating Basemap Selector (Top-Left) */}
-                  <FloatingBasemapSelector />
+                  {renderFloatingBasemapSelector()}
 
                   {/* Floating map layers trigger */}
                   <button
@@ -6595,7 +6538,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   />
 
                   {/* Floating Basemap Selector (Top-Left) */}
-                  <FloatingBasemapSelector />
+                  {renderFloatingBasemapSelector()}
 
                   {/* Floating map layers trigger */}
                   <button
@@ -6955,678 +6898,868 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               VERIFICATION
           ══════════════════════════════════════════════════════════════ */}
           {activeSidebarItem === 'analytics' && activeTab === 'verification' && (
-            <div className="p-10 space-y-10 animate-in fade-in duration-300">
-              <div>
-                <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Verification & MRV Audit Ledger</h2>
-                <p className="text-sm text-gray-500 font-medium mt-2">
-                  Measurement, Reporting, and Verification logs for smallholder groups and industrial certification.
-                </p>
-              </div>
-
-              {/* Plot selector */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {plotsData.map(plot => (
-                  <button
-                    key={plot.id}
-                    onClick={() => setSelectedVerifyPlot(plot.id)}
-                    className={`bg-white p-7 rounded-2xl border text-left shadow-sm flex flex-col gap-5 transition-all hover:shadow-md ${
-                      selectedVerifyPlot === plot.id ? 'border-green-500 ring-2 ring-green-100' : 'border-gray-100 hover:border-gray-200'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-base font-bold text-gray-900 block">{plot.id}</span>
-                        <span className="text-sm text-gray-500 font-medium block mt-1">{plot.name}</span>
-                      </div>
-                      <HealthBadge health={plot.health} />
-                    </div>
-                    <div className="w-full pt-4 border-t border-gray-100 flex justify-between items-center">
-                      <div>
-                        <span className="text-xs text-gray-400 font-medium block mb-0.5">NDVI</span>
-                        <span className="text-sm font-bold text-green-700">{plot.ndvi.toFixed(2)}</span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-gray-400 font-medium block mb-0.5">NDMI</span>
-                        <span className="text-sm font-bold text-blue-700">{plot.ndmi.toFixed(2)}</span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-gray-400 font-medium block mb-0.5">Area</span>
-                        <span className="text-sm font-bold text-gray-700">{plot.area}</span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Verification checklist */}
-              <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-8">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 pb-6 border-b border-gray-100">
-                  <div>
-                    <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                      <Shield size={18} className="text-green-600" />
-                      Verification Checklist — <span className="text-green-600">{selectedVerifyPlot}</span> {renderInfoTooltip("Verification Checklist")}</h3>
-                    <p className="text-sm text-gray-400 font-medium mt-1.5">Run interactive validation scans against satellite and cadastral data.</p>
-                  </div>
-                  <button
-                    disabled={isVerifying}
-                    onClick={triggerVerificationAudit}
-                    className="text-white font-bold text-sm px-6 py-3 rounded-xl shadow-sm transition-all disabled:opacity-50 flex items-center gap-2 hover:opacity-90 shrink-0"
-                    style={{ backgroundColor: '#16A34A' }}
-                  >
-                    {isVerifying
-                      ? <><RefreshCw className="animate-spin" size={15} /> Auditing...</>
-                      : <><Activity size={15} /> Run Validation Check</>}
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {Object.entries(verificationSteps).map(([key, step], idx) => (
-                    <div key={key} className="flex gap-5 items-start p-5 rounded-2xl bg-gray-50/60 border border-gray-100">
-                      {/* Status icon */}
-                      <div className="shrink-0 mt-0.5">
-                        {step.status === 'idle' && (
-                          <div className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-xs text-gray-400 bg-white font-bold">
-                            {idx + 1}
-                          </div>
-                        )}
-                        {step.status === 'scanning' && (
-                          <div className="w-8 h-8 rounded-full border-2 border-green-500 flex items-center justify-center bg-green-50">
-                            <RefreshCw className="animate-spin text-green-600" size={14} />
-                          </div>
-                        )}
-                        {step.status === 'success' && (
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: '#16A34A' }}>
-                            <CheckCircle2 size={15} />
-                          </div>
-                        )}
-                        {step.status === 'warning' && (
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: '#EF4444' }}>
-                            <AlertTriangle size={15} />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center gap-3">
-                          <span className="text-sm font-bold text-gray-900">{step.label}</span>
-                          <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full shrink-0 ${
-                            step.status === 'success'  ? 'bg-green-50 text-green-700' :
-                            step.status === 'warning'  ? 'bg-red-50 text-red-700' :
-                            step.status === 'scanning' ? 'bg-blue-50 text-blue-700 animate-pulse' :
-                            'bg-gray-100 text-gray-400'
-                          }`}>
-                            {step.status === 'success' ? 'Passed' : step.status === 'warning' ? 'Alert' : step.status === 'scanning' ? 'Scanning' : 'Queued'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-500 font-medium mt-1.5 leading-normal">{step.details}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {verificationStatus === 'completed' && (
-                  <div className="bg-green-50 border border-green-200 p-5 rounded-2xl flex items-start gap-4 animate-in fade-in duration-300">
-                    <Shield className="text-green-600 shrink-0 mt-0.5" size={22} />
-                    <div>
-                      <span className="text-sm font-bold text-green-800 block mb-1">Verification Complete</span>
-                      <span className="text-sm text-green-700 leading-relaxed">
-                        {selectedVerifyPlot === 'PLOT-BETA'
-                          ? 'Deforestation check passed, but moisture deficit triggers an alert. Soil health review is recommended.'
-                          : 'Plot boundaries and vegetative health indices match standard guidelines. MRV registry record has been generated.'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ── CARBON ACCOUNTING & GEOSPATIAL REGISTRY PANEL ── */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                      <Globe size={18} className="text-green-600" />
-                      Carbon Accounting & Geospatial Registry {renderInfoTooltip("Carbon Accounting & Geospatial Registry")}</h3>
-                    <span className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 uppercase">
-                      VCS Verified
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-400 font-semibold leading-relaxed">
-                    Continuous monitoring of carbon sequestration indices, baseline soil organic carbon (SOC), and canopy density mapping.
-                  </p>
-                  
-                  <div className="space-y-4 pt-2">
-                    <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <Trees size={16} className="text-green-600" />
-                        <div>
-                          <span className="text-xs font-bold text-gray-700 block">Est. Sequestration</span>
-                          <span className="text-[10px] text-gray-400">Canopy accumulation rate</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-bold text-green-700">
-                        {selectedVerifyPlot === 'PLOT-ALPHA' ? '3.42 tCO2e/HA/yr' : selectedVerifyPlot === 'PLOT-BETA' ? '1.85 tCO2e/HA/yr' : '2.94 tCO2e/HA/yr'}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <Database size={16} className="text-green-600" />
-                        <div>
-                          <span className="text-xs font-bold text-gray-700 block">Baseline Soil Carbon (SOC)</span>
-                          <span className="text-[10px] text-gray-400">Calculated via Sentinel-2 SWIR</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-bold text-gray-700">
-                        {selectedVerifyPlot === 'PLOT-ALPHA' ? '42.8 g/kg' : selectedVerifyPlot === 'PLOT-BETA' ? '31.2 g/kg' : '38.5 g/kg'}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle2 size={16} className="text-green-600" />
-                        <div>
-                          <span className="text-xs font-bold text-gray-700 block">Registry Submission</span>
-                          <span className="text-[10px] text-gray-400">VCS/Gold Standard overlap</span>
-                        </div>
-                      </div>
-                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                        selectedVerifyPlot === 'PLOT-BETA' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-green-50 text-green-700 border border-green-200'
-                      }`}>
-                        {selectedVerifyPlot === 'PLOT-BETA' ? 'Pending Review' : '100% Compliant'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── TRACEABILITY & ENVIRONMENTAL IMPACT MONITORING CHAIN ── */}
-                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                      <Shield size={18} className="text-green-600" />
-                      Traceability & Environmental Impact {renderInfoTooltip("Traceability & Environmental Impact")}</h3>
-                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 uppercase">
-                      Deforestation Free
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-400 font-semibold leading-relaxed">
-                    End-to-end supply chain validation tracking biomass origin from coordinates to certification.
-                  </p>
-
-                  <div className="relative pl-6 border-l border-gray-200 ml-3 space-y-5 pt-2">
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0.5 w-4 h-4 rounded-full bg-green-500 border border-green-600 flex items-center justify-center shadow-sm">
-                        <Check size={8} className="text-white" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-gray-800 block">GPS Boundary Validation</span>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Plot perimeter overlap verified within Cadastral registry with zero spatial buffer conflicts.</p>
-                      </div>
-                    </div>
-
-                     <div className="relative space-y-3">
-                      <div className="absolute -left-[30px] top-0.5 w-4 h-4 rounded-full bg-green-500 border border-green-600 flex items-center justify-center shadow-sm">
-                        <Check size={8} className="text-white" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-gray-800 block">EUDR Compliance Scan</span>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Deforestation compliance verified. Continuous multi-sensor canopy monitoring registers no forest-clearing events.</p>
-                      </div>
-
-                      {/* Side-by-Side Co-Evidence Display */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                        {/* Optical Co-Evidence Card */}
-                        <div className="bg-emerald-950/90 text-white rounded-xl p-3 border border-emerald-500/20 space-y-2 shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">Optical NIR Evidence</span>
-                            <span className="text-[8px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded border border-green-500/30">PASS</span>
-                          </div>
-                          <div className="space-y-1">
-                            <div className="text-[10px] font-bold text-gray-200">Sentinel-2 Canopy Vigour</div>
-                            <div className="text-[9px] text-gray-300 leading-tight">
-                              NDVI: <span className="font-mono text-green-400 font-bold">0.72</span> (Threshold &gt; 0.50)
-                            </div>
-                            <div className="text-[9px] text-gray-400 leading-relaxed">Sustained optical canopy coverage baseline validated.</div>
-                          </div>
-                        </div>
-
-                        {/* SAR Co-Evidence Card */}
-                        <div className="bg-emerald-950/90 text-white rounded-xl p-3 border border-emerald-500/20 space-y-2 shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">SAR InSAR Evidence</span>
-                            <span className="text-[8px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded border border-green-500/30">PASS</span>
-                          </div>
-                          <div className="space-y-1">
-                            <div className="text-[10px] font-bold text-gray-200">Sentinel-1 Coherence (γ)</div>
-                            <div className="text-[9px] text-gray-300 leading-tight">
-                              Coherence: <span className="font-mono text-green-400 font-bold">0.81</span> (Threshold &gt; 0.40)
-                            </div>
-                            <div className="text-[9px] text-gray-400 leading-relaxed">Zero phase stability decorrelation detected across pairs.</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Combined Confidence Banner */}
-                      <div className="bg-emerald-950/40 border border-emerald-500/20 rounded-xl p-2.5 flex items-center justify-between text-[9px] text-emerald-300 font-bold">
-                        <span>Combined Confidence Score:</span>
-                        <span className="bg-emerald-400/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-400/20">VERY HIGH CONFIDENCE (92% Accuracy)</span>
-                      </div>
-                    </div>
-
-
-                    <div className="relative">
-                      <div className={`absolute -left-[30px] top-0.5 w-4 h-4 rounded-full border border-white flex items-center justify-center shadow-sm ${
-                        selectedVerifyPlot === 'PLOT-BETA' ? 'bg-amber-500 animate-pulse' : 'bg-green-500'
-                      }`}>
-                        <Check size={8} className="text-white" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-gray-800 block">Climate-Smart Practices Audit</span>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                          {selectedVerifyPlot === 'PLOT-BETA' 
-                            ? 'Moisture stress anomaly detected in canopy index. Review of sub-surface cover status recommended.'
-                            : 'Optimal intercropping and canopy coverage ratios match required VCS climate-smart guidelines.'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <div className="p-10 space-y-10 animate-in fade-in duration-300" />
           )}
 
           {/* ══════════════════════════════════════════════════════════════
               REPORTS
           ══════════════════════════════════════════════════════════════ */}
-          {activeSidebarItem === 'analytics' && activeTab === 'reports' && (
-            <div className="p-10 space-y-10 animate-in fade-in duration-300">
-              <div>
-                <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Analytical Ledger Reports</h2>
-                <p className="text-sm text-gray-500 font-medium mt-2">
-                  Export verified geospatial datasets, CSV ledger tables, and printable PDF documents.
-                </p>
-              </div>
+          {activeSidebarItem === 'analytics' && activeTab === 'reports' && (() => {
+            const isWholeFarm = reportPlot === 'WHOLE-FARM';
+            const showAllPages = (selectedThemeReport || reportIndex) === 'ALL';
+            const showHealthPage = showAllPages || (selectedThemeReport || reportIndex) === 'NDVI';
+            const showClimatePage = showAllPages || (selectedThemeReport || reportIndex) === 'NDMI';
+            const showHydrologyPage = showAllPages || (selectedThemeReport || reportIndex) === 'NDWI';
+            const showCarbonPage = showAllPages || (selectedThemeReport || reportIndex) === 'SOC' || (selectedThemeReport || reportIndex) === 'AGB';
+            
+            const totalPages = 1 + (showHealthPage ? 1 : 0) + (showClimatePage ? 1 : 0) + (showHydrologyPage ? 1 : 0) + (showCarbonPage ? 1 : 0);
+            let pageCounter = 0;
 
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
-                {/* Config card */}
-                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-6">
-                  <h3 className="text-base font-bold text-gray-900 pb-4 border-b border-gray-100 flex items-center gap-2.5">
-                    <Settings2 size={18} className="text-green-600" />
-                    Configure Report
-                  </h3>
-                  <div className="space-y-5">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Report Scope</label>
-                      <select
-                        value={reportPlot}
-                        onChange={(e) => setReportPlot(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 text-sm font-semibold outline-none cursor-pointer focus:border-green-500 text-gray-700"
-                      >
-                        <option value="WHOLE-FARM">Whole Farm (Aggregate)</option>
-                        <option value="PLOT-ALPHA">PLOT-ALPHA — West Valley Plot</option>
-                        <option value="PLOT-BETA">PLOT-BETA — East Ridge Plot</option>
-                        <option value="PLOT-GAMMA">PLOT-GAMMA — South Slope Plot</option>
-                      </select>
+            const chartOptions = {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                y: { grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 9, weight: '600' } } },
+                x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' } } }
+              }
+            };
+
+            const getMetricChartData = (index, plot) => {
+              const plotName = plot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : plot;
+              const isPlotWholeFarm = plotName === 'Whole Farm (Aggregate)';
+              const labels = isPlotWholeFarm 
+                ? ['West Valley (Plot Alpha)', 'East Ridge (Plot Beta)', 'South Slope (Plot Gamma)']
+                : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'];
+                
+              const data = (() => {
+                if (isPlotWholeFarm) {
+                  if (index === 'SOC') return [42.8, 31.2, 38.5];
+                  if (index === 'AGB') return [124.5, 82.4, 105.8];
+                  if (index === 'NDVI') return [0.76, 0.45, 0.62];
+                  if (index === 'NDMI') return [0.42, 0.30, 0.36];
+                  if (index === 'NDWI') return [0.38, 0.25, 0.32];
+                  return [0.38, 0.25, 0.32];
+                }
+                return TIMELINE_DATA.map((t, idx) => {
+                  const baseVal = index === 'SOC' ? (plotName === 'PLOT-ALPHA' ? 42.8 : plotName === 'PLOT-BETA' ? 31.2 : 38.5)
+                                 : index === 'AGB' ? (plotName === 'PLOT-ALPHA' ? 124.5 : plotName === 'PLOT-BETA' ? 82.4 : 105.8)
+                                 : index === 'NDVI' ? t.ndvi
+                                 : t.ndmi;
+                  if (index === 'SOC' || index === 'AGB') {
+                    return parseFloat((baseVal * (0.95 + idx * 0.025)).toFixed(1));
+                  }
+                  const offset = plotName === 'PLOT-ALPHA' ? 0.04 : plotName === 'PLOT-BETA' ? -0.15 : -0.05;
+                  return parseFloat((baseVal + offset).toFixed(2));
+                });
+              })();
+
+              return {
+                labels,
+                datasets: [{
+                  label: `${index} Value`,
+                  data,
+                  backgroundColor: isPlotWholeFarm 
+                    ? ['rgba(22, 163, 74, 0.85)', 'rgba(234, 179, 8, 0.85)', 'rgba(2, 132, 199, 0.85)']
+                    : 'rgba(22, 163, 74, 0.1)',
+                  borderColor: isPlotWholeFarm ? '#ffffff' : '#16A34A',
+                  borderWidth: isPlotWholeFarm ? 0 : 2.5,
+                  fill: !isPlotWholeFarm,
+                  tension: 0.3,
+                  pointRadius: 3
+                }]
+              };
+            };
+
+            const renderCoverPage = () => {
+              pageCounter++;
+              const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
+              const reportType = generatedReport ? generatedReport.index : (selectedThemeReport || reportIndex);
+              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+              const reportDate = generatedReport ? generatedReport.date : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+              return (
+                <div className="w-full max-w-[700px] aspect-[1/1.414] bg-white border border-gray-200 shadow-md p-12 flex flex-col justify-between relative report-page-break mx-auto select-none">
+                  <div className="flex justify-between items-center pb-4 border-b border-gray-100 text-[9px] font-bold text-gray-450 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5">
+                      <Satellite size={12} className="text-green-600" />
+                      <span>Farmintelytics Spatial MRV Audit</span>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Analytical Metric</label>
-                      <select
-                        value={reportIndex}
-                        onChange={(e) => setReportIndex(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 text-sm font-semibold outline-none cursor-pointer focus:border-green-500 text-gray-700"
-                      >
-                        <option value="NDVI">NDVI — Vegetation Health</option>
-                        <option value="NDMI">NDMI — Soil Moisture</option>
-                        <option value="NDWI">NDWI — Water Hydrology</option>
-                        <option value="SOC">SOC — Soil Organic Carbon</option>
-                        <option value="AGB">AGB — Aboveground Biomass Carbon</option>
-                      </select>
+                    <span>Confidential Document</span>
+                  </div>
+
+                  <div className="my-auto space-y-8 text-center">
+                    <div className="w-20 h-20 bg-green-50 border border-green-500/10 rounded-3xl flex items-center justify-center text-green-600 mx-auto shadow-sm">
+                      <Satellite size={36} />
                     </div>
-                    <button
-                      onClick={triggerReportGeneration}
-                      disabled={isGeneratingReport}
-                      className="w-full text-white font-bold text-sm py-3.5 rounded-xl shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2.5 hover:opacity-90"
-                      style={{ backgroundColor: '#16A34A' }}
-                    >
-                      {isGeneratingReport
-                        ? <><RefreshCw className="animate-spin" size={15} /> Generating...</>
-                        : <><Download size={15} /> Generate Report PDF</>}
-                    </button>
+                    
+                    <div className="space-y-3">
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-green-700 bg-green-50 border border-green-150 px-3 py-1 rounded-full">
+                        Verified Compliance Certificate
+                      </span>
+                      <h3 className="text-3xl font-black text-gray-900 tracking-tight leading-tight pt-2">
+                        SPATIAL ENVIRONMENTAL AUDIT & REGISTRY REPORT
+                      </h3>
+                      <p className="text-sm text-gray-400 font-semibold max-w-md mx-auto leading-relaxed">
+                        Continuous satellite observation, biophysical metric ledgers, and carbon stock calculations.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 max-w-md mx-auto bg-gray-50/50 p-5 rounded-2xl border border-gray-150 text-left">
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-black uppercase tracking-wider block">Scope Target</span>
+                        <span className="text-xs font-bold text-gray-800">{plotName}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-black uppercase tracking-wider block">Report Category</span>
+                        <span className="text-xs font-bold text-gray-800">
+                          {reportType === 'ALL' ? 'Complete Farm Ledger' : `${reportType} Index Audit`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-black uppercase tracking-wider block">Document ID</span>
+                        <span className="text-xs font-mono font-bold text-gray-800">{reportId}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-black uppercase tracking-wider block">Compiled At</span>
+                        <span className="text-xs font-bold text-gray-800">{reportDate}</span>
+                      </div>
+                      <div className="col-span-2 border-t border-gray-150 pt-3 flex justify-between items-center">
+                        <div>
+                          <span className="text-[9px] text-gray-455 font-black uppercase tracking-wider block">MRV Compliance Status</span>
+                          <span className="text-xs font-bold text-green-700 flex items-center gap-1 mt-0.5">
+                            <CheckCircle2 size={11} className="text-green-600" /> Approved & Signed
+                          </span>
+                        </div>
+                        <span className="text-[8px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded border uppercase">
+                          VCS Standard
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-4 border-t border-gray-100 text-[8px] font-bold text-gray-400 uppercase tracking-wider">
+                    <span>FARMINTELYTICS WEBPORTAL v3.2</span>
+                    <span className="text-green-600">Certified Deforestation-Free</span>
+                    <span>Page {pageCounter} of {totalPages}</span>
+                  </div>
+                </div>
+              );
+            };
+
+            const renderHealthPage = () => {
+              pageCounter++;
+              const healthData = getMetricChartData('NDVI', reportPlot);
+              const isStressed = reportPlot === 'PLOT-BETA';
+              const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
+              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+              
+              return (
+                <div className="w-full max-w-[700px] aspect-[1/1.414] bg-white border border-gray-200 shadow-md p-12 flex flex-col justify-between relative report-page-break mx-auto select-none">
+                  <div className="flex justify-between items-center pb-4 border-b border-gray-100 text-[9px] font-bold text-gray-455 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5">
+                      <Satellite size={12} className="text-green-600" />
+                      <span>01. Vegetation Health Assessment</span>
+                    </div>
+                    <span>ID: {reportId}</span>
+                  </div>
+
+                  <div className="my-auto space-y-6 flex-1 pt-6 text-left">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-lg font-black text-gray-900 tracking-tight">CROP VEGETATION VIGOR & HEALTH STATUS</h4>
+                        <p className="text-xs text-gray-400 font-semibold mt-1">Satellite derived NDVI analysis mapping canopy health distribution.</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                        isStressed ? 'bg-amber-55/60 text-amber-800 border border-amber-200' : 'bg-green-50 text-green-700 border border-green-200'
+                      }`}>
+                        {isStressed ? 'Warning (Stress)' : 'Optimal Performance'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-bold text-gray-405 uppercase tracking-wider block">Temporal Trend Line</span>
+                      <div className="h-[180px] w-full bg-gray-50 border border-gray-100 p-4 rounded-2xl relative">
+                        {isWholeFarm ? (
+                          <Bar data={healthData} options={chartOptions} />
+                        ) : (
+                          <Line data={healthData} options={chartOptions} />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      <div>
+                        <span className="text-[9px] text-gray-450 font-bold uppercase block">Mean NDVI</span>
+                        <span className="text-base font-black text-gray-800 mt-1 block">
+                          {isWholeFarm ? '0.61' : reportPlot === 'PLOT-ALPHA' ? '0.76' : reportPlot === 'PLOT-BETA' ? '0.45' : '0.62'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-bold uppercase block">Active Chlorophyll</span>
+                        <span className="text-base font-black text-gray-850 mt-1 block">
+                          {isWholeFarm ? '0.55 GCVI' : reportPlot === 'PLOT-ALPHA' ? '0.72 GCVI' : '0.41 GCVI'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-bold uppercase block">Zonal Coverage</span>
+                        <span className="text-base font-black text-green-700 mt-1 block">
+                          {isStressed ? '68.4%' : '94.2%'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-green-50/40 border border-green-100 rounded-xl space-y-1.5">
+                      <span className="text-[9px] font-extrabold uppercase tracking-wider text-green-800 flex items-center gap-1.5">
+                        <Sparkles size={11} className="text-green-600" /> Agronomic Assessment
+                      </span>
+                      <p className="text-xs text-green-700 font-semibold leading-relaxed">
+                        {isWholeFarm 
+                          ? 'Spatial verification of the Whole Farm indicates high performance across the primary vegetative bands. West Valley (Plot Alpha) leads with optimal carbon density. East Ridge (Plot Beta) continues to register minor moisture stress anomalies.'
+                          : isStressed
+                            ? 'Plot Beta (East Ridge) reveals suppressed moisture index levels. Vegetative health remains moderate, but root-zone transpiration stress is elevated. Recommendation: Increase irrigation frequency by 25%.'
+                            : 'Diagnostic review of this plot shows optimal vegetation vigor. Canopy density trajectories remain stable with zero forest loss anomalies.'
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-4 border-t border-gray-100 text-[8px] font-bold text-gray-400 uppercase tracking-wider">
+                    <span>Plot: {plotName}</span>
+                    <span className="text-green-600">Compliance Audit Approved</span>
+                    <span>Page {pageCounter} of {totalPages}</span>
+                  </div>
+                </div>
+              );
+            };
+
+            const renderClimatePage = () => {
+              pageCounter++;
+              const climateData = getMetricChartData('NDMI', reportPlot);
+              const isStressed = reportPlot === 'PLOT-BETA';
+              const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
+              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+
+              return (
+                <div className="w-full max-w-[700px] aspect-[1/1.414] bg-white border border-gray-200 shadow-md p-12 flex flex-col justify-between relative report-page-break mx-auto select-none">
+                  <div className="flex justify-between items-center pb-4 border-b border-gray-100 text-[9px] font-bold text-gray-450 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5">
+                      <CloudRain size={12} className="text-green-600" />
+                      <span>02. Microclimate & Soil Moisture Profile</span>
+                    </div>
+                    <span>ID: {reportId}</span>
+                  </div>
+
+                  <div className="my-auto space-y-6 flex-1 pt-6 text-left">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-lg font-black text-gray-900 tracking-tight">CANOPY MOISTURE & TRANSPIRATION INDEX</h4>
+                        <p className="text-xs text-gray-400 font-semibold mt-1">Root-zone water content tracking (NDMI) combined with meteorology logs.</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                        isStressed ? 'bg-red-50 text-red-700 border border-red-200 animate-pulse' : 'bg-green-50 text-green-700 border border-green-200'
+                      }`}>
+                        {isStressed ? 'Deficit Alert' : 'Moisture Adequate'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-bold text-gray-450 uppercase tracking-wider block">NDMI Soil Moisture Trend</span>
+                      <div className="h-[180px] w-full bg-gray-55 border border-gray-100 p-4 rounded-2xl relative">
+                        {isWholeFarm ? (
+                          <Bar data={climateData} options={chartOptions} />
+                        ) : (
+                          <Line data={climateData} options={chartOptions} />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-center">
+                        <span className="text-[8px] text-gray-400 font-bold uppercase block">Mean NDMI</span>
+                        <span className="text-xs font-black text-gray-800 mt-1 block">
+                          {reportPlot === 'PLOT-ALPHA' ? '0.42' : reportPlot === 'PLOT-BETA' ? '0.30' : '0.36'}
+                        </span>
+                      </div>
+                      <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-center">
+                        <span className="text-[8px] text-gray-400 font-bold uppercase block">Soil Temp</span>
+                        <span className="text-xs font-black text-gray-800 mt-1 block">
+                          {reportPlot === 'PLOT-BETA' ? '28.5 °C' : '24.2 °C'}
+                        </span>
+                      </div>
+                      <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-center">
+                        <span className="text-[8px] text-gray-400 font-bold uppercase block">VPD Stress</span>
+                        <span className="text-xs font-black text-gray-800 mt-1 block">
+                          {reportPlot === 'PLOT-BETA' ? '2.3 kPa' : '1.4 kPa'}
+                        </span>
+                      </div>
+                      <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-center">
+                        <span className="text-[8px] text-gray-400 font-bold uppercase block">Rainfall</span>
+                        <span className="text-xs font-black text-blue-700 mt-1 block">
+                          {reportPlot === 'PLOT-BETA' ? '22 mm' : '38 mm'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-gray-55 border border-gray-150 rounded-xl space-y-1.5">
+                      <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-700 block">Hydrological Summary</span>
+                      <p className="text-xs text-gray-500 font-semibold leading-relaxed">
+                        {isStressed 
+                          ? 'Root-zone water stress is elevated due to suppressed precipitation in the East Ridge sector. Immediate cover-cropping and crop mulching recommended to retain sub-surface soil hydration.'
+                          : 'Soil moisture profiles sit within stable margins. Leaf stomatal conductance is optimal, indicating healthy plant transpiration rates with no active drought markers.'
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-4 border-t border-gray-100 text-[8px] font-bold text-gray-400 uppercase tracking-wider">
+                    <span>Plot: {plotName}</span>
+                    <span className="text-green-600">Meteorological Validation Log</span>
+                    <span>Page {pageCounter} of {totalPages}</span>
+                  </div>
+                </div>
+              );
+            };
+
+            const renderHydrologyPage = () => {
+              pageCounter++;
+              const hydrologyData = getMetricChartData('NDWI', reportPlot);
+              const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
+              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+
+              return (
+                <div className="w-full max-w-[700px] aspect-[1/1.414] bg-white border border-gray-200 shadow-md p-12 flex flex-col justify-between relative report-page-break mx-auto select-none">
+                  <div className="flex justify-between items-center pb-4 border-b border-gray-100 text-[9px] font-bold text-gray-450 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5">
+                      <Waves size={12} className="text-green-600" />
+                      <span>03. Water Hydrology Report</span>
+                    </div>
+                    <span>ID: {reportId}</span>
+                  </div>
+
+                  <div className="my-auto space-y-6 flex-1 pt-6 text-left">
+                    <div>
+                      <h4 className="text-lg font-black text-gray-900 tracking-tight">WATER STRESS & CANOPY WATER INDEX</h4>
+                      <p className="text-xs text-gray-400 font-semibold mt-1">Spatial hydrology mapping (NDWI) certifying canopy moisture levels.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-bold text-gray-455 uppercase tracking-wider block">NDWI Hydrological Index Profile</span>
+                      <div className="h-[180px] w-full bg-gray-55 border border-gray-100 p-4 rounded-2xl relative">
+                        {isWholeFarm ? (
+                          <Bar data={hydrologyData} options={chartOptions} />
+                        ) : (
+                          <Line data={hydrologyData} options={chartOptions} />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-bold uppercase block">Mean NDWI</span>
+                        <span className="text-sm font-black text-gray-800 mt-1 block">
+                          {reportPlot === 'PLOT-ALPHA' ? '0.38' : reportPlot === 'PLOT-BETA' ? '0.25' : '0.32'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-bold uppercase block">Evapotranspiration Deficit</span>
+                        <span className="text-sm font-black text-red-650 mt-1 block">
+                          {reportPlot === 'PLOT-BETA' ? '45% Deficit' : 'Optimal'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
+                      <span className="text-[9px] font-black uppercase text-gray-455 tracking-wider block">Security Hash & Signatures</span>
+                      <div className="flex justify-between items-center text-[10px] text-gray-550 font-semibold">
+                        <div>
+                          <span className="block font-mono text-[9px] text-gray-400">Node ID: Abeokuta-S2-085A</span>
+                          <span className="block font-mono text-[9px] text-gray-400">Digital Signature: SHA-256: 4e99fca1b32d29e</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="block text-gray-850 font-extrabold">Samuel (Lead GIS)</span>
+                          <span className="block text-[8px] text-green-600 uppercase">Electronically Signed</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-4 border-t border-gray-100 text-[8px] font-bold text-gray-450 uppercase tracking-wider">
+                    <span>Registry: VCS & Gold Standard compliant</span>
+                    <span className="text-green-600">Deforestation Free Verified</span>
+                    <span>Page {pageCounter} of {totalPages}</span>
+                  </div>
+                </div>
+              );
+            };
+
+            const renderCarbonPage = () => {
+              pageCounter++;
+              const carbonData = getMetricChartData('SOC', reportPlot);
+              const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
+              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+
+              return (
+                <div className="w-full max-w-[700px] aspect-[1/1.414] bg-white border border-gray-200 shadow-md p-12 flex flex-col justify-between relative report-page-break mx-auto select-none">
+                  <div className="flex justify-between items-center pb-4 border-b border-gray-100 text-[9px] font-bold text-gray-455 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5">
+                      <Globe size={12} className="text-green-600" />
+                      <span>04. Carbon Sequestration & Soil Chemistry</span>
+                    </div>
+                    <span>ID: {reportId}</span>
+                  </div>
+
+                  <div className="my-auto space-y-6 flex-1 pt-6 text-left">
+                    <div>
+                      <h4 className="text-lg font-black text-gray-900 tracking-tight">SOIL ORGANIC CARBON & ABOVEGROUND BIOMASS</h4>
+                      <p className="text-xs text-gray-400 font-semibold mt-1">Verification of baseline carbon reserves and annual wood biomass changes.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-bold text-gray-450 uppercase tracking-wider block">Carbon Accumulation Chart</span>
+                      <div className="h-[180px] w-full bg-gray-50 border border-gray-100 p-4 rounded-2xl relative">
+                        <Bar data={carbonData} options={chartOptions} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-bold uppercase block">Baseline Soil Carbon (SOC)</span>
+                        <span className="text-sm font-black text-gray-800 mt-1 block">
+                          {reportPlot === 'PLOT-ALPHA' ? '42.8 g/kg' : reportPlot === 'PLOT-BETA' ? '31.2 g/kg' : '38.5 g/kg'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-gray-455 font-bold uppercase block">Aboveground Biomass (AGB)</span>
+                        <span className="text-sm font-black text-gray-800 mt-1 block">
+                          {reportPlot === 'PLOT-ALPHA' ? '124.5 tCO2e' : reportPlot === 'PLOT-BETA' ? '82.4 tCO2e' : '105.8 tCO2e'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
+                    <span className="text-[9px] font-black uppercase text-gray-455 tracking-wider block">Security Hash & Signatures</span>
+                    <div className="flex justify-between items-center text-[10px] text-gray-550 font-semibold">
+                      <div>
+                        <span className="block font-mono text-[9px] text-gray-400">Node ID: Abeokuta-S2-085A</span>
+                        <span className="block font-mono text-[9px] text-gray-400">Digital Signature: SHA-256: 4e99fca1b32d29e</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="block text-gray-850 font-extrabold">Samuel (Lead GIS)</span>
+                        <span className="block text-[8px] text-green-600 uppercase">Electronically Signed</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-4 border-t border-gray-100 text-[8px] font-bold text-gray-450 uppercase tracking-wider">
+                    <span>Registry: VCS & Gold Standard compliant</span>
+                    <span className="text-green-600">Deforestation Free Verified</span>
+                    <span>Page {pageCounter} of {totalPages}</span>
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <div className="p-10 space-y-10 animate-in fade-in duration-300">
+                {/* Dynamic stylesheet for PDF print overrides */}
+                <style>{`
+                  @media print {
+                    /* Hide all UI containers */
+                    body * {
+                      visibility: hidden !important;
+                    }
+                    /* Show only the printable pages block */
+                    .printable-report-area, .printable-report-area * {
+                      visibility: visible !important;
+                    }
+                    .printable-report-area {
+                      position: absolute !important;
+                      left: 0 !important;
+                      top: 0 !important;
+                      width: 100% !important;
+                      max-width: 100% !important;
+                      margin: 0 !important;
+                      padding: 0 !important;
+                      background: white !important;
+                      border: none !important;
+                      box-shadow: none !important;
+                    }
+                    /* Format each page as A4 size and force break */
+                    .report-page-break {
+                      page-break-after: always !important;
+                      break-after: page !important;
+                      margin: 0 !important;
+                      border: none !important;
+                      box-shadow: none !important;
+                      padding: 2.5cm !important;
+                      width: 100% !important;
+                      height: 297mm !important;
+                      box-sizing: border-box !important;
+                      display: flex !important;
+                      flex-direction: column !important;
+                      justify-content: space-between !important;
+                      background: white !important;
+                    }
+                    .no-print {
+                      display: none !important;
+                    }
+                  }
+                `}</style>
+
+                <div className="flex justify-between items-center no-print">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Analytical Ledger Reports</h2>
+                    <p className="text-sm text-gray-500 font-medium mt-2">
+                      Export verified geospatial datasets, CSV ledger tables, and printable PDF documents.
+                    </p>
                   </div>
                 </div>
 
-                {/* Result card */}
-                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm xl:col-span-2 min-h-[360px] flex flex-col justify-center items-center">
-                  {isGeneratingReport && (
-                    <div className="w-full max-w-md space-y-6 animate-in fade-in duration-200 text-center">
-                      <div className="w-16 h-16 bg-green-50 border border-green-100 rounded-2xl flex items-center justify-center text-green-600 mx-auto">
-                        <RefreshCw className="animate-spin" size={24} />
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+                  {/* ── CONFIGURATION PANEL (Left side, 1/3 width) ── */}
+                  <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-6 no-print">
+                    <h3 className="text-base font-bold text-gray-900 pb-4 border-b border-gray-100 flex items-center gap-2.5">
+                      <Settings2 size={18} className="text-green-600" />
+                      Configure Report
+                    </h3>
+                    <div className="space-y-5">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Report Scope</label>
+                        <select
+                          value={reportPlot}
+                          onChange={(e) => {
+                            setReportPlot(e.target.value);
+                            setSelectedThemeReport('');
+                          }}
+                          className="w-full bg-gray-55 border border-gray-200 rounded-xl py-3 px-4 text-sm font-semibold outline-none cursor-pointer focus:border-green-500 text-gray-700"
+                        >
+                          <option value="WHOLE-FARM">Whole Farm (Aggregate)</option>
+                          <option value="PLOT-ALPHA">PLOT-ALPHA — West Valley Plot</option>
+                          <option value="PLOT-BETA">PLOT-BETA — East Ridge Plot</option>
+                          <option value="PLOT-GAMMA">PLOT-GAMMA — South Slope Plot</option>
+                        </select>
                       </div>
-                      <div className="space-y-1.5">
-                        <h4 className="text-base font-bold text-gray-800">Processing Spatial Report</h4>
-                        <p className="text-sm text-gray-400">{reportProgressText}</p>
-                      </div>
-                      <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${reportProgress}%`, backgroundColor: '#16A34A' }}></div>
-                      </div>
-                      <span className="text-sm font-bold text-green-700">{reportProgress}% complete</span>
-                    </div>
-                  )}
-                  {!isGeneratingReport && !generatedReport && (
-                    <div className="text-center space-y-3 py-10">
-                      <FileSpreadsheet size={48} className="text-gray-300 mx-auto" />
-                      <h4 className="text-base font-bold text-gray-500 mt-2">No Report Generated Yet</h4>
-                      <p className="text-sm text-gray-400 max-w-xs leading-relaxed mx-auto">
-                        Configure the details on the left and click Generate to create a verified PDF audit sheet.
-                      </p>
-                    </div>
-                  )}
-                  {!isGeneratingReport && generatedReport && (() => {
-                    const isWholeFarm = reportPlot === 'WHOLE-FARM';
-                    
-                    const chartData = {
-                      labels: isWholeFarm 
-                        ? ['West Valley (Plot Alpha)', 'East Ridge (Plot Beta)', 'South Slope (Plot Gamma)']
-                        : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                      datasets: [{
-                        label: `${reportIndex} Value`,
-                        data: isWholeFarm 
-                          ? (() => {
-                              if (reportIndex === 'SOC') return [42.8, 31.2, 38.5];
-                              if (reportIndex === 'AGB') return [124.5, 82.4, 105.8];
-                              if (reportIndex === 'NDVI') return [0.76, 0.45, 0.62];
-                              if (reportIndex === 'NDMI') return [0.42, 0.30, 0.36];
-                              return [0.38, 0.25, 0.32];
-                            })()
-                          : TIMELINE_DATA.map((t, idx) => {
-                              const baseVal = reportIndex === 'SOC' ? (reportPlot === 'PLOT-ALPHA' ? 42.8 : reportPlot === 'PLOT-BETA' ? 31.2 : 38.5)
-                                             : reportIndex === 'AGB' ? (reportPlot === 'PLOT-ALPHA' ? 124.5 : reportPlot === 'PLOT-BETA' ? 82.4 : 105.8)
-                                             : reportIndex === 'NDVI' ? t.ndvi
-                                             : t.ndmi;
-                              if (reportIndex === 'SOC' || reportIndex === 'AGB') {
-                                return parseFloat((baseVal * (0.95 + idx * 0.025)).toFixed(1));
-                              }
-                              const offset = reportPlot === 'PLOT-ALPHA' ? 0.04 : reportPlot === 'PLOT-BETA' ? -0.15 : -0.05;
-                              return parseFloat((baseVal + offset).toFixed(2));
-                            }),
-                        backgroundColor: isWholeFarm 
-                          ? ['rgba(22, 163, 74, 0.85)', 'rgba(234, 179, 8, 0.85)', 'rgba(2, 132, 199, 0.85)']
-                          : 'rgba(22, 163, 74, 0.1)',
-                        borderColor: isWholeFarm ? '#ffffff' : '#16A34A',
-                        borderWidth: isWholeFarm ? 0 : 2.5,
-                        fill: !isWholeFarm,
-                        tension: 0.3,
-                        pointRadius: 3
-                      }]
-                    };
-
-                    const chartOptions = {
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                        y: { grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 10, weight: '605' } } },
-                        x: { grid: { display: false }, ticks: { font: { size: 10, weight: '605' } } }
-                      }
-                    };
-
-                    const getReportInsight = () => {
-                      const scopeText = isWholeFarm ? 'the Whole Farm aggregate' : `Plot ${reportPlot}`;
-                      const metricName = {
-                        NDVI: 'Vegetation Vigor (NDVI)',
-                        NDMI: 'Soil Canopy Moisture (NDMI)',
-                        NDWI: 'Water Hydrology (NDWI)',
-                        SOC: 'Soil Organic Carbon (SOC)',
-                        AGB: 'Aboveground Biomass (AGB)'
-                      }[reportIndex] || reportIndex;
                       
-                      if (isWholeFarm) {
-                        return `Spatial verification of the Whole Farm indicates high performance across the primary vegetative bands. West Valley (Plot Alpha) leads with optimal carbon density. East Ridge (Plot Beta) continues to register minor moisture stress anomalies. Overall forest canopy coverage complies with the EUDR regulatory baseline, confirming 100% deforestation-free integrity.`;
-                      }
-                      if (reportPlot === 'PLOT-BETA') {
-                        return `Spatial audit of Plot Beta (East Ridge) reveals suppressed moisture index levels. Vegetative health remains moderate, but root-zone transpiration stress is elevated. Recommendation: Increase irrigation frequency by 25% and introduce multi-species cover crop systems to prevent further degradation.`;
-                      }
-                      return `Diagnostic review of ${scopeText} shows optimal values for ${metricName}. Canopy density trajectories remain stable with zero forest loss anomalies. The plot is verified compliant with carbon registry baselines and is recommended for VCS credit issuance.`;
-                    };
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-450 uppercase tracking-wider block">Report Type</label>
+                        <select
+                          value={selectedThemeReport || reportIndex}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val.startsWith('theme')) {
+                              setSelectedThemeReport(val);
+                              if (val === 'theme1') {
+                                setReportPlot('PLOT-ALPHA');
+                                setReportIndex('SOC');
+                                triggerReportGeneration('PLOT-ALPHA', 'SOC');
+                              } else if (val === 'theme2') {
+                                setReportPlot('PLOT-ALPHA');
+                                setReportIndex('NDMI');
+                                triggerReportGeneration('PLOT-ALPHA', 'NDMI');
+                              } else if (val === 'theme3') {
+                                setReportPlot('PLOT-GAMMA');
+                                setReportIndex('AGB');
+                                triggerReportGeneration('PLOT-GAMMA', 'AGB');
+                              } else if (val === 'theme4') {
+                                setReportPlot('PLOT-ALPHA');
+                                setReportIndex('NDVI');
+                                triggerReportGeneration('PLOT-ALPHA', 'NDVI');
+                              }
+                            } else {
+                              setSelectedThemeReport('');
+                              setReportIndex(val);
+                            }
+                          }}
+                          className="w-full bg-gray-55 border border-gray-200 rounded-xl py-3 px-4 text-sm font-semibold outline-none cursor-pointer focus:border-green-500 text-gray-700"
+                        >
+                          <optgroup label="Standard Analytical Metrics">
+                            <option value="NDVI">Health Status Report</option>
+                            <option value="NDMI">Climate & Soil Moisture Report</option>
+                            <option value="NDWI">Water Hydrology Report</option>
+                            <option value="SOC">Soil Organic Carbon Report</option>
+                            <option value="AGB">Aboveground Biomass Carbon Report</option>
+                            <option value="ALL">Complete Farm Ledger (All Reports)</option>
+                          </optgroup>
+                          <optgroup label="Pre-compiled Sustainability Reports">
+                            <option value="theme1">Carbon Credits & Climate-Smart Ag</option>
+                            <option value="theme2">Agroforestry & Land Restoration</option>
+                            <option value="theme3">Carbon Accounting & Verification</option>
+                            <option value="theme4">Traceability & Env. Impact</option>
+                          </optgroup>
+                        </select>
+                      </div>
 
-                    return (
-                      <div className="w-full space-y-8 animate-in fade-in duration-300">
-                        {/* Premium Header */}
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center pb-5 border-b border-gray-100 gap-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-600 shrink-0">
-                              <FileText size={20} />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-bold text-gray-900">Farmintelytics Spatial MRV Certificate</h4>
-                              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mt-0.5">Voluntary Carbon & Forest Registry Document</p>
-                            </div>
+                      <button
+                        onClick={() => triggerReportGeneration()}
+                        disabled={isGeneratingReport}
+                        className="w-full text-white font-bold text-sm py-3.5 rounded-xl shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-98"
+                        style={{ backgroundColor: '#16A34A' }}
+                      >
+                        {isGeneratingReport
+                          ? <><RefreshCw className="animate-spin" size={15} /> Generating...</>
+                          : <><Download size={15} /> Generate Report PDF</>}
+                      </button>
+                      
+                      {generatedReport && (
+                        <button
+                          onClick={() => window.print()}
+                          className="w-full text-gray-755 border border-gray-300 font-bold text-sm py-3.5 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2.5 hover:bg-gray-55 active:scale-98"
+                        >
+                          <Download size={15} /> Download PDF
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── REPORT DOCUMENT PAGES VIEW (Right side, 2/3 width) ── */}
+                  <div className="xl:col-span-2 space-y-6">
+                    
+                    {isGeneratingReport && (
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm min-h-[500px] flex flex-col justify-center items-center no-print">
+                        <div className="w-full max-w-md space-y-6 text-center">
+                          <div className="w-16 h-16 bg-green-50 border border-green-100 rounded-2xl flex items-center justify-center text-green-600 mx-auto">
+                            <RefreshCw className="animate-spin" size={24} />
                           </div>
-                          <div className="flex items-center gap-3 self-start sm:self-auto">
-                            <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                              Verified Compliance
-                            </span>
-                            <span className="text-xs font-mono font-bold text-gray-400 bg-gray-50 border border-gray-200 px-3 py-1 rounded-lg">
-                              {generatedReport.id}
-                            </span>
+                          <div className="space-y-1.5">
+                            <h4 className="text-base font-bold text-gray-800">Processing Spatial Report</h4>
+                            <p className="text-sm text-gray-400">{reportProgressText}</p>
                           </div>
-                        </div>
-
-                        {/* Metadata Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 bg-gray-50/50 p-5 rounded-2xl border border-gray-100">
-                          {[
-                            { label: 'Scope Target', value: isWholeFarm ? 'Whole Farm Aggregate' : generatedReport.plot },
-                            { label: 'Metric Analyzed', value: generatedReport.index },
-                            { label: 'Mean Value', value: generatedReport.meanVal, color: 'text-green-700 font-extrabold' },
-                            { label: 'Generated At', value: generatedReport.date }
-                          ].map((row, i) => (
-                            <div key={i}>
-                              <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block mb-1">{row.label}</span>
-                              <span className={`text-xs font-bold ${row.color || 'text-gray-800'}`}>{row.value}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Interactive Graph Section */}
-                        <div className="space-y-3">
-                          <h5 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
-                            <LineChart size={14} className="text-green-600" />
-                            {isWholeFarm ? 'Spatial Comparative Chart' : 'Temporal Historical Trend'}
-                          </h5>
-                          <div className="h-[180px] bg-white p-4 rounded-2xl border border-gray-100 shadow-[inset_0_1px_2px_rgba(0,0,0,0.01)]">
-                            {isWholeFarm ? (
-                              <Bar data={chartData} options={chartOptions} />
-                            ) : (
-                              <Line data={chartData} options={chartOptions} />
-                            )}
+                          <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${reportProgress}%`, backgroundColor: '#16A34A' }}></div>
                           </div>
+                          <span className="text-sm font-bold text-green-700">{reportProgress}% complete</span>
                         </div>
+                      </div>
+                    )}
 
-                        {/* Dynamic Insights Block */}
-                        <div className="p-5 bg-green-50/40 border border-green-100 rounded-2xl space-y-2">
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-green-800 flex items-center gap-1.5">
-                            <Sparkles size={12} className="text-green-600 animate-pulse" />
-                            Automated Agronomic Diagnostic Insight
-                          </span>
-                          <p className="text-xs text-green-700 font-semibold leading-relaxed">
-                            {getReportInsight()}
+                    {!isGeneratingReport && !generatedReport && (
+                      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm min-h-[500px] flex flex-col justify-center items-center text-center no-print">
+                        <div className="space-y-3 py-10">
+                          <FileSpreadsheet size={48} className="text-gray-300 mx-auto" />
+                          <h4 className="text-base font-bold text-gray-500 mt-2">No Report Generated Yet</h4>
+                          <p className="text-sm text-gray-400 max-w-xs leading-relaxed mx-auto">
+                            Configure the details on the left and click Generate to create a verified PDF audit sheet.
                           </p>
                         </div>
+                      </div>
+                    )}
 
-                        {/* PDF Registry footer bar */}
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center pt-5 border-t border-gray-100 gap-4">
-                          <div>
-                            <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Registry Compliance Status</span>
-                            <span className="text-xs font-bold text-green-800 flex items-center gap-1.5 mt-0.5">
-                              <CheckCircle2 size={12} className="text-green-600" /> Approved, VCS Compliant & Digitally Signed
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center gap-3 shrink-0">
-                            <button className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold text-xs px-5 py-3 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors shadow-sm active:scale-98">
-                              Export CSV Data
-                            </button>
-                            <button className="flex items-center gap-2 text-white font-bold text-xs px-5 py-3 rounded-xl transition-all shadow-sm hover:opacity-90 active:scale-98" style={{ backgroundColor: '#16A34A' }}>
+                    {!isGeneratingReport && generatedReport && (() => {
+                      const reportPlot = generatedReport.plot;
+                      const reportIndex = generatedReport.index;
+                      const isWholeFarm = reportPlot === 'WHOLE-FARM';
+                      
+                      const chartData = {
+                        labels: isWholeFarm 
+                          ? ['West Valley (Plot Alpha)', 'East Ridge (Plot Beta)', 'South Slope (Plot Gamma)']
+                          : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                        datasets: [{
+                          label: `${reportIndex} Value`,
+                          data: isWholeFarm 
+                            ? (() => {
+                                if (reportIndex === 'SOC') return [42.8, 31.2, 38.5];
+                                if (reportIndex === 'AGB') return [124.5, 82.4, 105.8];
+                                if (reportIndex === 'NDVI') return [0.76, 0.45, 0.62];
+                                if (reportIndex === 'NDMI') return [0.42, 0.30, 0.36];
+                                return [0.38, 0.25, 0.32];
+                              })()
+                            : TIMELINE_DATA.map((t, idx) => {
+                                const baseVal = reportIndex === 'SOC' ? (reportPlot === 'PLOT-ALPHA' ? 42.8 : reportPlot === 'PLOT-BETA' ? 31.2 : 38.5)
+                                               : reportIndex === 'AGB' ? (reportPlot === 'PLOT-ALPHA' ? 124.5 : reportPlot === 'PLOT-BETA' ? 82.4 : 105.8)
+                                               : reportIndex === 'NDVI' ? t.ndvi
+                                               : t.ndmi;
+                                if (reportIndex === 'SOC' || reportIndex === 'AGB') {
+                                  return parseFloat((baseVal * (0.95 + idx * 0.025)).toFixed(1));
+                                }
+                                const offset = reportPlot === 'PLOT-ALPHA' ? 0.04 : reportPlot === 'PLOT-BETA' ? -0.15 : -0.05;
+                                return parseFloat((baseVal + offset).toFixed(2));
+                              }),
+                          backgroundColor: isWholeFarm 
+                            ? ['rgba(22, 163, 74, 0.85)', 'rgba(234, 179, 8, 0.85)', 'rgba(2, 132, 199, 0.85)']
+                            : 'rgba(22, 163, 74, 0.1)',
+                          borderColor: isWholeFarm ? '#ffffff' : '#16A34A',
+                          borderWidth: isWholeFarm ? 0 : 2.5,
+                          fill: !isWholeFarm,
+                          tension: 0.3,
+                          pointRadius: 3
+                        }]
+                      };
+
+                      const chartOptions = {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                          y: { grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 10, weight: '600' } } },
+                          x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } }
+                        }
+                      };
+
+                      const getReportInsight = () => {
+                        const scopeText = isWholeFarm ? 'the Whole Farm aggregate' : `Plot ${reportPlot}`;
+                        const metricName = {
+                          NDVI: 'Vegetation Vigor (NDVI)',
+                          NDMI: 'Soil Canopy Moisture (NDMI)',
+                          NDWI: 'Water Hydrology (NDWI)',
+                          SOC: 'Soil Organic Carbon (SOC)',
+                          AGB: 'Aboveground Biomass (AGB)'
+                        }[reportIndex] || reportIndex;
+                        
+                        if (isWholeFarm) {
+                          return `Spatial verification of the Whole Farm indicates high performance across the primary vegetative bands. West Valley (Plot Alpha) leads with optimal carbon density. East Ridge (Plot Beta) continues to register minor moisture stress anomalies. Overall forest canopy coverage complies with the EUDR regulatory baseline, confirming 100% deforestation-free integrity.`;
+                        }
+                        if (reportPlot === 'PLOT-BETA') {
+                          return `Spatial audit of Plot Beta (East Ridge) reveals suppressed moisture index levels. Vegetative health remains moderate, but root-zone transpiration stress is elevated. Recommendation: Increase irrigation frequency by 25% and introduce multi-species cover crop systems to prevent further degradation.`;
+                        }
+                        return `Diagnostic review of ${scopeText} shows optimal values for ${metricName}. Canopy density trajectories remain stable with zero forest loss anomalies. The plot is verified compliant with carbon registry baselines and is recommended for VCS credit issuance.`;
+                      };
+
+                      return (
+                        <div className="w-full flex-1 flex flex-col min-h-0 bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800 animate-in fade-in duration-300">
+                          {/* PDF Viewer Header */}
+                          <div className="bg-slate-950 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 no-print shrink-0 select-none">
+                            <div className="flex items-center gap-3">
+                              <FileText size={18} className="text-green-500" />
+                              <span className="font-mono text-xs font-bold text-slate-200">{generatedReport.id}.pdf</span>
+                              <span className="bg-slate-800 text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-700">2 Pages</span>
+                            </div>
+                            <button
+                              onClick={() => window.print()}
+                              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95"
+                            >
                               <Download size={13} /> Download PDF
                             </button>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
 
-              {/* ── PRE-COMPILED THEMATIC REPORTS SHOWCASE ── */}
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                    <FileText size={18} className="text-green-600" />
-                    Verified Sustainability & Environmental Reports
-                    {renderInfoTooltip("Verified Sustainability & Environmental Reports")}</h3>
-                  <p className="text-xs text-gray-400 font-semibold mt-1.5">
-                    Pre-compiled carbon offsets, land restoration metrics, and environmental compliance logs verified by remote sensing nodes.
-                  </p>
-                </div>
+                          {/* PDF Pages Viewer */}
+                          <div className="bg-slate-800 p-8 overflow-y-auto space-y-8 flex flex-col items-center flex-1 max-h-[720px] scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                            
+                            {/* PAGE 1: COVER CERTIFICATE */}
+                            <div className="bg-white shadow-2xl border border-gray-300 w-full max-w-[620px] aspect-[1/1.414] p-12 flex flex-col justify-between relative select-none">
+                              {/* Confidential Header */}
+                              <div className="flex justify-between items-center text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-3">
+                                <span className="text-green-600 flex items-center gap-1 font-bold">
+                                  <Globe size={10} /> FARMINTELYTICS SPATIAL MRV AUDIT
+                                </span>
+                                <span>CONFIDENTIAL DOCUMENT</span>
+                              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                  {/* Theme 1 Card */}
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all h-[240px]">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="p-2 bg-green-50 text-green-700 rounded-xl">
-                          <Leaf size={16} />
-                        </div>
-                        <span className="text-[9px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 uppercase">
-                          Climate-Smart
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-800 leading-snug">Carbon Credits & Climate-Smart Ag</h4>
-                        <p className="text-[11px] text-gray-400 leading-normal mt-1">Verified carbon offsets, tillage performance, and nitrogen efficiency metrics.</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3 pt-3 border-t border-gray-50">
-                      <div className="flex justify-between text-xs font-semibold text-gray-500">
-                        <span>Total Sequestration</span>
-                        <span className="text-green-600 font-bold">124.5 tCO2e</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setReportPlot('PLOT-ALPHA');
-                          setReportIndex('SOC');
-                          triggerReportGeneration();
-                        }}
-                        className="w-full text-center py-2 bg-gray-50 hover:bg-green-50 hover:text-green-700 text-gray-600 text-xs font-bold rounded-xl border border-gray-200 hover:border-green-200 transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <Download size={12} /> Compile PDF
-                      </button>
-                    </div>
-                  </div>
+                              {/* Center Content */}
+                              <div className="my-auto text-center space-y-8">
+                                <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-100 mx-auto shadow-sm">
+                                  <Shield size={32} />
+                                </div>
+                                
+                                <div className="space-y-4">
+                                  <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/30 px-3.5 py-1 rounded-full uppercase tracking-wider inline-block">
+                                    Verified Compliance Certificate
+                                  </span>
+                                  <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-snug uppercase max-w-md mx-auto">
+                                    Spatial Environmental Audit & Registry Report
+                                  </h1>
+                                  <p className="text-xs text-gray-400 font-semibold leading-relaxed max-w-sm mx-auto">
+                                    Continuous satellite observation, biophysical metric ledgers, and carbon stock calculations.
+                                  </p>
+                                </div>
+                              </div>
 
-                  {/* Theme 2 Card */}
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all h-[240px]">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="p-2 bg-yellow-50 text-yellow-700 rounded-xl">
-                          <Trees size={16} />
-                        </div>
-                        <span className="text-[9px] font-bold text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-200 uppercase">
-                          Restoration
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-800 leading-snug">Agroforestry & Land Restoration</h4>
-                        <p className="text-[11px] text-gray-400 leading-normal mt-1">Canopy density improvement trajectories and native tree counts by zone.</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3 pt-3 border-t border-gray-50">
-                      <div className="flex justify-between text-xs font-semibold text-gray-500">
-                        <span>Canopy Progress</span>
-                        <span className="text-yellow-600 font-bold">+14.2% YoY</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setReportPlot('PLOT-ALPHA');
-                          setReportIndex('NDMI');
-                          triggerReportGeneration();
-                        }}
-                        className="w-full text-center py-2 bg-gray-50 hover:bg-green-50 hover:text-green-700 text-gray-600 text-xs font-bold rounded-xl border border-gray-200 hover:border-green-200 transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <Download size={12} /> Compile PDF
-                      </button>
-                    </div>
-                  </div>
+                              {/* Metadata block at bottom */}
+                              <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-200 text-left">
+                                <div>
+                                  <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-wider block mb-1">Scope Target</span>
+                                  <span className="text-xs font-bold text-gray-800">
+                                    {generatedReport.plot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : (
+                                      generatedReport.plot === 'PLOT-ALPHA' ? 'PLOT-ALPHA — West Valley Plot' :
+                                      generatedReport.plot === 'PLOT-BETA' ? 'PLOT-BETA — East Ridge Plot' :
+                                      'PLOT-GAMMA — South Slope Plot'
+                                    )}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-wider block mb-1">Report Category</span>
+                                  <span className="text-xs font-bold text-gray-800">
+                                    {generatedReport.index === 'NDVI' ? 'NDVI — Vegetation Health Audit' :
+                                     generatedReport.index === 'NDMI' ? 'NDMI — Soil Moisture Audit' :
+                                     generatedReport.index === 'NDWI' ? 'NDWI — Water Hydrology Audit' :
+                                     generatedReport.index === 'SOC' ? 'SOC — Soil Organic Carbon Audit' :
+                                     'AGB — Aboveground Biomass Carbon Audit'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
 
-                  {/* Theme 3 Card */}
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all h-[240px]">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="p-2 bg-blue-50 text-blue-700 rounded-xl">
-                          <Globe size={16} />
-                        </div>
-                        <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 uppercase">
-                          Voluntary Carbon
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-800 leading-snug">Carbon Accounting & Verification</h4>
-                        <p className="text-[11px] text-gray-400 leading-normal mt-1">Geospatial coordinate boundary validation and registry alignment audits.</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3 pt-3 border-t border-gray-50">
-                      <div className="flex justify-between text-xs font-semibold text-gray-500">
-                        <span>Confidence Index</span>
-                        <span className="text-blue-600 font-bold">99.4% Verified</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setReportPlot('PLOT-GAMMA');
-                          setReportIndex('AGB');
-                          triggerReportGeneration();
-                        }}
-                        className="w-full text-center py-2 bg-gray-50 hover:bg-green-50 hover:text-green-700 text-gray-600 text-xs font-bold rounded-xl border border-gray-200 hover:border-green-200 transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <Download size={12} /> Compile PDF
-                      </button>
-                    </div>
-                  </div>
+                            {/* PAGE 2: LEDGER DATA PAGE */}
+                            <div className="bg-white shadow-2xl border border-gray-300 w-full max-w-[620px] aspect-[1/1.414] p-12 flex flex-col justify-between relative select-none">
+                              {/* Page 2 Header */}
+                              <div className="flex justify-between items-center text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-3">
+                                <span className="text-green-600 flex items-center gap-1 font-bold">
+                                  <Globe size={10} /> FARMINTELYTICS SPATIAL MRV AUDIT
+                                </span>
+                                <span>ANALYTICAL DATA LEDGER</span>
+                              </div>
 
-                  {/* Theme 4 Card */}
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all h-[240px]">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="p-2 bg-slate-100 text-slate-700 rounded-xl">
-                          <Shield size={16} />
+                              {/* Data Details */}
+                              <div className="my-auto space-y-6 flex-1 pt-6 text-left">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                                  {[
+                                    { label: 'Scope Target', value: generatedReport.plot === 'WHOLE-FARM' ? 'Whole Farm' : generatedReport.plot },
+                                    { label: 'Metric Analyzed', value: generatedReport.index },
+                                    { label: 'Mean Value', value: generatedReport.meanVal, color: 'text-green-700 font-extrabold' },
+                                    { label: 'Compiled At', value: generatedReport.date }
+                                  ].map((row, i) => (
+                                    <div key={i}>
+                                      <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-wider block mb-0.5">{row.label}</span>
+                                      <span className={`text-[11px] font-bold ${row.color || 'text-gray-800'}`}>{row.value}</span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Chart */}
+                                <div className="space-y-2">
+                                  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block flex items-center gap-1">
+                                    <LineChart size={12} className="text-green-600" />
+                                    {generatedReport.plot === 'WHOLE-FARM' ? 'Spatial Comparative Chart' : 'Temporal Historical Trend'}
+                                  </span>
+                                  <div className="h-[160px] bg-white p-3 rounded-xl border border-gray-100">
+                                    {generatedReport.plot === 'WHOLE-FARM' ? (
+                                      <Bar data={chartData} options={chartOptions} />
+                                    ) : (
+                                      <Line data={chartData} options={chartOptions} />
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Agronomic Insight */}
+                                <div className="p-4 bg-green-50/40 border border-green-100 rounded-xl space-y-1.5">
+                                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-green-800 flex items-center gap-1">
+                                    <Sparkles size={11} className="text-green-600" />
+                                    Automated Agronomic Diagnostic Insight
+                                  </span>
+                                  <p className="text-[11px] text-green-700 font-semibold leading-relaxed">
+                                    {getReportInsight()}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Page 2 Footer */}
+                              <div className="flex justify-between items-center pt-3 border-t border-gray-100 text-[8px] font-bold text-gray-400 uppercase tracking-wider">
+                                <span>FARMINTELYTICS WEBPORTAL v3.2</span>
+                                <span className="text-green-650 font-bold">Certified Deforestation-Free</span>
+                                <span>Page 2 of 2</span>
+                              </div>
+                            </div>
+
+                          </div>
                         </div>
-                        <span className="text-[9px] font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200 uppercase">
-                          EUDR Traceable
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-800 leading-snug">Traceability & Env. Impact</h4>
-                        <p className="text-[11px] text-gray-400 leading-normal mt-1">Chain of custody coordinates tracking and deforestation-free compliance certificates.</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3 pt-3 border-t border-gray-50">
-                      <div className="flex justify-between text-xs font-semibold text-gray-500">
-                        <span>Deforestation Score</span>
-                        <span className="text-slate-800 font-bold">0.0 Anomaly</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setReportPlot('PLOT-ALPHA');
-                          setReportIndex('NDVI');
-                          triggerReportGeneration();
-                        }}
-                        className="w-full text-center py-2 bg-gray-50 hover:bg-green-50 hover:text-green-700 text-gray-600 text-xs font-bold rounded-xl border border-gray-200 hover:border-green-200 transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <Download size={12} /> Compile PDF
-                      </button>
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ══════════════════════════════════════════════════════════════
               AI ASSISTANT
@@ -7764,121 +7897,77 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           )}
 
           {activeSidebarItem === 'help' && (
-            <div className="p-10 space-y-10 animate-in fade-in duration-300">
-              <div>
-                <h2 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-                  <Info size={28} className="text-green-600" />
-                  Help & Remote Sensing Support
-                </h2>
-                <p className="text-sm text-gray-500 font-medium mt-2">
-                  Access remote sensing guides, index explanations, or contact our spatial helpdesk.
-                </p>
+            <div className="p-10 space-y-8 animate-in fade-in duration-300 overflow-y-auto h-full">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+                    <Info size={28} className="text-green-650" />
+                    Platform Glossary
+                  </h2>
+                  <p className="text-sm text-gray-500 font-medium mt-2">
+                    Dictionary of key Remote Sensing Indices, Biophysical Indicators, and Cadastral metrics.
+                  </p>
+                </div>
+                <div className="relative max-w-xs w-full">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={glossarySearch}
+                    onChange={(e) => setGlossarySearch(e.target.value)}
+                    placeholder="Search terms, formulas..."
+                    className="w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-9 pr-4 text-xs font-semibold outline-none focus:border-green-500 transition-all text-gray-700 shadow-sm"
+                  />
+                  {glossarySearch && (
+                    <button 
+                      onClick={() => setGlossarySearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-455 hover:text-gray-755 text-xs"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                {/* Accordion FAQ Guide */}
-                <div className="bg-white rounded-2xl border border-gray-150 shadow-sm p-6 lg:col-span-2 space-y-4">
-                  <h3 className="text-base font-bold text-gray-900 pb-4 border-b border-gray-100 flex items-center gap-2.5">
-                    <Globe size={18} className="text-green-600" />
-                    Spatial Knowledge Base
-                  </h3>
-                  <div className="space-y-3 pt-2">
-                    {[
-                      {
-                        q: 'What is NDVI and how is it calculated?',
-                        a: 'NDVI (Normalized Difference Vegetation Index) measures crop vigor by comparing near-infrared reflectance (which vegetation reflects strongly) and red light reflectance (which vegetation absorbs). Calculation: (NIR - Red) / (NIR + Red). In the portal, values above 0.65 represent optimal crop growth.'
-                      },
-                      {
-                        q: 'What is LSWI / NDMI and why does it track moisture?',
-                        a: 'LSWI (Land Surface Water Index) and NDMI (Normalized Difference Moisture Index) use Shortwave Infrared (SWIR) bands to monitor liquid water content in crop canopies and soil surfaces. It drops sharply during root-zone dry spells, triggering moisture warning logs on the Alerts Desk.'
-                      },
-                      {
-                        q: 'How often does Sentinel-2 capture new composite images?',
-                        a: 'Sentinel-2 satellites orbit the earth constantly, providing a repeat frequency of 5 days at the equator. Cloud cover filters are automatically applied to compile cloud-free composites. If clouds exceed 20%, historical data interpolation is activated.'
-                      },
-                      {
-                        q: 'How do I download or export analytical PDF ledgers?',
-                        a: 'Go to the "Reports" tab at the top header, select your target plot and index (NDVI/NDWI/NDMI), then click "Generate Report PDF". Once completed, click "Download PDF" to save the verified spatial MRV document.'
-                      }
-                    ].map((faq, idx) => {
-                      const isOpen = activeHelpTopic === idx;
-                      return (
-                        <div key={idx} className="border border-gray-150 rounded-xl overflow-hidden bg-gray-50/50">
-                          <button
-                            onClick={() => setActiveHelpTopic(isOpen ? null : idx)}
-                            className="w-full px-5 py-4 flex items-center justify-between text-left font-bold text-sm text-gray-800 hover:bg-gray-100/50 transition-colors"
-                          >
-                            <span>{faq.q}</span>
-                            {isOpen ? <ChevronUp size={16} className="text-green-600" /> : <ChevronDown size={16} className="text-gray-400" />}
-                          </button>
-                          {isOpen && (
-                            <div className="px-5 pb-5 pt-1 text-xs text-gray-500 font-semibold leading-relaxed border-t border-gray-150 bg-white animate-in slide-in-from-top-2 duration-200">
-                              {faq.a}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Support ticket submission form */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-5">
-                  <h3 className="text-base font-bold text-gray-900 pb-4 border-b border-gray-100 flex items-center gap-2.5">
-                    <MessageSquare size={18} className="text-green-600" />
-                    Submit Technical Ticket
-                  </h3>
-                  {showSupportSubmitted && (
-                    <div className="p-4 bg-green-50 border border-green-200 text-green-800 text-xs font-bold rounded-xl flex items-center gap-2 animate-in fade-in duration-200">
-                      <CheckCircle2 size={16} className="text-green-600 shrink-0" />
-                      Ticket Submitted Successfully!
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Object.entries(TOOLTIP_DESCRIPTIONS)
+                  .filter(([key, value]) => {
+                    const searchLower = glossarySearch.toLowerCase();
+                    return (
+                      key.toLowerCase().includes(searchLower) ||
+                      (value.desc && value.desc.toLowerCase().includes(searchLower)) ||
+                      (value.done && value.done.toLowerCase().includes(searchLower)) ||
+                      (value.formula && value.formula.toLowerCase().includes(searchLower))
+                    );
+                  })
+                  .map(([key, value]) => (
+                    <div key={key} className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm flex flex-col justify-between hover:shadow-md transition-all gap-4">
+                      <div>
+                        <h3 className="text-base font-bold text-gray-950 flex items-center justify-between gap-2">
+                          {key}
+                        </h3>
+                        <p className="text-xs text-gray-555 font-semibold leading-relaxed mt-2">
+                          {value.desc}
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-2 pt-3 border-t border-gray-100">
+                        {value.done && (
+                          <div className="text-[11px] text-gray-650 font-semibold">
+                            <span className="font-extrabold text-gray-400 uppercase text-[9px] block tracking-wider">Methodology</span>
+                            {value.done}
+                          </div>
+                        )}
+                        {value.formula && (
+                          <div className="text-[11px] text-gray-650 font-semibold">
+                            <span className="font-extrabold text-gray-400 uppercase text-[9px] block tracking-wider mb-1">Formula / Expression</span>
+                            <code className="block font-mono text-[10px] text-green-705 bg-green-50/50 border border-green-100 rounded-lg p-2 overflow-x-auto whitespace-pre-wrap word-break-all">
+                              {value.formula}
+                            </code>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  <form onSubmit={handleSupportSubmit} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Incident Category</label>
-                      <select
-                        value={ticketCategory}
-                        onChange={e => setTicketCategory(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 text-sm font-semibold outline-none cursor-pointer focus:border-green-500 focus:bg-white text-gray-700 transition-all"
-                      >
-                        <option value="General Query">General Query</option>
-                        <option value="Anomaly Diagnostic">Anomaly Diagnostic</option>
-                        <option value="API Integration">API Integration</option>
-                        <option value="Billing & Plans">Billing & Plans</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Subject</label>
-                      <input
-                        type="text"
-                        value={ticketSubject}
-                        onChange={e => setTicketSubject(e.target.value)}
-                        placeholder="Subject..."
-                        required
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 text-sm font-semibold outline-none focus:border-green-500 focus:bg-white text-gray-700 placeholder-gray-450 transition-all"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Message Details</label>
-                      <textarea
-                        value={ticketMessage}
-                        onChange={e => setTicketMessage(e.target.value)}
-                        placeholder="Describe your issue or query..."
-                        required
-                        rows="4"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 text-sm font-semibold outline-none focus:border-green-500 focus:bg-white text-gray-700 placeholder-gray-450 transition-all resize-none"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full text-white font-bold text-sm py-3.5 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 hover:opacity-90 active:scale-98"
-                      style={{ backgroundColor: '#16A34A' }}
-                    >
-                      <Send size={15} /> Submit Support Ticket
-                    </button>
-                  </form>
-                </div>
+                  ))}
               </div>
             </div>
           )}
