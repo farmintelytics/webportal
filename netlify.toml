@@ -6,8 +6,7 @@
   NPM_FLAGS = "--legacy-peer-deps"
   # Lock this Netlify deployment to Agro Monitoring only.
   # Remove or change this variable to expose the full portal.
-  VITE_RESTRICT_TO_MODULE = "custom-agromonitor"
-  VITE_API_BASE_URL = "http://ec2-98-91-17-63.compute-1.amazonaws.com/farmintelytics-engine/agromonitoring"
+  VITE_API_BASE_URL = "/farmintelytics-engine/agromonitoring"
 
 [[redirects]]
   from = "/*"
