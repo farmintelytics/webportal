@@ -1,46 +1,47 @@
 import React, { useState } from 'react';
-import Login from './views/Login';
-import PortalHub from './views/PortalHub';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import Login from './pages/Login';
+import PortalHub from './pages/PortalHub';
 import PortalLayout from './layouts/PortalLayout';
 
 // === FFB Management ===
-import FFBDashboard from './apps/management/ffb/Dashboard';
+import FFBDashboard from './modules/management/ffb/Dashboard';
 
 // === Crop Management Portals ===
-import CashewDashboard from './apps/management/cashew/Dashboard';
-import SugarcaneDashboard from './apps/management/sugarcane/Dashboard';
-import RiceDashboard from './apps/management/rice/Dashboard';
-import CocoaDashboard from './apps/management/cocoa/Dashboard';
-import RubberDashboard from './apps/management/rubber/Dashboard';
-import CassavaDashboard from './apps/management/cassava/Dashboard';
-import MaizeDashboard from './apps/management/maize/Dashboard';
+import CashewDashboard from './modules/management/cashew/Dashboard';
+import SugarcaneDashboard from './modules/management/sugarcane/Dashboard';
+import RiceDashboard from './modules/management/rice/Dashboard';
+import CocoaDashboard from './modules/management/cocoa/Dashboard';
+import RubberDashboard from './modules/management/rubber/Dashboard';
+import CassavaDashboard from './modules/management/cassava/Dashboard';
+import MaizeDashboard from './modules/management/maize/Dashboard';
 
 // === Field Advisory & Agronomy ===
-import ClimateIntelligence from './apps/advisor/ClimateIntelligence';
-import MonitoringPortal from './apps/monitoring/MonitoringPortal';
-import SustainabilityPortal from './apps/sustainability/SustainabilityPortal';
-import EstatePortal from './apps/sustainability/estate/EstatePortal';
-import GroupsPortal from './apps/sustainability/groups/GroupsPortal';
-import ForestryPortal from './apps/sustainability/forestry/ForestryPortal';
-import EstimatorPortal from './apps/sustainability/estimator/EstimatorPortal';
+import ClimateIntelligence from './modules/advisor/ClimateIntelligence';
+import MonitoringPortal from './modules/monitoring/MonitoringPortal';
+import SustainabilityPortal from './modules/sustainability/SustainabilityPortal';
+import EstatePortal from './modules/sustainability/estate/EstatePortal';
+import GroupsPortal from './modules/sustainability/groups/GroupsPortal';
+import ForestryPortal from './modules/sustainability/forestry/ForestryPortal';
+import EstimatorPortal from './modules/sustainability/estimator/EstimatorPortal';
 
 // === Specialized Monitoring Apps ===
-import RiceMonitoring from './apps/monitoring/rice/Monitoring';
-import MaizeMonitoring from './apps/monitoring/maize/Monitoring';
-import CocoaMonitoring from './apps/monitoring/cocoa/Monitoring';
-import FFBMonitoring from './apps/monitoring/ffb/Monitoring';
-import CassavaMonitoring from './apps/monitoring/cassava/Monitoring';
-import SugarcaneMonitoring from './apps/monitoring/sugarcane/Monitoring';
+import RiceMonitoring from './modules/monitoring/rice/Monitoring';
+import MaizeMonitoring from './modules/monitoring/maize/Monitoring';
+import CocoaMonitoring from './modules/monitoring/cocoa/Monitoring';
+import FFBMonitoring from './modules/monitoring/ffb/Monitoring';
+import CassavaMonitoring from './modules/monitoring/cassava/Monitoring';
+import SugarcaneMonitoring from './modules/monitoring/sugarcane/Monitoring';
 
 // === Cooperative & Group Management ===
-import GroupsDashboard from './apps/cooperative/Dashboard';
+import GroupsDashboard from './modules/cooperative/Dashboard';
 
 // === Finance & Payments ===
-import FinanceDashboard from './apps/finance/Dashboard';
+import FinanceDashboard from './modules/finance/Dashboard';
 
-import AgroMonitor from './apps/custom/AgroMonitor';
+import AgroMonitor from './modules/agro-monitor/AgroMonitor';
 
-import { crops } from './config/crops.jsx';
+import { crops } from './constants/crops.jsx';
 import { Zap } from 'lucide-react';
 
 // Placeholder for modules in development
@@ -54,57 +55,115 @@ const ComingSoon = ({ title, description }) => (
   </div>
 );
 
-const App = () => {
-  const [view, setView] = useState('hub');
-  const [selectedModule, setSelectedModule] = useState(null);
-  const [activeSection, setActiveSection] = useState('dashboard');
-  const [currentCrop, setCurrentCrop] = useState(crops[0]);
+// ─── Module name map ─────────────────────────────────────────────────────────
+const MODULE_NAMES = {
+  'rs-ffb':               'Oil Palm Monitoring',
+  'rs-cashew':            'Cashew Monitoring',
+  'rs-sugarcane':         'SugarCane Monitoring',
+  'rs-rice':              'Rice Monitoring',
+  'rs-cocoa':             'Cocoa Monitoring',
+  'rs-rubber':            'Rubber Monitoring',
+  'rs-cassava':           'Cassava Monitoring',
+  'rs-maize':             'Maize Monitoring',
+  'rs-drone':             'Drone Intelligence',
+  'finance-hub':          'Central Finance Hub',
+  'management-ffb':       'Oil Palm Management',
+  'management-cashew':    'Cashew Management',
+  'management-sugarcane': 'SugarCane Management',
+  'management-rice':      'Rice Management',
+  'management-cocoa':     'Cocoa Management',
+  'management-rubber':    'Rubber Management',
+  'management-cassava':   'Cassava Management',
+  'management-maize':     'Maize Management',
+  'group-management':     'Groups Management',
+  'group-monitoring':     'Group Monitoring',
+  'activity-ffb':         'Operations Logs',
+  'advisor':              'Farm Advisor',
+  'custom-agromonitor':   'Agro Monitoring',
+};
 
-  const handleSelectModule = (moduleId) => { 
-    setSelectedModule(moduleId); 
-    const crop = crops.find(c => c.id === moduleId);
-    if (crop) setCurrentCrop(crop);
-    setView('login'); 
+// ─── Build-time access restriction ──────────────────────────────────────────
+// If VITE_RESTRICT_TO_MODULE is set (e.g. in netlify.toml), the app bypasses
+// the hub and locks users into that single module.
+const RESTRICTED_MODULE = import.meta.env.VITE_RESTRICT_TO_MODULE || null;
+
+// The URL path used for the restricted module's portal
+const AGROMONITOR_PATH = '/farmintelytics-engine/agromonitoring';
+
+
+// ─── Hub page ────────────────────────────────────────────────────────────────
+const HubPage = () => {
+  const navigate = useNavigate();
+
+  const handleSelectModule = (moduleId) => {
+    sessionStorage.setItem('fi_module', moduleId);
+    navigate('/login');
   };
-  const handleLogin = () => setView('portal');
-  const handleSignOut = () => { setView('login'); setActiveSection('dashboard'); };
-  const handleBackToHub = () => { setView('hub'); setActiveSection('dashboard'); };
 
-  const getSectionContent = () => {
+  return <PortalHub onSelectModule={handleSelectModule} />;
+};
 
-    // Monitoring Portals (Standard Remote Sensing Web Portal Style)
-    if (selectedModule?.startsWith('rs-')) {
+
+// ─── Login page ──────────────────────────────────────────────────────────────
+const LoginPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // In restricted mode the module is fixed; otherwise read from sessionStorage
+  const moduleId = RESTRICTED_MODULE || sessionStorage.getItem('fi_module');
+  const moduleName = MODULE_NAMES[moduleId] || moduleId;
+
+  // Where does the portal land after login?
+  const portalPath = moduleId === 'custom-agromonitor'
+    ? AGROMONITOR_PATH
+    : '/portal';
+
+  const handleLogin = () => navigate(portalPath);
+  const handleBack  = RESTRICTED_MODULE ? null : () => navigate('/');
+
+  return (
+    <Login
+      onLogin={handleLogin}
+      moduleName={moduleName}
+      onBack={handleBack}
+    />
+  );
+};
+
+
+// ─── Portal page (generic modules) ──────────────────────────────────────────
+const PortalPage = () => {
+  const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState('dashboard');
+  const [currentCrop, setCurrentCrop]     = useState(crops[0]);
+
+  const moduleId = sessionStorage.getItem('fi_module');
+
+  const handleSignOut   = () => { navigate('/login'); setActiveSection('dashboard'); };
+  const handleBackToHub = () => { navigate('/');     setActiveSection('dashboard'); };
+
+  if (!moduleId) return <Navigate to="/" replace />;
+
+  // ── resolve the component for this module ──
+  const getContent = () => {
+    // Remote-sensing monitoring portals
+    if (moduleId.startsWith('rs-')) {
       const rsApps = {
-        'rs-ffb':               <FFBMonitoring />,
-        'rs-sugarcane':         <SugarcaneMonitoring />,
-        'rs-rice':              <RiceMonitoring />,
-        'rs-cocoa':             <CocoaMonitoring />,
-        'rs-cassava':           <CassavaMonitoring />,
-        'rs-maize':             <MaizeMonitoring />,
+        'rs-ffb':      <FFBMonitoring />,
+        'rs-sugarcane':<SugarcaneMonitoring />,
+        'rs-rice':     <RiceMonitoring />,
+        'rs-cocoa':    <CocoaMonitoring />,
+        'rs-cassava':  <CassavaMonitoring />,
+        'rs-maize':    <MaizeMonitoring />,
       };
-
-      if (rsApps[selectedModule]) {
-        return React.cloneElement(rsApps[selectedModule], {
-          onSignOut: handleSignOut,
-          onBack: handleBackToHub
-        });
+      if (rsApps[moduleId]) {
+        return React.cloneElement(rsApps[moduleId], { onSignOut: handleSignOut, onBack: handleBackToHub });
       }
-
-      const cropMap = {
-        'rs-cashew': 'Cashew',
-        'rs-rubber': 'Rubber',
-        'rs-drone': 'Drone Intelligence'
-      };
-
-      return <MonitoringPortal
-        cropName={cropMap[selectedModule] || "Crop"}
-        onSignOut={handleSignOut}
-        onBack={handleBackToHub}
-      />;
+      const cropMap = { 'rs-cashew': 'Cashew', 'rs-rubber': 'Rubber', 'rs-drone': 'Drone Intelligence' };
+      return <MonitoringPortal cropName={cropMap[moduleId] || 'Crop'} onSignOut={handleSignOut} onBack={handleBackToHub} />;
     }
 
-    // Single-dashboard portals
-    const routes = {
+    const routeMap = {
       'management-ffb':       <FFBDashboard activeSection={activeSection} />,
       'management-cashew':    <CashewDashboard activeSection={activeSection} />,
       'management-sugarcane': <SugarcaneDashboard activeSection={activeSection} />,
@@ -113,83 +172,41 @@ const App = () => {
       'management-rubber':    <RubberDashboard activeSection={activeSection} />,
       'management-cassava':   <CassavaDashboard activeSection={activeSection} />,
       'management-maize':     <MaizeDashboard activeSection={activeSection} />,
-      
-      'rs-ffb':               <FFBMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-cashew':            <MonitoringPortal cropName="Cashew" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-rubber':            <MonitoringPortal cropName="Rubber" onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-sugarcane':         <SugarcaneMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-rice':              <RiceMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-cocoa':             <CocoaMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-cassava':           <CassavaMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'rs-maize':             <MaizeMonitoring onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      
-      'drone-ffb':            <ComingSoon title="Drone Inspection" description="Live drone feed and high-resolution field surveillance." onSignOut={handleSignOut} />,
-      'drone-cashew':         <ComingSoon title="Orchard Survey" description="Tree count, canopy gap analysis and disease spot detection." onSignOut={handleSignOut} />,
-      
-      'carbon-ffb':           <EstatePortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'carbon-groups':        <GroupsPortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'forestry-intel':       <ForestryPortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'carbon-estimator':     <EstimatorPortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
 
-      'finance-hub':          <FinanceDashboard onSignOut={handleSignOut} />,
-      'activity-ffb':         <ComingSoon title="Operations Log" description="Geo-referenced daily field logs — harvesting, planting, spraying." />,
-      'advisor':              <ClimateIntelligence onSignOut={handleSignOut} onBack={handleBackToHub} />,
-      'custom-agromonitor':   <AgroMonitor onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'drone-ffb':    <ComingSoon title="Drone Inspection" description="Live drone feed and high-resolution field surveillance." />,
+      'drone-cashew': <ComingSoon title="Orchard Survey" description="Tree count, canopy gap analysis and disease spot detection." />,
 
-      // Groups & Smallholder Management
-      'group-management':     <GroupsDashboard mode="group-management" onSignOut={handleSignOut} />,
-      'group-monitoring':     <MonitoringPortal cropName="Smallholder" onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'carbon-ffb':       <EstatePortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'carbon-groups':    <GroupsPortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'forestry-intel':   <ForestryPortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
+      'carbon-estimator': <EstimatorPortal onSignOut={handleSignOut} onBack={handleBackToHub} />,
+
+      'finance-hub':  <FinanceDashboard onSignOut={handleSignOut} />,
+      'activity-ffb': <ComingSoon title="Operations Log" description="Geo-referenced daily field logs — harvesting, planting, spraying." />,
+      'advisor':      <ClimateIntelligence onSignOut={handleSignOut} onBack={handleBackToHub} />,
+
+      'group-management': <GroupsDashboard mode="group-management" onSignOut={handleSignOut} />,
+      'group-monitoring': <MonitoringPortal cropName="Smallholder" onSignOut={handleSignOut} onBack={handleBackToHub} />,
     };
 
-    return routes[selectedModule] || (
-      <ComingSoon title={selectedModule?.replace(/-/g, ' ')} description="This module is under active development." />
+    return routeMap[moduleId] || (
+      <ComingSoon title={moduleId.replace(/-/g, ' ')} description="This module is under active development." />
     );
   };
 
-  if (view === 'hub')   return <PortalHub onSelectModule={handleSelectModule} />;
-  if (view === 'login') {
-    const cleanNameMap = {
-      'rs-ffb': 'Oil Palm Monitoring',
-      'rs-cashew': 'Cashew Monitoring',
-      'rs-sugarcane': 'SugarCane Monitoring',
-      'rs-rice': 'Rice Monitoring',
-      'rs-cocoa': 'Cocoa Monitoring',
-      'rs-rubber': 'Rubber Monitoring',
-      'rs-cassava': 'Cassava Monitoring',
-      'rs-maize': 'Maize Monitoring',
-      'rs-drone': 'Drone Intelligence',
-      'finance-hub': 'Central Finance Hub',
-      'management-ffb': 'Oil Palm Management',
-      'management-cashew': 'Cashew Management',
-      'management-sugarcane': 'SugarCane Management',
-      'management-rice': 'Rice Management',
-      'management-cocoa': 'Cocoa Management',
-      'management-rubber': 'Rubber Management',
-      'management-cassava': 'Cassava Management',
-      'management-maize': 'Maize Management',
-      'group-management': 'Groups Management',
-      'group-monitoring': 'Group Monitoring',
-      'activity-ffb': 'Operations Logs',
-      'advisor': 'Farm Advisor',
-      'custom-agromonitor': 'Agro Monitoring'
-    };
-    return <Login onLogin={handleLogin} moduleName={cleanNameMap[selectedModule] || selectedModule} onBack={handleBackToHub} />;
-  }
+  const content = getContent();
 
-  const sectionContent = getSectionContent();
+  // Standalone modules (full-screen, no PortalLayout sidebar)
+  const standaloneModules = ['rs-', 'group-monitoring', 'carbon-', 'forestry-', 'advisor'];
+  const isStandalone = standaloneModules.some(m => moduleId.startsWith(m) || moduleId === m);
 
-  // If it's a Monitoring Portal or Sustainability/Advisor, render it standalone
-  const standaloneModules = ['rs-', 'group-monitoring', 'carbon-', 'forestry-', 'advisor', 'custom-agromonitor'];
-  if (standaloneModules.some(m => selectedModule?.startsWith(m) || selectedModule === m)) {
-    return React.cloneElement(sectionContent, { 
-      onBack: handleBackToHub,
-      onSignOut: handleSignOut 
-    });
-  }
-
-  // If it's a Groups module, render it standalone
-  if (selectedModule === 'group-management') {
-    return sectionContent;
+  if (isStandalone || moduleId === 'group-management') {
+    // Pass back/signout handlers if the component accepts them (RS portals already have them)
+    try {
+      return React.cloneElement(content, { onBack: handleBackToHub, onSignOut: handleSignOut });
+    } catch {
+      return content;
+    }
   }
 
   return (
@@ -202,8 +219,47 @@ const App = () => {
       onBackToHub={handleBackToHub}
       onSignOut={handleSignOut}
     >
-      {sectionContent}
+      {content}
     </PortalLayout>
+  );
+};
+
+
+// ─── Agro Monitor page (dedicated URL) ──────────────────────────────────────
+const AgroMonitorPage = () => {
+  const navigate = useNavigate();
+
+  // In restricted mode there is no hub to go back to
+  const handleSignOut   = () => navigate('/login');
+  const handleBackToHub = RESTRICTED_MODULE ? null : () => navigate('/');
+
+  return <AgroMonitor onSignOut={handleSignOut} onBack={handleBackToHub} />;
+};
+
+
+// ─── Root App ────────────────────────────────────────────────────────────────
+const App = () => {
+  // In restricted mode, always start at /login regardless of entered URL
+  if (RESTRICTED_MODULE) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path={AGROMONITOR_PATH} element={<AgroMonitorPage />} />
+        {/* Redirect everything else to /login */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/"                       element={<HubPage />} />
+      <Route path="/login"                  element={<LoginPage />} />
+      <Route path="/portal"                 element={<PortalPage />} />
+      <Route path={AGROMONITOR_PATH}        element={<AgroMonitorPage />} />
+      {/* Catch-all: back to hub */}
+      <Route path="*"                       element={<Navigate to="/" replace />} />
+    </Routes>
   );
 };
 

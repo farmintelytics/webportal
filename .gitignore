@@ -23,5 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 .env
-/playground
+# Project-specific ignored folders
+/scratch
+/standardized-imagery
+/dist
 /references
+/backend/data

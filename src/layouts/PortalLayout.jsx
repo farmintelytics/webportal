@@ -1,6 +1,6 @@
 import React from 'react';
-import Sidebar from '../shared/components/Sidebar';
-import TopBar from '../shared/components/TopBar';
+import Sidebar from '../components/Sidebar';
+import TopBar from '../components/TopBar';
 
 const PortalLayout = ({ children, activeSection, setActiveSection, currentCrop, onSignOut }) => {
   return (

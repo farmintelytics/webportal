@@ -15,8 +15,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@/components/ui': path.resolve(__dirname, './src/apps/monitoring/shared/ui'),
-      '@monitoring-shared': path.resolve(__dirname, './src/apps/monitoring/shared'),
+      '@/components/ui': path.resolve(__dirname, './src/modules/monitoring/shared/ui'),
+      '@monitoring-shared': path.resolve(__dirname, './src/modules/monitoring/shared'),
       '@': path.resolve(__dirname, './src'),
     },
   },

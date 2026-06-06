@@ -1,7 +1,0 @@
-{
-  "plot_id": "PLOT-BETA",
-  "variables": [
-    "ndvi",
-    "ndmi"
-  ]
-}
