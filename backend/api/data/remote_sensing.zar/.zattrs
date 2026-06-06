@@ -1,0 +1,10 @@
+{
+  "description": "Geospatial Remote Sensing Timeseries for Farmintelytics",
+  "variables": [
+    "ndvi",
+    "ndmi"
+  ],
+  "dimensions": [
+    "time"
+  ]
+}
