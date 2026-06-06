@@ -7,9 +7,9 @@
 #   PLOT-GAMMA  → "South Slope Plot"   15.0 HA   North Ridge Estate
 #
 # Restoration zones match RESTORATION_ZONES constant in AgroMonitor.jsx:
-#   ZONE-ALPHA  → "Canopy Reforestation"          6.4 HA   John Musa
-#   ZONE-BETA   → "Agroforestry Zone"             5.8 HA   Alice Peters
-#   ZONE-GAMMA  → "Riparian Buffer Restoration"   8.1 HA   David Kalu
+#   ZONE-ALPHA  → "Canopy Reforestation"           6.4 HA   John Musa
+#   ZONE-BETA   → "Agroforestry Zone"              5.8 HA   Alice Peters
+#   ZONE-GAMMA  → "Riparian Buffer Zone"           8.1 HA   David Kalu
 #
 # Boundary coordinates are GeoJSON [lng, lat] order.
 # The frontend helper geoJsonToLeaflet() in src/api/agromonitorApi.js
@@ -19,7 +19,7 @@
 MOCK_PLOTS = {
     "PLOT-ALPHA": {
         "plot_id": "PLOT-ALPHA",
-        "name": "West Valley Plot",       # matches frontend plotsData name
+        "name": "West Valley Plot",        # matches frontend plotsData name
         "estate": "West Valley Estate",
         "area_ha": 12.5,
         "historical_yield_base": 18.5,
@@ -32,7 +32,7 @@ MOCK_PLOTS = {
     },
     "PLOT-BETA": {
         "plot_id": "PLOT-BETA",
-        "name": "East Ridge Plot",        # matches frontend plotsData name
+        "name": "East Ridge Plot",         # matches frontend plotsData name
         "estate": "West Valley Estate",
         "area_ha": 8.2,
         "historical_yield_base": 14.2,
@@ -45,7 +45,7 @@ MOCK_PLOTS = {
     },
     "PLOT-GAMMA": {
         "plot_id": "PLOT-GAMMA",
-        "name": "South Slope Plot",       # matches frontend plotsData name
+        "name": "South Slope Plot",        # matches frontend plotsData name
         "estate": "North Ridge Estate",
         "area_ha": 15.0,
         "historical_yield_base": 16.0,
@@ -58,9 +58,9 @@ MOCK_PLOTS = {
     }
 }
 
-# ── Restoration zones ────────────────────────────────────────────────────────
-# Names, managers, area labels and progress values match RESTORATION_ZONES
-# and restorationPlotsDataA in AgroMonitor.jsx.
+# ── Restoration zones ─────────────────────────────────────────────────────────
+# Names, managers, area labels and progress values exactly match RESTORATION_ZONES
+# and the zone popup display fields in AgroMonitor.jsx.
 MOCK_RESTORATION_ZONES = {
     "ZONE-ALPHA": {
         "zone_id": "ZONE-ALPHA",
@@ -69,11 +69,15 @@ MOCK_RESTORATION_ZONES = {
         "project_type": "Canopy Density",
         "progress_pct": 88,
         "survival_rate_pct": 94,
+        "survival_display": "94%",
         "tree_count": 1200,
+        "tree_count_display": "1,200",
         "carbon_offset_tco2e": 45.2,
+        "carbon_display": "45.2 tCO2e",
         "biodiversity_score": "92%",
+        "biodiversity_score_num": 92,
         "status": "Optimal Growth",
-        "manager": "John Musa",           # matches frontend manager field
+        "manager": "John Musa",             # matches frontend manager field
         # GeoJSON [lng, lat] — matches RESTORE_ZONE_A_COORDS swapped
         "boundary": {
             "type": "Polygon",
@@ -87,11 +91,15 @@ MOCK_RESTORATION_ZONES = {
         "project_type": "Species Diversification",
         "progress_pct": 74,
         "survival_rate_pct": 89,
+        "survival_display": "89%",
         "tree_count": 980,
+        "tree_count_display": "980",
         "carbon_offset_tco2e": 32.8,
+        "carbon_display": "32.8 tCO2e",
         "biodiversity_score": "88%",
+        "biodiversity_score_num": 88,
         "status": "Active Care",
-        "manager": "Alice Peters",        # matches frontend manager field
+        "manager": "Alice Peters",          # matches frontend manager field
         "boundary": {
             "type": "Polygon",
             "coordinates": [[[3.356, 7.141], [3.356, 7.144], [3.361, 7.144], [3.361, 7.141], [3.356, 7.141]]]
@@ -99,22 +107,27 @@ MOCK_RESTORATION_ZONES = {
     },
     "ZONE-GAMMA": {
         "zone_id": "ZONE-GAMMA",
-        "name": "Riparian Buffer Restoration",
+        "name": "Riparian Buffer Zone",     # matches RESTORATION_ZONES[2].name in AgroMonitor.jsx
         "area": "8.1 HA",
         "project_type": "Soil Stabilization",
         "progress_pct": 62,
         "survival_rate_pct": 81,
+        "survival_display": "81%",
         "tree_count": 1550,
+        "tree_count_display": "1,550",
         "carbon_offset_tco2e": 21.5,
+        "carbon_display": "21.5 tCO2e",
         "biodiversity_score": "81%",
+        "biodiversity_score_num": 81,
         "status": "Initial Phase",
-        "manager": "David Kalu",          # matches frontend manager field
+        "manager": "David Kalu",            # matches frontend manager field
         "boundary": {
             "type": "Polygon",
             "coordinates": [[[3.350, 7.135], [3.350, 7.139], [3.355, 7.139], [3.355, 7.135], [3.350, 7.135]]]
         }
     }
 }
+
 
 def verify_boundary_integrity(coordinates) -> bool:
     """
@@ -131,6 +144,7 @@ def verify_boundary_integrity(coordinates) -> bool:
     if abs(first_pt[0] - 7.12) < 0.005:
         return False
     return True
+
 
 def run_eudr_forest_check(plot_id: str) -> dict:
     """
