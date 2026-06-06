@@ -9,20 +9,29 @@ router = Router(tags=["Intelligence Layers"])
 @router.get("/", response=List[PlotIntelligence])
 def get_plots_intelligence(request):
     """
-    Returns boundaries and composite indices for all plots.
-    Calculations are derived dynamically from simulated satellite bands.
+    Returns plot boundaries + composite indices for the Intelligence Layers map.
+
+    Frontend field mapping (from agromonitorApi.js):
+      plot_id              → id  (PLOT-ALPHA / PLOT-BETA / PLOT-GAMMA)
+      name                 → name
+      area_ha              → area (displayed in sidebar cards)
+      indices.ndvi         → ndvi
+      indices.ndmi         → ndmi
+      indices.chlorophyll  → chlorophyll (CAR RECI proxy)
+      indices.uas_anomaly_score → uas_anomaly_score
+      boundary.coordinates → coords (after lat/lng swap via geoJsonToLeaflet)
     """
     results = []
     for plot_id, plot_data in MOCK_PLOTS.items():
         bands = plot_data["sentinel_bands"]
-        
+
         ndvi = calculate_ndvi(bands["nir"], bands["red"])
         ndmi = calculate_ndmi(bands["nir"], bands["swir1"])
-        
-        # Calculate Chlorophyll (CAR) as a red-edge absorption proxy
+
+        # Chlorophyll (CAR) as red-edge absorption proxy
         chlorophyll = round(ndvi * 0.9, 2)
-        
-        # Assign custom drone UAS anomaly scores based on moisture/health deficit
+
+        # Drone UAS anomaly scores (localized from multispectral UAV orthomosaic)
         if plot_id == "PLOT-ALPHA":
             uas_anomaly = 0.15
         elif plot_id == "PLOT-BETA":
@@ -35,6 +44,7 @@ def get_plots_intelligence(request):
                 plot_id=plot_id,
                 name=plot_data["name"],
                 estate=plot_data["estate"],
+                area_ha=plot_data["area_ha"],
                 boundary=plot_data["boundary"],
                 indices=PlotIndices(
                     ndvi=round(ndvi, 2),

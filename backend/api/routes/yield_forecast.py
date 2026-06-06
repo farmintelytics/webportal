@@ -10,14 +10,21 @@ router = Router(tags=["Crop Yield Forecasting"])
 def get_plots_yield_forecast(request, date: Optional[str] = None, plot_id: Optional[str] = None):
     """
     Returns harvest yield forecasts and canopy biomass estimations:
-    - Estimated Yield Rate (t/HA)
-    - Projected Season Output (Tonnes)
-    - Dry Biomass index (EVI)
-    - Harvest Readiness Percentage
-    - Forecasting Confidence Accuracy
+    - Estimated Yield Rate (t/HA)          → yield_rate_ton_ha
+    - Projected Season Output (Tonnes)     → projected_yield_tons
+    - Dry Biomass index (EVI)              → biomass_index
+    - Harvest Readiness Percentage         → harvest_readiness_pct
+    - Forecasting Confidence Accuracy      → confidence_accuracy
+
+    Frontend field mapping (from agromonitorApi.js):
+      yield_rate_ton_ha    → yieldValue
+      projected_yield_tons → predictedYield
+      biomass_index        → biomass (EVI-derived)
+      harvest_readiness_pct → readiness
+      confidence_accuracy  → predAccuracy
     """
     results = []
-    
+
     # Filter plots
     target_plots = MOCK_PLOTS
     if plot_id:
@@ -28,18 +35,18 @@ def get_plots_yield_forecast(request, date: Optional[str] = None, plot_id: Optio
 
     for pid, pdata in target_plots.items():
         bands = pdata["sentinel_bands"]
-        
+
         ndvi = calculate_ndvi(bands["nir"], bands["red"])
         evi = calculate_evi(bands["nir"], bands["red"], bands["blue"])
-        
+
         # Calculate yield rate using regression model
         yield_rate = model_yield_rate(ndvi, pdata["historical_yield_base"])
         projected_yield = round(yield_rate * pdata["area_ha"], 1)
-        
-        # Define readiness profiles
+
+        # Define readiness profiles per plot
         readiness_pct = 92
         confidence = "95.4%"
-        
+
         if pid == "PLOT-BETA":
             readiness_pct = 76
             confidence = "91.2%"
@@ -50,6 +57,8 @@ def get_plots_yield_forecast(request, date: Optional[str] = None, plot_id: Optio
         results.append(
             PlotYieldResponse(
                 plot_id=pid,
+                name=pdata["name"],
+                area_ha=pdata["area_ha"],
                 yield_rate_ton_ha=yield_rate,
                 projected_yield_tons=projected_yield,
                 biomass_index=round(evi, 2),
