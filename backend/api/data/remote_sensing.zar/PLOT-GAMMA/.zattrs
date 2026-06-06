@@ -1,0 +1,7 @@
+{
+  "plot_id": "PLOT-GAMMA",
+  "variables": [
+    "ndvi",
+    "ndmi"
+  ]
+}

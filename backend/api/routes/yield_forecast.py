@@ -1,8 +1,18 @@
+"""
+yield_forecast.py — Crop Yield Forecasting route
+──────────────────────────────────────────────────────────────────────────────
+Band reflectance values are read from:
+  backend/api/data/sentinel_bands.zar/<PLOT-ID>/<band>/0
+Plot metadata (name, area, yield base) from:
+  backend/api/data/plots.geojson  (loaded via gis.MOCK_PLOTS)
+──────────────────────────────────────────────────────────────────────────────
+"""
 from ninja import Router
 from typing import List, Optional
-from ..utils.gis import MOCK_PLOTS
+from ..utils.gis import MOCK_PLOTS, get_sentinel_bands_from_zarr
 from ..utils.calculations import calculate_ndvi, calculate_evi, model_yield_rate
 from ..schemas.plot import PlotYieldResponse
+
 
 router = Router(tags=["Crop Yield Forecasting"])
 
@@ -34,7 +44,8 @@ def get_plots_yield_forecast(request, date: Optional[str] = None, plot_id: Optio
             return []
 
     for pid, pdata in target_plots.items():
-        bands = pdata["sentinel_bands"]
+        # Read band reflectance live from sentinel_bands.zar/<pid>/<band>/0
+        bands = get_sentinel_bands_from_zarr(pid)
 
         ndvi = calculate_ndvi(bands["nir"], bands["red"])
         evi = calculate_evi(bands["nir"], bands["red"], bands["blue"])

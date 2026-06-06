@@ -1,0 +1,10 @@
+{
+  "plot_id": "PLOT-ALPHA",
+  "bands": [
+    "blue",
+    "red",
+    "nir",
+    "swir1",
+    "swir2"
+  ]
+}

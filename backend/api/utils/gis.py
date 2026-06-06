@@ -1,179 +1,161 @@
-# Mock GIS Utility simulating PostGIS and remote sensing ingest pipelines.
-#
-# ── FRONTEND ALIGNMENT NOTE ──────────────────────────────────────────────────
-# Plot names, IDs, area_ha and estate fields exactly match AgroMonitor.jsx:
-#   PLOT-ALPHA  → "West Valley Plot"   12.5 HA   West Valley Estate
-#   PLOT-BETA   → "East Ridge Plot"     8.2 HA   West Valley Estate
-#   PLOT-GAMMA  → "South Slope Plot"   15.0 HA   North Ridge Estate
-#
-# Restoration zones match RESTORATION_ZONES constant in AgroMonitor.jsx:
-#   ZONE-ALPHA  → "Canopy Reforestation"           6.4 HA   John Musa
-#   ZONE-BETA   → "Agroforestry Zone"              5.8 HA   Alice Peters
-#   ZONE-GAMMA  → "Riparian Buffer Zone"           8.1 HA   David Kalu
-#
-# Boundary coordinates are GeoJSON [lng, lat] order.
-# The frontend helper geoJsonToLeaflet() in src/api/agromonitorApi.js
-# converts them to Leaflet [lat, lng] before passing to <Polygon>.
-# ─────────────────────────────────────────────────────────────────────────────
+"""
+gis.py — Geospatial data loader
+──────────────────────────────────────────────────────────────────────────────
+Loads all spatial data from the pre-generated geospatial files in api/data/:
+  plots.geojson               → MOCK_PLOTS dict (keyed by plot_id)
+  restoration_zones.geojson   → MOCK_RESTORATION_ZONES dict (keyed by zone_id)
+  lulc.geojson                → LULC_FEATURES list
+  eudr_compliance.json        → EUDR_RECORDS dict
+  sentinel_bands.zar/         → band reflectance values read via Zarr helpers
+  remote_sensing.zar/         → NDVI/NDMI timeseries read via Zarr helpers
 
-MOCK_PLOTS = {
-    "PLOT-ALPHA": {
-        "plot_id": "PLOT-ALPHA",
-        "name": "West Valley Plot",        # matches frontend plotsData name
-        "estate": "West Valley Estate",
-        "area_ha": 12.5,
-        "historical_yield_base": 18.5,
-        # Coordinates match PLOT_ALPHA_COORDS in AgroMonitor.jsx (lng/lat order)
-        "boundary": {
-            "type": "Polygon",
-            "coordinates": [[[3.355, 7.145], [3.355, 7.150], [3.360, 7.150], [3.360, 7.145], [3.355, 7.145]]]
-        },
-        "sentinel_bands": {"blue": 0.05, "red": 0.08, "nir": 0.65, "swir1": 0.20, "swir2": 0.12}
-    },
-    "PLOT-BETA": {
-        "plot_id": "PLOT-BETA",
-        "name": "East Ridge Plot",         # matches frontend plotsData name
-        "estate": "West Valley Estate",
-        "area_ha": 8.2,
-        "historical_yield_base": 14.2,
-        # Coordinates match PLOT_BETA_COORDS in AgroMonitor.jsx (lng/lat order)
-        "boundary": {
-            "type": "Polygon",
-            "coordinates": [[[3.362, 7.145], [3.362, 7.150], [3.367, 7.150], [3.367, 7.145], [3.362, 7.145]]]
-        },
-        "sentinel_bands": {"blue": 0.06, "red": 0.14, "nir": 0.40, "swir1": 0.22, "swir2": 0.16}
-    },
-    "PLOT-GAMMA": {
-        "plot_id": "PLOT-GAMMA",
-        "name": "South Slope Plot",        # matches frontend plotsData name
-        "estate": "North Ridge Estate",
-        "area_ha": 15.0,
-        "historical_yield_base": 16.0,
-        # Coordinates match PLOT_GAMMA_COORDS in AgroMonitor.jsx (lng/lat order)
-        "boundary": {
-            "type": "Polygon",
-            "coordinates": [[[3.355, 7.138], [3.355, 7.143], [3.360, 7.143], [3.360, 7.138], [3.355, 7.138]]]
-        },
-        "sentinel_bands": {"blue": 0.04, "red": 0.07, "nir": 0.68, "swir1": 0.18, "swir2": 0.10}
+All downstream route handlers import from here — no inline hardcoded dicts.
+──────────────────────────────────────────────────────────────────────────────
+"""
+import os, json, struct
+
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+
+
+# ─── Zarr helpers ──────────────────────────────────────────────────────────────
+def _zarr_read(array_dir: str) -> list:
+    """Read a float32 Zarr array from a directory (no external zarr library needed)."""
+    with open(os.path.join(array_dir, '.zarray')) as f:
+        meta = json.load(f)
+    n = meta['shape'][0]
+    with open(os.path.join(array_dir, '0'), 'rb') as f:
+        return [round(v, 4) for v in struct.unpack(f'<{n}f', f.read())]
+
+
+# ─── Load plots.geojson ────────────────────────────────────────────────────────
+def _load_plots() -> dict:
+    with open(os.path.join(DATA_DIR, 'plots.geojson')) as f:
+        fc = json.load(f)
+    plots = {}
+    for feat in fc['features']:
+        p   = feat['properties']
+        pid = p['plot_id']
+        # Reconstruct sentinel_bands from flat GeoJSON properties
+        plots[pid] = {
+            'plot_id':               pid,
+            'name':                  p['name'],
+            'estate':                p['estate'],
+            'area_ha':               p['area_ha'],
+            'historical_yield_base': p['historical_yield_base'],
+            'boundary':              feat['geometry'],
+            'sentinel_bands': {
+                'blue':  p['sentinel_blue'],
+                'red':   p['sentinel_red'],
+                'nir':   p['sentinel_nir'],
+                'swir1': p['sentinel_swir1'],
+                'swir2': p['sentinel_swir2'],
+            }
+        }
+    return plots
+
+
+# ─── Load restoration_zones.geojson ───────────────────────────────────────────
+def _load_zones() -> dict:
+    with open(os.path.join(DATA_DIR, 'restoration_zones.geojson')) as f:
+        fc = json.load(f)
+    zones = {}
+    for feat in fc['features']:
+        p  = feat['properties']
+        zid = p['zone_id']
+        zones[zid] = {**p, 'boundary': feat['geometry']}
+    return zones
+
+
+# ─── Load lulc.geojson ────────────────────────────────────────────────────────
+def _load_lulc() -> list:
+    with open(os.path.join(DATA_DIR, 'lulc.geojson')) as f:
+        fc = json.load(f)
+    return [
+        {**feat['properties'], 'geometry': feat['geometry']}
+        for feat in fc['features']
+    ]
+
+
+# ─── Load eudr_compliance.json ────────────────────────────────────────────────
+def _load_eudr() -> dict:
+    with open(os.path.join(DATA_DIR, 'eudr_compliance.json')) as f:
+        return json.load(f)
+
+
+# ─── Public module-level caches (loaded once at import time) ──────────────────
+MOCK_PLOTS              = _load_plots()
+MOCK_RESTORATION_ZONES  = _load_zones()
+LULC_FEATURES           = _load_lulc()
+EUDR_DATA               = _load_eudr()
+
+
+# ─── Zarr-backed Sentinel-2 band lookup ───────────────────────────────────────
+def get_sentinel_bands_from_zarr(plot_id: str) -> dict:
+    """
+    Read the current-snapshot Sentinel-2 band reflectance for a plot
+    from sentinel_bands.zar/<plot_id>/<band>/0.
+    Returns a dict matching the legacy sentinel_bands schema.
+    """
+    zarr_dir = os.path.join(DATA_DIR, 'sentinel_bands.zar', plot_id)
+    return {
+        band: _zarr_read(os.path.join(zarr_dir, band))[0]
+        for band in ('blue', 'red', 'nir', 'swir1', 'swir2')
     }
-}
 
-# ── Restoration zones ─────────────────────────────────────────────────────────
-# Names, managers, area labels and progress values exactly match RESTORATION_ZONES
-# and the zone popup display fields in AgroMonitor.jsx.
-MOCK_RESTORATION_ZONES = {
-    "ZONE-ALPHA": {
-        "zone_id": "ZONE-ALPHA",
-        "name": "Canopy Reforestation",
-        "area": "6.4 HA",
-        "project_type": "Canopy Density",
-        "progress_pct": 88,
-        "survival_rate_pct": 94,
-        "survival_display": "94%",
-        "tree_count": 1200,
-        "tree_count_display": "1,200",
-        "carbon_offset_tco2e": 45.2,
-        "carbon_display": "45.2 tCO2e",
-        "biodiversity_score": "92%",
-        "biodiversity_score_num": 92,
-        "status": "Optimal Growth",
-        "manager": "John Musa",             # matches frontend manager field
-        # GeoJSON [lng, lat] — matches RESTORE_ZONE_A_COORDS swapped
-        "boundary": {
-            "type": "Polygon",
-            "coordinates": [[[3.350, 7.141], [3.350, 7.144], [3.354, 7.144], [3.354, 7.141], [3.350, 7.141]]]
+
+# ─── Zarr-backed NDVI/NDMI timeseries lookup ──────────────────────────────────
+def get_ndvi_timeseries(plot_id: str = None) -> list:
+    """
+    Return 24-week NDVI float list.
+    If plot_id is None returns farm-wide average; else returns per-plot series.
+    """
+    if plot_id and plot_id in MOCK_PLOTS:
+        return _zarr_read(os.path.join(DATA_DIR, 'remote_sensing.zar', plot_id, 'ndvi'))
+    return _zarr_read(os.path.join(DATA_DIR, 'remote_sensing.zar', 'farm_ndvi'))
+
+
+def get_ndmi_timeseries(plot_id: str = None) -> list:
+    """
+    Return 24-week NDMI float list.
+    If plot_id is None returns farm-wide average; else returns per-plot series.
+    """
+    if plot_id and plot_id in MOCK_PLOTS:
+        return _zarr_read(os.path.join(DATA_DIR, 'remote_sensing.zar', plot_id, 'ndmi'))
+    return _zarr_read(os.path.join(DATA_DIR, 'remote_sensing.zar', 'farm_ndmi'))
+
+
+# ─── EUDR forest-check helper ─────────────────────────────────────────────────
+def run_eudr_forest_check(plot_id: str) -> dict:
+    """
+    Returns EUDR compliance record for a plot, loaded from eudr_compliance.json.
+    Falls back to a non-compliant result for unknown plot IDs.
+    """
+    records = EUDR_DATA.get('records', {})
+    rec = records.get(plot_id)
+    if rec:
+        return {
+            'complies':             rec['complies'],
+            'canopy_loss_pct':      rec['canopy_loss_pct'],
+            'baseline_canopy_2020': rec['baseline_canopy_2020'],
+            'current_canopy_pct':   rec['current_canopy_pct'],
         }
-    },
-    "ZONE-BETA": {
-        "zone_id": "ZONE-BETA",
-        "name": "Agroforestry Zone",
-        "area": "5.8 HA",
-        "project_type": "Species Diversification",
-        "progress_pct": 74,
-        "survival_rate_pct": 89,
-        "survival_display": "89%",
-        "tree_count": 980,
-        "tree_count_display": "980",
-        "carbon_offset_tco2e": 32.8,
-        "carbon_display": "32.8 tCO2e",
-        "biodiversity_score": "88%",
-        "biodiversity_score_num": 88,
-        "status": "Active Care",
-        "manager": "Alice Peters",          # matches frontend manager field
-        "boundary": {
-            "type": "Polygon",
-            "coordinates": [[[3.356, 7.141], [3.356, 7.144], [3.361, 7.144], [3.361, 7.141], [3.356, 7.141]]]
-        }
-    },
-    "ZONE-GAMMA": {
-        "zone_id": "ZONE-GAMMA",
-        "name": "Riparian Buffer Zone",     # matches RESTORATION_ZONES[2].name in AgroMonitor.jsx
-        "area": "8.1 HA",
-        "project_type": "Soil Stabilization",
-        "progress_pct": 62,
-        "survival_rate_pct": 81,
-        "survival_display": "81%",
-        "tree_count": 1550,
-        "tree_count_display": "1,550",
-        "carbon_offset_tco2e": 21.5,
-        "carbon_display": "21.5 tCO2e",
-        "biodiversity_score": "81%",
-        "biodiversity_score_num": 81,
-        "status": "Initial Phase",
-        "manager": "David Kalu",            # matches frontend manager field
-        "boundary": {
-            "type": "Polygon",
-            "coordinates": [[[3.350, 7.135], [3.350, 7.139], [3.355, 7.139], [3.355, 7.135], [3.350, 7.135]]]
-        }
+    return {
+        'complies': False,
+        'canopy_loss_pct': 100.0,
+        'baseline_canopy_2020': 0.0,
+        'current_canopy_pct': 0.0,
     }
-}
 
 
+# ─── Boundary integrity check (PostGIS ST_Overlaps simulation) ────────────────
 def verify_boundary_integrity(coordinates) -> bool:
     """
-    Simulates a PostGIS ST_Overlaps or ST_Contains check.
-    Returns True if the boundary is clear of spatial disputes (collisions),
-    False if it collides with another protected boundary.
-    For this mock: coordinates near [7.12, 3.32] represent overlapping registry disputes.
+    Simulates a PostGIS ST_Overlaps / ST_Contains check.
+    Returns False for coordinates near the disputed zone at lng≈7.12.
     """
     if not coordinates or len(coordinates) == 0:
         return False
-    # Simple check on coordinates to mock boundary collision
     first_pt = coordinates[0][0]
-    # If coordinate x value is close to 7.12, flag an overlap dispute
     if abs(first_pt[0] - 7.12) < 0.005:
         return False
     return True
-
-
-def run_eudr_forest_check(plot_id: str) -> dict:
-    """
-    Checks the plot's temporal canopy cover change since the Dec 31, 2020 cutoff.
-    Returns:
-      - complies (bool)
-      - canopy_loss_pct (float)
-      - baseline_canopy_2020 (float)
-      - current_canopy_pct (float)
-    """
-    if plot_id == "PLOT-ALPHA":
-        return {
-            "complies": True,
-            "canopy_loss_pct": 0.8,
-            "baseline_canopy_2020": 42.5,
-            "current_canopy_pct": 41.7
-        }
-    elif plot_id == "PLOT-BETA":
-        return {
-            "complies": True,
-            "canopy_loss_pct": 0.2,
-            "baseline_canopy_2020": 30.1,
-            "current_canopy_pct": 29.9
-        }
-    else:  # PLOT-GAMMA
-        # Simulate a minor deforestation event
-        return {
-            "complies": False,
-            "canopy_loss_pct": 14.5,
-            "baseline_canopy_2020": 78.0,
-            "current_canopy_pct": 63.5
-        }

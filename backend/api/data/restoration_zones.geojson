@@ -1,0 +1,153 @@
+{
+  "type": "FeatureCollection",
+  "name": "farmintelytics_restoration_zones",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "ZONE-ALPHA",
+        "name": "Canopy Reforestation",
+        "area": "6.4 HA",
+        "project_type": "Canopy Density",
+        "progress_pct": 88,
+        "survival_rate_pct": 94,
+        "survival_display": "94%",
+        "tree_count": 1200,
+        "tree_count_display": "1,200",
+        "carbon_offset_tco2e": 45.2,
+        "carbon_display": "45.2 tCO2e",
+        "biodiversity_score": "92%",
+        "biodiversity_score_num": 92,
+        "status": "Optimal Growth",
+        "manager": "John Musa"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              3.35,
+              7.141
+            ],
+            [
+              3.35,
+              7.144
+            ],
+            [
+              3.354,
+              7.144
+            ],
+            [
+              3.354,
+              7.141
+            ],
+            [
+              3.35,
+              7.141
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "ZONE-BETA",
+        "name": "Agroforestry Zone",
+        "area": "5.8 HA",
+        "project_type": "Species Diversification",
+        "progress_pct": 74,
+        "survival_rate_pct": 89,
+        "survival_display": "89%",
+        "tree_count": 980,
+        "tree_count_display": "980",
+        "carbon_offset_tco2e": 32.8,
+        "carbon_display": "32.8 tCO2e",
+        "biodiversity_score": "88%",
+        "biodiversity_score_num": 88,
+        "status": "Active Care",
+        "manager": "Alice Peters"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              3.356,
+              7.141
+            ],
+            [
+              3.356,
+              7.144
+            ],
+            [
+              3.361,
+              7.144
+            ],
+            [
+              3.361,
+              7.141
+            ],
+            [
+              3.356,
+              7.141
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "ZONE-GAMMA",
+        "name": "Riparian Buffer Zone",
+        "area": "8.1 HA",
+        "project_type": "Soil Stabilization",
+        "progress_pct": 62,
+        "survival_rate_pct": 81,
+        "survival_display": "81%",
+        "tree_count": 1550,
+        "tree_count_display": "1,550",
+        "carbon_offset_tco2e": 21.5,
+        "carbon_display": "21.5 tCO2e",
+        "biodiversity_score": "81%",
+        "biodiversity_score_num": 81,
+        "status": "Initial Phase",
+        "manager": "David Kalu"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              3.35,
+              7.135
+            ],
+            [
+              3.35,
+              7.139
+            ],
+            [
+              3.355,
+              7.139
+            ],
+            [
+              3.355,
+              7.135
+            ],
+            [
+              3.35,
+              7.135
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

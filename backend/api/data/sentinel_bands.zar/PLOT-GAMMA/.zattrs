@@ -1,0 +1,10 @@
+{
+  "plot_id": "PLOT-GAMMA",
+  "bands": [
+    "blue",
+    "red",
+    "nir",
+    "swir1",
+    "swir2"
+  ]
+}

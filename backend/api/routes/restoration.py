@@ -1,3 +1,12 @@
+"""
+restoration.py — Land Restoration & Agroforestry route
+──────────────────────────────────────────────────────────────────────────────
+Spatial data is loaded from:  backend/api/data/restoration_zones.geojson
+
+The gis.py utility parses the GeoJSON FeatureCollection at import time and
+exposes MOCK_RESTORATION_ZONES as a dict keyed by zone_id.
+──────────────────────────────────────────────────────────────────────────────
+"""
 from ninja import Router
 from typing import List
 from ..utils.gis import MOCK_RESTORATION_ZONES
@@ -5,10 +14,12 @@ from ..schemas.restoration import RestorationZoneResponse
 
 router = Router(tags=["Land Restoration & Agroforestry"])
 
+
 @router.get("/", response=List[RestorationZoneResponse])
 def get_restoration_zones(request):
     """
-    Returns spatial boundaries and verification parameters for active restoration zones.
+    Returns spatial boundaries and verification parameters for active
+    restoration zones, sourced from restoration_zones.geojson.
 
     Frontend field mapping (from agromonitorApi.js):
       zone_id              → id

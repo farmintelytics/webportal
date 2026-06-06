@@ -1,6 +1,15 @@
+"""
+intelligence.py — Intelligence Layers route
+────────────────────────────────────────────────────────────────────────
+Band reflectance values are read from:
+  backend/api/data/sentinel_bands.zar/<PLOT-ID>/<band>/0
+Plot boundaries + metadata from:
+  backend/api/data/plots.geojson  (loaded via gis.MOCK_PLOTS)
+────────────────────────────────────────────────────────────────────────
+"""
 from ninja import Router
 from typing import List
-from ..utils.gis import MOCK_PLOTS
+from ..utils.gis import MOCK_PLOTS, get_sentinel_bands_from_zarr
 from ..utils.calculations import calculate_ndvi, calculate_ndmi
 from ..schemas.plot import PlotIntelligence, PlotIndices
 
@@ -23,7 +32,8 @@ def get_plots_intelligence(request):
     """
     results = []
     for plot_id, plot_data in MOCK_PLOTS.items():
-        bands = plot_data["sentinel_bands"]
+        # Read band reflectance live from sentinel_bands.zar/<plot_id>/<band>/0
+        bands = get_sentinel_bands_from_zarr(plot_id)
 
         ndvi = calculate_ndvi(bands["nir"], bands["red"])
         ndmi = calculate_ndmi(bands["nir"], bands["swir1"])

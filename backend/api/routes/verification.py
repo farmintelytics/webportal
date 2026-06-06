@@ -1,7 +1,25 @@
+"""
+verification.py — MRV Verification Portal route
+──────────────────────────────────────────────────────────────────────────────
+Data sources:
+  Plot boundaries & attributes → backend/api/data/plots.geojson
+  EUDR compliance records      → backend/api/data/eudr_compliance.json
+  Sentinel-2 band reflectance  → backend/api/data/sentinel_bands.zar/
+    (read as float32 Zarr chunks — no external zarr library required)
+
+All data is loaded by gis.py at import time.  The audit logic itself runs
+the same 4-step verification pipeline as before.
+──────────────────────────────────────────────────────────────────────────────
+"""
 import time
 from ninja import Router
 from typing import Optional
-from ..utils.gis import MOCK_PLOTS, verify_boundary_integrity, run_eudr_forest_check
+from ..utils.gis import (
+    MOCK_PLOTS,
+    verify_boundary_integrity,
+    run_eudr_forest_check,
+    get_sentinel_bands_from_zarr,
+)
 from ..utils.calculations import calculate_ndvi, calculate_ndmi
 from ..schemas.verification import AuditResponse, VerificationItem
 
@@ -11,7 +29,10 @@ router = Router(tags=["MRV Verification Portal"])
 @router.get("/audit", response=AuditResponse)
 def run_mrv_audit(request, plot_id: Optional[str] = "PLOT-ALPHA"):
     """
-    Evaluates regulatory and voluntary carbon standard checklists for a selected plot.
+    Evaluates regulatory and voluntary carbon standard checklists for a plot.
+    Band reflectance values are read live from sentinel_bands.zar/.
+    EUDR compliance records are loaded from eudr_compliance.json.
+
     Runs 4 verification checks:
       1. Boundary Integrity Check (PostGIS overlap check)
       2. Deforestation Compliance Check (EUDR Dec-2020 cutoff)
@@ -39,14 +60,15 @@ def run_mrv_audit(request, plot_id: Optional[str] = "PLOT-ALPHA"):
             logs=[f"[ERROR] Invalid plot_id '{plot_id}' requested.", "[ERROR] Audit aborted."]
         )
 
-    bands  = plot["sentinel_bands"]
+    # ── Read band reflectance from sentinel_bands.zar ─────────────────────────
+    bands  = get_sentinel_bands_from_zarr(plot_id)
     ndvi   = calculate_ndvi(bands["nir"], bands["red"])
     ndmi   = calculate_ndmi(bands["nir"], bands["swir1"])
     checks = []
     logs   = []
     ts     = time.strftime("%Y-%m-%d %H:%M:%S GMT")
 
-    # ── Check 1: Boundary Integrity ────────────────────────────────────────
+    # ── Check 1: Boundary Integrity ───────────────────────────────────────────
     coords          = plot["boundary"]["coordinates"]
     boundary_ok     = verify_boundary_integrity(coords)
     boundary_status = "Pass" if boundary_ok else "Failed"
@@ -61,9 +83,9 @@ def run_mrv_audit(request, plot_id: Optional[str] = "PLOT-ALPHA"):
     ))
     logs.append(f"[{boundary_status.upper()}] Boundary integrity check completed at {ts}.")
 
-    # ── Check 2: EUDR Deforestation Compliance ─────────────────────────────
-    eudr           = run_eudr_forest_check(plot_id)
-    eudr_status    = "Pass" if eudr["complies"] else "Failed"
+    # ── Check 2: EUDR Deforestation Compliance ────────────────────────────────
+    eudr        = run_eudr_forest_check(plot_id)
+    eudr_status = "Pass" if eudr["complies"] else "Failed"
     checks.append(VerificationItem(
         name="Deforestation Compliance Check (EUDR)",
         status=eudr_status,
@@ -80,40 +102,39 @@ def run_mrv_audit(request, plot_id: Optional[str] = "PLOT-ALPHA"):
         f"Canopy loss: {eudr['canopy_loss_pct']}%."
     )
 
-    # ── Check 3: Canopy Density Standard ───────────────────────────────────
-    ndvi_threshold  = 0.45
-    ndvi_ok         = ndvi >= ndvi_threshold
-    ndvi_status     = "Pass" if ndvi_ok else "Warning"
+    # ── Check 3: Canopy Density Standard ─────────────────────────────────────
+    ndvi_threshold = 0.45
+    ndvi_ok        = ndvi >= ndvi_threshold
+    ndvi_status    = "Pass" if ndvi_ok else "Warning"
     checks.append(VerificationItem(
         name="Canopy Density Standard (NDVI)",
         status=ndvi_status,
         details=(
             f"Measured NDVI: {round(ndvi, 3)}. "
-            f"Required threshold: ≥ {ndvi_threshold}. "
+            f"Required threshold: >= {ndvi_threshold}. "
             f"{'Photosynthetic canopy coverage meets standard.' if ndvi_ok else 'Canopy density below acceptable threshold — possible crop stress.'}"
         ),
-        description="Measures active photosynthetic activity coverage using Sentinel-2 NDVI (NIR−Red)/(NIR+Red)."
+        description="Measures active photosynthetic activity coverage using Sentinel-2 NDVI (NIR-Red)/(NIR+Red)."
     ))
     logs.append(f"[{'PASS' if ndvi_ok else 'WARN'}] Canopy density NDVI check: {round(ndvi, 3)} vs threshold {ndvi_threshold}.")
 
-    # ── Check 4: Soil Water Index Target ───────────────────────────────────
-    ndmi_threshold  = 0.35
-    ndmi_ok         = ndmi >= ndmi_threshold
-    ndmi_status     = "Pass" if ndmi_ok else "Warning"
+    # ── Check 4: Soil Water Index Target ─────────────────────────────────────
+    ndmi_threshold = 0.35
+    ndmi_ok        = ndmi >= ndmi_threshold
+    ndmi_status    = "Pass" if ndmi_ok else "Warning"
     checks.append(VerificationItem(
         name="Soil Water Index Target (NDMI)",
         status=ndmi_status,
         details=(
             f"Measured NDMI: {round(ndmi, 3)}. "
-            f"Required threshold: ≥ {ndmi_threshold}. "
+            f"Required threshold: >= {ndmi_threshold}. "
             f"{'Root-zone moisture within acceptable range.' if ndmi_ok else 'Soil moisture below target — irrigation deficit likely.'}"
         ),
-        description="Assesses root-zone moisture anomalies using Sentinel-2 NDMI (NIR−SWIR)/(NIR+SWIR)."
+        description="Assesses root-zone moisture anomalies using Sentinel-2 NDMI (NIR-SWIR)/(NIR+SWIR)."
     ))
     logs.append(f"[{'PASS' if ndmi_ok else 'WARN'}] Soil water NDMI check: {round(ndmi, 3)} vs threshold {ndmi_threshold}.")
     logs.append(f"[INFO] Full MRV audit for {plot_id} ({plot['name']}) completed at {ts}.")
 
-    # Overall compliance: all checks must pass or warn (no failures)
     overall = all(c.status in ("Pass", "Warning") for c in checks)
 
     return AuditResponse(

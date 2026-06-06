@@ -1,10 +1,18 @@
 {
-  "description": "Geospatial Remote Sensing Timeseries for Farmintelytics",
+  "description": "Farmintelytics Remote Sensing Timeseries \u00e2\u20ac\u201d Geospatial Zarr v2",
+  "sensor": "Sentinel-2 L2A (ESA Copernicus)",
+  "temporal_resolution": "Weekly (ISO weeks, 24-week rolling window)",
   "variables": [
     "ndvi",
     "ndmi"
   ],
+  "plots": [
+    "PLOT-ALPHA",
+    "PLOT-BETA",
+    "PLOT-GAMMA"
+  ],
   "dimensions": [
     "time"
-  ]
+  ],
+  "units": "dimensionless (scaled reflectance ratio)"
 }
