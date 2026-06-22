@@ -71,6 +71,7 @@ import {
 } from 'lucide-react';
 import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap, Pane } from 'react-leaflet';
 import ReactDOM from 'react-dom';
+import * as api from '../../services/agromonitorApi';
 
 /* ─── Portal-based Info Tooltip ─────────────────────────────────────────── */
 const InfoTooltipPortal = ({ title, desc, done, formula }) => {
@@ -833,6 +834,54 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [activeSidebarItem, setActiveSidebarItem] = useState('analytics');
   const [activeTab, setActiveTab] = useState('monitor');
 
+  const [stats, setStats] = useState(null);
+  const [trends, setTrends] = useState(null);
+  const [plots, setPlots] = useState([]);
+  const [restorationZones, setRestorationZones] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function loadBackendData() {
+      try {
+        const statsRes = await api.fetchDashboardStats();
+        const trendsRes = await api.fetchDashboardTrends();
+        const plotsRes = await api.fetchPlotsIntelligence();
+        const zonesRes = await api.fetchRestorationZones();
+        const alertsRes = await api.fetchAlerts();
+
+        if (active) {
+          setStats(statsRes);
+          setTrends(trendsRes);
+          setPlots(plotsRes);
+          setRestorationZones(zonesRes);
+          // Map backend alert items to frontend structure
+          const mappedAlerts = (alertsRes.feed || []).map(a => ({
+            id: a.alert_id,
+            estate: 'Okomu Estate',
+            plot: a.plot_id,
+            category: a.type,
+            severity: a.severity,
+            desc: a.message,
+            date: a.timestamp.split(' ')[0],
+            time: a.timestamp.split(' ')[1] || '00:00',
+            status: a.acknowledged ? 'Acknowledged' : 'Active'
+          }));
+          setAlerts(mappedAlerts);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard data from backend:", err);
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+    loadBackendData();
+    return () => { active = false; };
+  }, []);
+
   const renderInfoTooltip = (title) => {
     let lookupKey = title;
     const lowerTitle = title.toLowerCase().trim();
@@ -1171,19 +1220,6 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   // Left sidebar Tools states
   const [showCalendarTool, setShowCalendarTool] = useState(true);
   const [showTimeSliderTool, setShowTimeSliderTool] = useState(true);
-
-  // Alerts data state
-  const [alerts, setAlerts] = useState([
-    { id: 'ALT-2026-001', estate: 'East Ridge Estate', plot: 'PLOT-BETA', category: 'Water Stress', severity: 'Critical', desc: 'LSWI moisture index dropped below 0.30 target. Root-zone dry spell requires immediate +30% irrigation flow.', date: 'May 29, 2026', time: '14:22', status: 'Active' },
-    { id: 'ALT-2026-002', estate: 'East Ridge Estate', plot: 'PLOT-BETA', category: 'Pest Infestation', severity: 'Critical', desc: 'Stem borer outbreak warning near East Ridge boundary. Recommended insecticide spray buffer zone of 150m.', date: 'May 28, 2026', time: '09:45', status: 'Active' },
-    { id: 'ALT-2026-003', estate: 'South Slope Estate', plot: 'PLOT-GAMMA', category: 'Growth Deficit', severity: 'Warning', desc: 'NDVI vegetation vigor index showing abnormal 3-week plateau during Grand Growth phase.', date: 'May 26, 2026', time: '11:15', status: 'Active' },
-    { id: 'ALT-2026-004', estate: 'West Valley Estate', plot: 'PLOT-ALPHA', category: 'Cloud Cover', severity: 'Info', desc: 'Sentinel-2 imagery shows 12% localized cloud cover. Index computations adjusted.', date: 'May 22, 2026', time: '16:05', status: 'Acknowledged' },
-    { id: 'ALT-2026-005', estate: 'East Ridge Estate', plot: 'PLOT-BETA', category: 'Water Stress', severity: 'Critical', desc: 'Evapotranspiration deficit detected. Actual transpiration (ETa) is 45% below demand (ETc).', date: 'May 29, 2026', time: '10:12', status: 'Active' },
-    { id: 'ALT-2026-006', estate: 'South Slope Estate', plot: 'PLOT-GAMMA', category: 'Growth Deficit', severity: 'Info', desc: 'Refined Lee speckle filter applied to Sentinel-1 radar pass. Noise cleared successfully.', date: 'May 25, 2026', time: '08:30', status: 'Acknowledged' },
-    { id: 'ALT-2026-007', estate: 'West Valley Estate', plot: 'PLOT-ALPHA', category: 'Water Stress', severity: 'Warning', desc: 'WDI thermal-optical crop water stress index exceeds 0.60 warning threshold.', date: 'May 27, 2026', time: '13:50', status: 'Active' },
-    { id: 'ALT-2026-008', estate: 'East Ridge Estate', plot: 'PLOT-BETA', category: 'Growth Deficit', severity: 'Warning', desc: 'DpRVI radar canopy index indicates localized canopy structure loss or thinning.', date: 'May 24, 2026', time: '15:10', status: 'Active' },
-    { id: 'ALT-2026-009', estate: 'West Valley Estate', plot: 'PLOT-ALPHA', category: 'Pest Infestation', severity: 'Warning', desc: 'Early stress ndre signature indicates possible mild pathogen pressure in Zone-A.', date: 'May 21, 2026', time: '10:00', status: 'Acknowledged' }
-  ]);
 
   // Settings and User Management States
   const [settingsUsers, setSettingsUsers] = useState([

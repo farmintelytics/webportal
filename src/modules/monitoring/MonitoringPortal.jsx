@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import * as api from '../../services/agromonitorApi';
 import { 
   Globe, 
   Layers, 
@@ -177,10 +178,33 @@ const MonitoringPortal = ({ cropName, onSignOut, onBack }) => {
     ...config.indices
   ]);
 
-  const plots = [
-    { id: `B-${cropName.substring(0,3).toUpperCase()}-01`, area: '4.2 HA', health: '98%', status: 'Healthy', ndvi: 0.72, layman: config.layman.health, advice: 'No action needed.', history: [0.3, 0.45, 0.58, 0.72, 0.75, 0.72] },
-    { id: `B-${cropName.substring(0,3).toUpperCase()}-04`, area: '2.8 HA', health: '35%', status: 'Stressed', ndvi: 0.35, layman: config.layman.stress, advice: 'Inspect and apply remediation.', history: [0.3, 0.32, 0.40, 0.38, 0.35, 0.33] },
-  ];
+  const [plots, setPlots] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadPlots() {
+      try {
+        const res = await api.fetchPlotsIntelligence();
+        if (active) {
+          const mappedPlots = res.map(p => ({
+            id: p.plot_id,
+            area: `${p.area_ha} HA`,
+            health: p.indices.ndvi > 0.7 ? '98%' : p.indices.ndvi > 0.55 ? '75%' : '35%',
+            status: p.indices.ndvi > 0.55 ? 'Healthy' : 'Stressed',
+            ndvi: p.indices.ndvi,
+            layman: p.indices.ndvi > 0.55 ? config.layman.health : config.layman.stress,
+            advice: p.indices.ndvi > 0.55 ? 'No action needed.' : 'Inspect and apply remediation.',
+            history: [0.3, 0.45, 0.58, p.indices.ndvi - 0.05, p.indices.ndvi, p.indices.ndvi]
+          }));
+          setPlots(mappedPlots);
+        }
+      } catch (err) {
+        console.error("Failed to load plots for crop portal:", err);
+      }
+    }
+    loadPlots();
+    return () => { active = false; };
+  }, [cropName, config]);
 
   const columns = [
     { key: 'id', label: 'Plot ID' },
