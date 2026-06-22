@@ -22,9 +22,17 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/far
 /** Generic fetch helper with JSON parsing and error handling */
 async function apiFetch(path, options = {}) {
   const url = `${API_BASE}${path}`;
+  const token = localStorage.getItem('fi_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers,
   });
   if (!res.ok) {
     const text = await res.text();

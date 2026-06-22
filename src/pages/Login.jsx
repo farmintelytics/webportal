@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { ArrowRight, Lock, Mail, Eye, EyeOff, ShieldCheck, Globe, Zap, CreditCard, Landmark, Coins, Plane, Radar, Satellite, Users, Layers, UserCheck, Grid } from 'lucide-react';
+import { login } from '../services/agromonitorApi';
 
 const Login = ({ onLogin, moduleName, onBack }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  const [error, setError] = useState('');
 
   const displayName = moduleName?.toUpperCase() || 'AGRICULTURAL';
   const isFinance = moduleName?.toLowerCase().includes('finance') || moduleName?.toLowerCase().includes('payment');
@@ -11,10 +15,25 @@ const Login = ({ onLogin, moduleName, onBack }) => {
   const isDrone = moduleName?.toLowerCase().includes('drone');
   const isCooperative = moduleName?.toLowerCase().includes('cooperative') || moduleName?.toLowerCase().includes('ngo') || moduleName?.toLowerCase().includes('government') || moduleName?.toLowerCase().includes('group');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => { onLogin(); setLoading(false); }, 1200);
+    setError('');
+    try {
+      const response = await login(email, accessCode);
+      if (response.status === 'success' && response.token) {
+        localStorage.setItem('fi_token', response.token);
+        localStorage.setItem('fi_email', response.email);
+        localStorage.setItem('fi_tenant', response.tenant || 'okomu');
+        onLogin();
+      } else {
+        setError(response.message || 'Authentication failed');
+      }
+    } catch (err) {
+      setError(err.message || 'Server error connecting to backend');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getBrandingContent = () => {
@@ -133,12 +152,19 @@ const Login = ({ onLogin, moduleName, onBack }) => {
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--brand-primary)]">{displayName} Access Console</p>
           </div>
 
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-650 rounded-2xl text-xs font-bold shadow-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Email Identity</label>
               <div className="relative group">
                 <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--brand-primary)] transition-colors" />
                 <input type="email" required placeholder="admin@farmintelytics.com"
+                  value={email} onChange={e => setEmail(e.target.value)}
                   className="w-full bg-gray-50 border border-black/5 focus:border-[var(--brand-primary)] focus:bg-white rounded-2xl py-4 pl-12 pr-4 text-[14px] font-bold outline-none transition-all" />
               </div>
             </div>
@@ -148,6 +174,7 @@ const Login = ({ onLogin, moduleName, onBack }) => {
               <div className="relative group">
                 <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--brand-primary)] transition-colors" />
                 <input type={showPassword ? 'text' : 'password'} required placeholder="••••••••"
+                  value={accessCode} onChange={e => setAccessCode(e.target.value)}
                   className="w-full bg-gray-50 border border-black/5 focus:border-[var(--brand-primary)] focus:bg-white rounded-2xl py-4 pl-12 pr-12 text-[14px] font-bold outline-none transition-all" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">

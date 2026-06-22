@@ -103,7 +103,7 @@ const CONFIG = {
    drillDownType: 'Canopy Health'
 };
 
-const CashewMonitoring = ({ onBack }) => {
+const CashewMonitoring = ({ onBack, onSignOut }) => {
    const [activeTab, setActiveTab] = useState('overview');
    const [showLayerList, setShowLayerList] = useState(true);
    const [dateRange, setDateRange] = useState('Current Season Analytics');

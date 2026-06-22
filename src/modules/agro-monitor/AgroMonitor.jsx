@@ -831,6 +831,9 @@ const MONTH_NAMES = [
 ];
 
 const AgroMonitor = ({ onBack, onSignOut }) => {
+  const tenant = localStorage.getItem('fi_tenant') || 'okomu';
+  const tenantDisplayName = tenant.charAt(0).toUpperCase() + tenant.slice(1);
+
   const [activeSidebarItem, setActiveSidebarItem] = useState('analytics');
   const [activeTab, setActiveTab] = useState('monitor');
 
@@ -3269,7 +3272,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             </div>
             <div>
               <h1 className="text-base font-bold tracking-tight text-gray-900 leading-none">
-                {brandingMode === 'AM' ? 'Agro Monitoring' : 'Farm Tools Harvest'}
+                {tenantDisplayName} {brandingMode === 'AM' ? 'Agro Monitoring' : 'Farm Tools'}
               </h1>
               <p className={`text-[11px] font-semibold uppercase tracking-widest mt-1 leading-none ${brandingMode === 'AM' ? 'text-green-600' : 'text-blue-600'}`}>
                 {brandingMode === 'AM' ? 'Enterprise Satellite Node' : 'Agricultural Operations Hub'}
