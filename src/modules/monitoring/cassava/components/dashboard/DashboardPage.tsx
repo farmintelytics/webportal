@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import { Card } from "@monitoring-shared/ui/card";
 import { Badge } from "@monitoring-shared/ui/badge";
 import { Button } from "@monitoring-shared/ui/button";
-import { batches, plots, alerts, rainfall, totalArea, totalYield, stressCount, statusColors } from "../../lib/mockData";
+import { batches, plots, alerts, rainfall, totalArea, totalYield, stressCount, statusColors } from "../../lib/fallbackData";
 import { Sprout, Layers, Wheat, AlertTriangle, Info, Download, Maximize2, X } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer,

@@ -5,7 +5,6 @@ export interface Plot {
   id: string;
   name: string;
   area: number; // ha
-  // simple polygon (lat,lng) around farm in Mekong Delta-ish area
   polygon: [number, number][];
   centroid: [number, number];
   suitability: "High" | "Moderate" | "Low";
@@ -25,10 +24,8 @@ export interface Plot {
   climateScore: number;
 }
 
-// Generate plots around a center
-const center: [number, number] = [10.45, 105.63]; // Mekong-ish
+const center: [number, number] = [10.45, 105.63];
 
-// Pseudo-random but deterministic per seed for stable irregular polygons
 function rand(seed: number) {
   let s = seed * 9301 + 49297;
   return () => {
@@ -39,12 +36,12 @@ function rand(seed: number) {
 
 function makePolygon(lat: number, lng: number, seed: number, size = 0.009): [number, number][] {
   const r = rand(seed);
-  const sides = 6 + Math.floor(r() * 3); // 6-8 sides for organic field shapes
+  const sides = 6 + Math.floor(r() * 3);
   const pts: [number, number][] = [];
   for (let i = 0; i < sides; i++) {
     const angle = (i / sides) * Math.PI * 2 + r() * 0.4;
     const radius = size * (0.55 + r() * 0.7);
-    const aspect = 1.4; // lng stretched (degrees)
+    const aspect = 1.4;
     pts.push([
       +(lat + Math.sin(angle) * radius).toFixed(6),
       +(lng + Math.cos(angle) * radius * aspect).toFixed(6),

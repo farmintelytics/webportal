@@ -3,7 +3,7 @@ import { Layers, ChevronRight, X } from "lucide-react";
 import { Button } from "@monitoring-shared/ui/button";
 import { Switch } from "@monitoring-shared/ui/switch";
 import { Slider } from "@monitoring-shared/ui/slider";
-import type { MapLayer } from "../data/mockData";
+import type { MapLayer } from "../data/fallbackData";
 import { cn } from "@monitoring-shared/lib/utils";
 
 export function LayersPanel({

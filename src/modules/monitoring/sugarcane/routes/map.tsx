@@ -4,9 +4,10 @@ import { TopBar } from "../components/TopBar";
 import { AppLayout } from "../components/AppLayout";
 import { LayersPanel } from "../components/LayersPanel";
 import { BlockDetail } from "../components/BlockDetail";
-import { defaultLayers, type Block, type MapLayer, blocks } from "../data/mockData";
+import { defaultLayers, type Block, type MapLayer, blocks as fallbackBlocks } from "../data/fallbackData";
 import { AlertTriangle, Sprout, Map as MapIcon, Mountain, Globe, Layers as LayersIcon } from "lucide-react";
 import { cn } from "@monitoring-shared/lib/utils";
+import { fetchPlotsIntelligence } from "../../../../services/agromonitorApi";
 
 const FarmMap = lazy(() => import("../components/FarmMap").then((m) => ({ default: m.FarmMap })));
 
@@ -28,7 +29,50 @@ function MapPage() {
   const [basemap, setBasemap] = useState<Basemap>("satellite");
   const [source, setSource] = useState<"sentinel" | "landsat">("sentinel");
   const [date, setDate] = useState("Peak · Oct '25");
-  useEffect(() => setClient(true), []);
+  const [blocksData, setBlocksData] = useState<Block[]>(fallbackBlocks);
+
+  useEffect(() => {
+    setClient(true);
+    fetchPlotsIntelligence()
+      .then((res) => {
+        if (res && res.length > 0) {
+          const mapped = res.map((p: any) => {
+            let polygon: [number, number][] = [];
+            if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+              polygon = p.boundary.coordinates[0].map(([lng, lat]: [number, number]) => [lat, lng]);
+            }
+            const ndvi = p.indices?.ndvi ?? 0.65;
+            const ndmi = p.indices?.ndmi ?? 0.45;
+            return {
+              id: p.plot_id,
+              name: p.name || p.plot_id,
+              hectares: p.area_ha ?? 10.0,
+              polygon,
+              cropAgeMonths: 6,
+              growthStage: ndvi > 0.7 ? "Harvest Ready" : ndvi > 0.55 ? "Grand Growth" : "Tillering",
+              ndvi,
+              evi: +(ndvi * 0.8).toFixed(2),
+              lai: 3.5,
+              lswi: ndmi,
+              vhi: Math.round(ndvi * 100),
+              sar: -9.0,
+              stressAlert: p.indices?.uas_anomaly_score > 0.4 ? "Water Stress" : "None",
+              predictedYield: Math.round(ndvi * 85),
+              harvestReady: ndvi > 0.7,
+              harvestWindow: ndvi > 0.7 ? "End of month" : "Jul 2026",
+              suitability: ndvi > 0.6 ? "Suitable" : "Marginal",
+              soilScore: 85,
+              thermalScore: 80,
+              rainfallScore: 78,
+              waterAvailability: "Irrigated",
+              landUseStatus: "Vegetated"
+            };
+          });
+          setBlocksData(mapped);
+        }
+      })
+      .catch((err) => console.error("Error fetching sugarcane plots:", err));
+  }, []);
 
   return (
     <AppLayout>
@@ -36,7 +80,7 @@ function MapPage() {
       <main className="relative flex-1 overflow-hidden">
         {client && (
           <Suspense fallback={<div className="h-full w-full bg-muted" />}>
-            <FarmMap layers={layers} onSelect={setSelected} selectedId={selected?.id} basemap={basemap} />
+            <FarmMap layers={layers} onSelect={setSelected} selectedId={selected?.id} basemap={basemap} blocks={blocksData} />
           </Suspense>
         )}
 

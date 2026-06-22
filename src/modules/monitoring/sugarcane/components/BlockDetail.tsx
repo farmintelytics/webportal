@@ -1,5 +1,5 @@
 import { X, AlertTriangle, Droplets, Sprout, Calendar } from "lucide-react";
-import type { Block } from "../data/mockData";
+import type { Block } from "../data/fallbackData";
 import { Button } from "@monitoring-shared/ui/button";
 import { Badge } from "@monitoring-shared/ui/badge";
 

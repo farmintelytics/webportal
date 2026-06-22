@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout } from "../components/AppLayout";
-import { plots } from "../lib/mockData";
+import { plots } from "../lib/fallbackData";
 import { AlertTriangle, Droplets, Thermometer, TrendingDown } from "lucide-react";
 
 export const Route = createFileRoute("/alerts")({

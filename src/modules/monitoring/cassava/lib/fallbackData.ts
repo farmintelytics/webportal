@@ -15,7 +15,6 @@ export interface Plot {
   predictedYield: number;
   status: PlotStatus;
   harvestWindow: string;
-  // GeoJSON polygon coordinates [lng, lat]
   polygon: [number, number][];
   center: [number, number];
 }
@@ -82,7 +81,6 @@ export const batches: Batch[] = [
   },
 ];
 
-// Generate polygons around lat 7.5N, lng 5.0E
 function makePoly(lat: number, lng: number, size = 0.008): [number, number][] {
   return [
     [lng - size, lat - size],

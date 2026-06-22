@@ -8,7 +8,7 @@ import { Checkbox } from "@monitoring-shared/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@monitoring-shared/ui/select";
 import { Label } from "@monitoring-shared/ui/label";
 import { Badge } from "@monitoring-shared/ui/badge";
-import { blocks } from "../data/mockData";
+import { blocks } from "../data/fallbackData";
 import { Download, FileText, Printer } from "lucide-react";
 import { toast } from "sonner";
 

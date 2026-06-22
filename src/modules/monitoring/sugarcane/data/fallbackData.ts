@@ -5,7 +5,6 @@ export interface Block {
   id: string;
   name: string;
   hectares: number;
-  // rough polygon in [lat,lng] for a Nigerian sugarcane region (Bacita-ish)
   polygon: [number, number][];
   cropAgeMonths: number;
   growthStage: GrowthStage;
@@ -16,7 +15,7 @@ export interface Block {
   vhi: number;
   sar: number;
   stressAlert: "None" | "Water Stress" | "Heat Stress" | "Waterlogging";
-  predictedYield: number; // t/ha
+  predictedYield: number;
   harvestReady: boolean;
   harvestWindow: string;
   suitability: SuitabilityClass;

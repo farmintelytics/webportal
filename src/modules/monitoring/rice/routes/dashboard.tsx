@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { KpiCard } from "../components/KpiCard";
-import { plots, ndviTimeSeries, rainfallData, yieldByStage, stageColors } from "../lib/mockData";
+import { plots, ndviTimeSeries, rainfallData, yieldByStage, stageColors } from "../lib/fallbackData";
 import { Sprout, Droplets, AlertTriangle, Wheat } from "lucide-react";
 import {
   Line, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell,

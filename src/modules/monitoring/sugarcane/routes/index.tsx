@@ -4,7 +4,7 @@ import { AppLayout } from "../components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@monitoring-shared/ui/card";
 import { Badge } from "@monitoring-shared/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@monitoring-shared/ui/select";
-import { blocks, eviTimeSeries, rainfallSeries, seasonComparison } from "../data/mockData";
+import { blocks, eviTimeSeries, rainfallSeries, seasonComparison } from "../data/fallbackData";
 import { Sprout, TrendingUp, AlertTriangle, Droplets } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Polygon, Tooltip, useMap } from "react-leaflet";
-import { blocks, mapCenter, type Block, type MapLayer } from "../data/mockData";
+import { mapCenter, type Block, type MapLayer } from "../data/fallbackData";
 import type { Basemap } from "../routes/map";
 
 function colorForGrowth(stage: Block["growthStage"]) {
@@ -30,12 +30,12 @@ function colorForSuitability(s: Block["suitability"]) {
   return s === "Suitable" ? "#16a34a" : s === "Marginal" ? "#f59e0b" : "#dc2626";
 }
 
-function FitBounds() {
+function FitBounds({ blocks }: { blocks: Block[] }) {
   const map = useMap();
   useEffect(() => {
     const all = blocks.flatMap((b) => b.polygon) as [number, number][];
     if (all.length) map.fitBounds(all, { padding: [40, 40] });
-  }, [map]);
+  }, [map, blocks]);
   return null;
 }
 
@@ -60,12 +60,13 @@ const basemapTiles: Record<Basemap, { url: string; attribution: string; overlay?
 };
 
 export function FarmMap({
-  layers, onSelect, selectedId, basemap = "satellite",
+  layers, onSelect, selectedId, basemap = "satellite", blocks = [],
 }: {
   layers: MapLayer[];
   onSelect: (b: Block) => void;
   selectedId?: string;
   basemap?: Basemap;
+  blocks?: Block[];
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -79,7 +80,7 @@ export function FarmMap({
     <MapContainer center={mapCenter} zoom={14} className="h-full w-full" zoomControl={false}>
       <TileLayer key={basemap} attribution={tile.attribution} url={tile.url} />
       {tile.overlay && <TileLayer key={`${basemap}-overlay`} url={tile.overlay} attribution="" />}
-      <FitBounds />
+      <FitBounds blocks={blocks} />
       {blocks.map((b) => {
         let fill = "transparent";
         let fillOpacity = 0;

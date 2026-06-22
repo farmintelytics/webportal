@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { AppLayout } from "../components/AppLayout";
-import { plots } from "../lib/mockData";
+import { plots } from "../lib/fallbackData";
 import {
   FileText, Download, Calendar, MapPin, Sprout, Wheat, Search,
   Printer, Share2, ChevronRight, Layers, Droplets, AlertTriangle

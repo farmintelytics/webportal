@@ -2,7 +2,7 @@ import { Card } from "@monitoring-shared/ui/card";
 import { Button } from "@monitoring-shared/ui/button";
 import { Badge } from "@monitoring-shared/ui/badge";
 import { Input } from "@monitoring-shared/ui/input";
-import { plots, batches, farms } from "../../lib/mockData";
+import { plots, batches, farms } from "../../lib/fallbackData";
 import { Upload, Download, Search, Database, Satellite, CloudRain, Thermometer } from "lucide-react";
 
 const sources = [

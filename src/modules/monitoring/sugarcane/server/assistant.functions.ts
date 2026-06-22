@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { blocks } from "../data/mockData";
+import { blocks } from "../data/fallbackData";
 
 const Schema = z.object({
   messages: z.array(z.object({

@@ -1,10 +1,10 @@
-import { Plot, statusColors } from "../../lib/mockData";
+import { Plot, statusColors } from "../../lib/fallbackData";
 import { Card } from "@monitoring-shared/ui/card";
 import { Button } from "@monitoring-shared/ui/button";
 import { Badge } from "@monitoring-shared/ui/badge";
 import { X, Flag, FileText } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
-import { batches } from "../../lib/mockData";
+import { batches } from "../../lib/fallbackData";
 
 export function PlotDetailCard({ plot, onClose }: { plot: Plot; onClose: () => void }) {
   const batch = batches.find(b => b.id === plot.batchId);

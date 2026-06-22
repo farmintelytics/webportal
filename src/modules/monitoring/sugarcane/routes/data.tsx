@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { TopBar } from "../components/TopBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@monitoring-shared/ui/card";
 import { AppLayout } from "../components/AppLayout";
-import { blocks } from "../data/mockData";
+import { blocks } from "../data/fallbackData";
 import { Badge } from "@monitoring-shared/ui/badge";
 
 export const Route = createFileRoute("/data")({ component: DataPage });

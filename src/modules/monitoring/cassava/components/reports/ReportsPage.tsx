@@ -6,7 +6,7 @@ import { Checkbox } from "@monitoring-shared/ui/checkbox";
 import { Label } from "@monitoring-shared/ui/label";
 import { RadioGroup, RadioGroupItem } from "@monitoring-shared/ui/radio-group";
 import { Input } from "@monitoring-shared/ui/input";
-import { batches, plots, totalArea, totalYield } from "../../lib/mockData";
+import { batches, plots, totalArea, totalYield } from "../../lib/fallbackData";
 import { Download, Share2, FileText, Check } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from "recharts";
 

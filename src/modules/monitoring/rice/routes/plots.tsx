@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { AppLayout } from "../components/AppLayout";
-import { plots, Plot } from "../lib/mockData";
+import { plots, Plot } from "../lib/fallbackData";
 import { Search, Filter, Download, FileText } from "lucide-react";
 
 export const Route = createFileRoute("/plots")({

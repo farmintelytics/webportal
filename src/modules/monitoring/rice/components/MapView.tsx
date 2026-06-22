@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, Polygon, Tooltip, LayerGroup, Pane } from "react-leaflet";
-import { alertColors, stageColors, Plot } from "../lib/mockData";
+import { alertColors, stageColors, Plot } from "../lib/fallbackData";
 
 export type LayerId = "alert" | "stage" | "yield" | "ndvi" | "suitability" | "lswi";
 

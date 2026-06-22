@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { MapView, ActiveLayers, LayerId } from "../components/MapView";
-import { Plot, alertColors, stageColors, plots } from "../lib/mockData";
+import { Plot, alertColors, stageColors, plots } from "../lib/fallbackData";
 import {
   Layers, Droplets, Sprout, Activity, X, ChevronRight, MapPin,
   Eye, EyeOff, Satellite, FileText

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, Polygon, useMap } from "react-leaflet";
 import { LatLngBoundsExpression } from "leaflet";
-import { plots, statusColors, Plot } from "../../lib/mockData";
+import { plots as fallbackPlots, statusColors, Plot } from "../../lib/fallbackData";
 import { PlotDetailCard } from "./PlotDetailCard";
 import { LayerPanel } from "./LayerPanel";
 import { TimeSlider } from "./TimeSlider";
@@ -9,6 +9,7 @@ import { Search, Layers as LayersIcon } from "lucide-react";
 import { Input } from "@monitoring-shared/ui/input";
 import { Button } from "@monitoring-shared/ui/button";
 import { cn } from "@monitoring-shared/lib/utils";
+import { fetchPlotsIntelligence } from "../../../../../services/agromonitorApi";
 
 function FitBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
   const map = useMap();
@@ -23,15 +24,56 @@ export function MapView() {
   const [basemap, setBasemap] = useState<"satellite" | "terrain" | "streets">("satellite");
   const [date, setDate] = useState("Peak · Oct '25");
   const [query, setQuery] = useState("");
+  const [plotsData, setPlotsData] = useState<Plot[]>(fallbackPlots);
 
-  const bounds = useMemo<LatLngBoundsExpression>(() => {
-    const lats = plots.map(p => p.center[0]);
-    const lngs = plots.map(p => p.center[1]);
-    return [[Math.min(...lats) - 0.005, Math.min(...lngs) - 0.005], [Math.max(...lats) + 0.005, Math.max(...lngs) + 0.005]];
+  useEffect(() => {
+    fetchPlotsIntelligence()
+      .then((res) => {
+        if (res && res.length > 0) {
+          const mapped = res.map((p: any) => {
+            let polygon: [number, number][] = [];
+            let center: [number, number] = [7.51, 5.02];
+            if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+              polygon = p.boundary.coordinates[0];
+              const lats = polygon.map(pt => pt[1]);
+              const lngs = polygon.map(pt => pt[0]);
+              center = [lats.reduce((a,b)=>a+b,0)/lats.length, lngs.reduce((a,b)=>a+b,0)/lngs.length];
+            }
+            const ndvi = p.indices?.ndvi ?? 0.65;
+            const statusVal: Plot["status"] = ndvi > 0.7 ? "harvest" : ndvi > 0.55 ? "healthy" : p.indices?.uas_anomaly_score > 0.4 ? "alert" : "stress";
+            return {
+              id: p.plot_id,
+              farmId: "F1",
+              batchId: "B1",
+              size: p.area_ha ?? 2.0,
+              soil: "Loam",
+              slope: "0-5°",
+              plantingDate: "2024-01-20",
+              ageMonths: 6,
+              ndvi,
+              lswi: p.indices?.ndmi ?? 0.45,
+              vhi: Math.round(ndvi * 100),
+              predictedYield: Math.round(ndvi * 24),
+              status: statusVal,
+              harvestWindow: ndvi > 0.7 ? "Now - 4 weeks" : "3-4 months",
+              polygon,
+              center
+            };
+          });
+          setPlotsData(mapped);
+        }
+      })
+      .catch((err) => console.error("Error fetching cassava plots:", err));
   }, []);
 
+  const bounds = useMemo<LatLngBoundsExpression>(() => {
+    const lats = plotsData.map(p => p.center[0]);
+    const lngs = plotsData.map(p => p.center[1]);
+    return [[Math.min(...lats) - 0.005, Math.min(...lngs) - 0.005], [Math.max(...lats) + 0.005, Math.max(...lngs) + 0.005]];
+  }, [plotsData]);
+
   const filteredHighlight = query
-    ? plots.find(p => p.id.toLowerCase().includes(query.toLowerCase()) || p.batchId.toLowerCase().includes(query.toLowerCase()))
+    ? plotsData.find(p => p.id.toLowerCase().includes(query.toLowerCase()) || p.batchId.toLowerCase().includes(query.toLowerCase()))
     : null;
 
   return (
@@ -59,7 +101,7 @@ export function MapView() {
           opacity={0.6}
         />
         <FitBounds bounds={bounds} />
-        {plots.map(p => {
+        {plotsData.map(p => {
           const isHi = filteredHighlight?.id === p.id;
           return (
             <Polygon

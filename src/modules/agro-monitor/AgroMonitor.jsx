@@ -2263,26 +2263,97 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const currentTimeline = currentTimelineA;
 
   const plotsDataA = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+        }
+        const ndviVal = p.indices?.ndvi ?? (currentTimelineA.ndvi + 0.02);
+        const ndmiVal = p.indices?.ndmi ?? (currentTimelineA.ndmi + 0.01);
+        const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
+        const colorVal = healthVal === 'Optimal' ? '#15803d' : healthVal === 'Good' ? '#84cc16' : '#dc2626';
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          health: healthVal,
+          ndvi: ndviVal,
+          ndmi: ndmiVal,
+          color: colorVal,
+          coords
+        };
+      });
+    }
     const health = currentTimelineA.plotsHealth;
     return [
       { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: currentTimelineA.ndvi + 0.04, ndmi: currentTimelineA.ndmi + 0.02, color: health.alpha, coords: PLOT_ALPHA_COORDS },
       { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: currentTimelineA.ndvi < 0.65 ? 'Stressed' : 'Good', ndvi: currentTimelineA.ndvi - 0.15, ndmi: currentTimelineA.ndmi - 0.10, color: health.beta, coords: PLOT_BETA_COORDS },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: currentTimelineA.ndvi - 0.05, ndmi: currentTimelineA.ndmi - 0.04, color: health.gamma, coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimelineA]);
+  }, [plots, currentTimelineA]);
 
   const plotsDataB = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+        }
+        const ndviVal = p.indices?.ndvi ?? (currentTimelineB.ndvi + 0.02);
+        const ndmiVal = p.indices?.ndmi ?? (currentTimelineB.ndmi + 0.01);
+        const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
+        const colorVal = healthVal === 'Optimal' ? '#15803d' : healthVal === 'Good' ? '#84cc16' : '#dc2626';
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          health: healthVal,
+          ndvi: ndviVal,
+          ndmi: ndmiVal,
+          color: colorVal,
+          coords
+        };
+      });
+    }
     const health = currentTimelineB.plotsHealth;
     return [
       { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: currentTimelineB.ndvi + 0.04, ndmi: currentTimelineB.ndmi + 0.02, color: health.alpha, coords: PLOT_ALPHA_COORDS },
       { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: currentTimelineB.ndvi < 0.65 ? 'Stressed' : 'Good', ndvi: currentTimelineB.ndvi - 0.15, ndmi: currentTimelineB.ndmi - 0.10, color: health.beta, coords: PLOT_BETA_COORDS },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: currentTimelineB.ndvi - 0.05, ndmi: currentTimelineB.ndmi - 0.04, color: health.gamma, coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimelineB]);
+  }, [plots, currentTimelineB]);
 
   const plotsData = plotsDataA;
 
   const healthPlotsDataA = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+        }
+        const ndviVal = p.indices?.ndvi ?? (currentTimelineA.ndvi + 0.02);
+        const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          health: healthVal,
+          ndvi: ndviVal,
+          chlorophyll: p.indices?.chlorophyll ?? parseFloat((ndviVal * 0.9).toFixed(2)),
+          waterStress: p.indices?.ndmi ?? 0.45,
+          pestRisk: p.indices?.uas_anomaly_score > 0.4 ? 'High Risk' : p.indices?.uas_anomaly_score > 0.15 ? 'Moderate Risk' : 'Low Risk',
+          coords
+        };
+      });
+    }
     const baseNdvi = currentTimelineA.ndvi;
     const baseNdmi = currentTimelineA.ndmi;
     return [
@@ -2290,9 +2361,32 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: baseNdvi < 0.65 ? 'Stressed' : 'Good', ndvi: baseNdvi - 0.15, chlorophyll: parseFloat(((baseNdvi - 0.15) * 0.9).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.10)).toFixed(2)), pestRisk: 'High Risk', coords: PLOT_BETA_COORDS },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: baseNdvi - 0.05, chlorophyll: parseFloat(((baseNdvi - 0.05) * 0.92).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.04)).toFixed(2)), pestRisk: 'Moderate Risk', coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimelineA]);
+  }, [plots, currentTimelineA]);
 
   const healthPlotsDataB = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+        }
+        const ndviVal = p.indices?.ndvi ?? (currentTimelineB.ndvi + 0.02);
+        const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          health: healthVal,
+          ndvi: ndviVal,
+          chlorophyll: p.indices?.chlorophyll ?? parseFloat((ndviVal * 0.9).toFixed(2)),
+          waterStress: p.indices?.ndmi ?? 0.45,
+          pestRisk: p.indices?.uas_anomaly_score > 0.4 ? 'High Risk' : p.indices?.uas_anomaly_score > 0.15 ? 'Moderate Risk' : 'Low Risk',
+          coords
+        };
+      });
+    }
     const baseNdvi = currentTimelineB.ndvi;
     const baseNdmi = currentTimelineB.ndmi;
     return [
@@ -2300,65 +2394,215 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: baseNdvi < 0.65 ? 'Stressed' : 'Good', ndvi: baseNdvi - 0.15, chlorophyll: parseFloat(((baseNdvi - 0.15) * 0.9).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.10)).toFixed(2)), pestRisk: 'High Risk', coords: PLOT_BETA_COORDS },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: baseNdvi - 0.05, chlorophyll: parseFloat(((baseNdvi - 0.05) * 0.92).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.04)).toFixed(2)), pestRisk: 'Moderate Risk', coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimelineB]);
+  }, [plots, currentTimelineB]);
 
   const healthPlotsData = healthPlotsDataA;
 
   const yieldPlotsDataA = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+        }
+        const ndviVal = p.indices?.ndvi ?? 0.65;
+        const yieldVal = parseFloat((ndviVal * 24).toFixed(1));
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          yieldValue: yieldVal,
+          biomass: parseFloat((ndviVal * 2.6).toFixed(2)),
+          readiness: Math.min(100, Math.round(ndviVal * 115)),
+          growth: parseFloat(ndviVal.toFixed(2)),
+          coords,
+          predAccuracy: '94.2%',
+          predictedYield: parseFloat((yieldVal * (p.area_ha || 10.0)).toFixed(1)),
+          yieldStatus: ndviVal > 0.6 ? 'Optimal (On Track)' : 'Underperforming (Water Stress)'
+        };
+      });
+    }
     const base = currentTimelineA.ndvi;
     return [
       { id: 'PLOT-ALPHA', name: 'West Valley Plot', area: '12.5 HA', yieldValue: parseFloat((base * 25).toFixed(1)), biomass: parseFloat((base * 2.8).toFixed(2)), readiness: Math.min(100, Math.round(base * 120)), growth: parseFloat(base.toFixed(2)), coords: PLOT_ALPHA_COORDS, predAccuracy: '95.4%', predictedYield: parseFloat((base * 25 * 12.5).toFixed(1)), yieldStatus: 'Optimal (On Track)' },
       { id: 'PLOT-BETA',  name: 'East Ridge Plot', area: '8.2 HA', yieldValue: parseFloat(((base - 0.15) * 20).toFixed(1)), biomass: parseFloat(((base - 0.15) * 2.2).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.1) * 100)), growth: parseFloat((base - 0.15).toFixed(2)), coords: PLOT_BETA_COORDS, predAccuracy: '89.2%', predictedYield: parseFloat(((base - 0.15) * 20 * 8.2).toFixed(1)), yieldStatus: 'Underperforming (Water Stress)' },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', yieldValue: parseFloat(((base - 0.05) * 22).toFixed(1)), biomass: parseFloat(((base - 0.05) * 2.4).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.05) * 110)), growth: parseFloat((base - 0.05).toFixed(2)), coords: PLOT_GAMMA_COORDS, predAccuracy: '92.1%', predictedYield: parseFloat(((base - 0.05) * 22 * 15.0).toFixed(1)), yieldStatus: 'Moderate (Minor Anomaly)' }
     ];
-  }, [currentTimelineA]);
+  }, [plots, currentTimelineA]);
 
   const yieldPlotsDataB = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+        }
+        const ndviVal = p.indices?.ndvi ?? 0.65;
+        const yieldVal = parseFloat((ndviVal * 24).toFixed(1));
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          yieldValue: yieldVal,
+          biomass: parseFloat((ndviVal * 2.6).toFixed(2)),
+          readiness: Math.min(100, Math.round(ndviVal * 115)),
+          growth: parseFloat(ndviVal.toFixed(2)),
+          coords,
+          predAccuracy: '94.2%',
+          predictedYield: parseFloat((yieldVal * (p.area_ha || 10.0)).toFixed(1)),
+          yieldStatus: ndviVal > 0.6 ? 'Optimal (On Track)' : 'Underperforming (Water Stress)'
+        };
+      });
+    }
     const base = currentTimelineB.ndvi;
     return [
       { id: 'PLOT-ALPHA', name: 'West Valley Plot', area: '12.5 HA', yieldValue: parseFloat((base * 25).toFixed(1)), biomass: parseFloat((base * 2.8).toFixed(2)), readiness: Math.min(100, Math.round(base * 120)), growth: parseFloat(base.toFixed(2)), coords: PLOT_ALPHA_COORDS, predAccuracy: '95.4%', predictedYield: parseFloat((base * 25 * 12.5).toFixed(1)), yieldStatus: 'Optimal (On Track)' },
       { id: 'PLOT-BETA',  name: 'East Ridge Plot', area: '8.2 HA', yieldValue: parseFloat(((base - 0.15) * 20).toFixed(1)), biomass: parseFloat(((base - 0.15) * 2.2).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.1) * 100)), growth: parseFloat((base - 0.15).toFixed(2)), coords: PLOT_BETA_COORDS, predAccuracy: '89.2%', predictedYield: parseFloat(((base - 0.15) * 20 * 8.2).toFixed(1)), yieldStatus: 'Underperforming (Water Stress)' },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', yieldValue: parseFloat(((base - 0.05) * 22).toFixed(1)), biomass: parseFloat(((base - 0.05) * 2.4).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.05) * 110)), growth: parseFloat((base - 0.05).toFixed(2)), coords: PLOT_GAMMA_COORDS, predAccuracy: '92.1%', predictedYield: parseFloat(((base - 0.05) * 22 * 15.0).toFixed(1)), yieldStatus: 'Moderate (Minor Anomaly)' }
     ];
-  }, [currentTimelineB]);
+  }, [plots, currentTimelineB]);
 
   const yieldPlotsData = yieldPlotsDataA;
 
   const climatePlotsDataA = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map((p, idx) => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+        }
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          rainfall: 11 + selectedTimelineIndex * 4 + idx,
+          soilTemp: 25 + (5 - selectedTimelineIndex),
+          lst: 27 + (5 - selectedTimelineIndex),
+          vpd: parseFloat((1.4 + selectedTimelineIndex * 0.15).toFixed(1)),
+          coords
+        };
+      });
+    }
     return [
       { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', rainfall: 12 + selectedTimelineIndex * 4, soilTemp: 24 + (5 - selectedTimelineIndex), lst: 26 + (5 - selectedTimelineIndex), vpd: parseFloat((1.2 + selectedTimelineIndex * 0.2).toFixed(1)), coords: PLOT_ALPHA_COORDS },
       { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  rainfall: 10 + selectedTimelineIndex * 3, soilTemp: 28 + (5 - selectedTimelineIndex), lst: 32 + (5 - selectedTimelineIndex), vpd: parseFloat((2.5 - selectedTimelineIndex * 0.1).toFixed(1)), coords: PLOT_BETA_COORDS },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', rainfall: 11 + selectedTimelineIndex * 4, soilTemp: 26 + (5 - selectedTimelineIndex), lst: 28 + (5 - selectedTimelineIndex), vpd: parseFloat((1.6 + selectedTimelineIndex * 0.15).toFixed(1)), coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimelineA, selectedTimelineIndex]);
+  }, [plots, currentTimelineA, selectedTimelineIndex]);
 
   const climatePlotsDataB = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map((p, idx) => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+        }
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          rainfall: 11 + compareTimelineIndex * 4 + idx,
+          soilTemp: 25 + (5 - compareTimelineIndex),
+          lst: 27 + (5 - compareTimelineIndex),
+          vpd: parseFloat((1.4 + compareTimelineIndex * 0.15).toFixed(1)),
+          coords
+        };
+      });
+    }
     return [
       { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', rainfall: 12 + compareTimelineIndex * 4, soilTemp: 24 + (5 - compareTimelineIndex), lst: 26 + (5 - compareTimelineIndex), vpd: parseFloat((1.2 + compareTimelineIndex * 0.2).toFixed(1)), coords: PLOT_ALPHA_COORDS },
       { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  rainfall: 10 + compareTimelineIndex * 3, soilTemp: 28 + (5 - compareTimelineIndex), lst: 32 + (5 - compareTimelineIndex), vpd: parseFloat((2.5 - compareTimelineIndex * 0.1).toFixed(1)), coords: PLOT_BETA_COORDS },
       { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', rainfall: 11 + compareTimelineIndex * 4, soilTemp: 26 + (5 - compareTimelineIndex), lst: 28 + (5 - compareTimelineIndex), vpd: parseFloat((1.6 + compareTimelineIndex * 0.15).toFixed(1)), coords: PLOT_GAMMA_COORDS }
     ];
-  }, [currentTimelineB, compareTimelineIndex]);
+  }, [plots, currentTimelineB, compareTimelineIndex]);
 
   const climatePlotsData = climatePlotsDataA;
 
   const restorationPlotsDataA = useMemo(() => {
+    if (restorationZones && restorationZones.length > 0) {
+      return restorationZones.map(z => {
+        let coords = [];
+        if (z.boundary && z.boundary.coordinates && z.boundary.coordinates[0]) {
+          coords = z.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = z.zone_id === 'ZONE-ALPHA' ? RESTORE_ZONE_A_COORDS : z.zone_id === 'ZONE-BETA' ? RESTORE_ZONE_B_COORDS : RESTORE_ZONE_C_COORDS;
+        }
+        return {
+          id: z.zone_id,
+          name: z.name,
+          area: `${z.area_ha ?? 6.0} HA`,
+          type: z.project_type || 'Canopy Density',
+          progress: z.progress_pct || 70,
+          survival: `${z.survival_rate_pct || 85}%`,
+          trees: (z.tree_count || 1000).toLocaleString(),
+          carbon: `${z.carbon_offset_tco2e || 30.0} tCO2e`,
+          status: z.progress_pct > 80 ? 'Optimal Growth' : 'Active Care',
+          color: z.progress_pct > 80 ? '#16A34A' : '#EAB308',
+          coords,
+          manager: z.manager || 'Staff',
+          survivalNum: z.survival_rate_pct || 85,
+          insar: z.biodiversity_score ? z.biodiversity_score / 100 : 0.6,
+          gedi: 12,
+          ndwi: 0.25,
+          lulc: 'Forest',
+          eudr: 'Compliant'
+        };
+      });
+    }
     const base = currentTimelineA.ndvi;
     return [
       { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, insar: 0.85, gedi: 18, ndwi: 0.35, lulc: 'Forest', eudr: 'Compliant' },
       { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, insar: 0.62, gedi: 12, ndwi: 0.22, lulc: 'Shrubland', eudr: 'Warning' },
       { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, insar: 0.38, gedi: 4, ndwi: -0.15, lulc: 'Cropland', eudr: 'Deforested' }
     ];
-  }, [currentTimelineA]);
+  }, [restorationZones, currentTimelineA]);
 
   const restorationPlotsDataB = useMemo(() => {
+    if (restorationZones && restorationZones.length > 0) {
+      return restorationZones.map(z => {
+        let coords = [];
+        if (z.boundary && z.boundary.coordinates && z.boundary.coordinates[0]) {
+          coords = z.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+        } else {
+          coords = z.zone_id === 'ZONE-ALPHA' ? RESTORE_ZONE_A_COORDS : z.zone_id === 'ZONE-BETA' ? RESTORE_ZONE_B_COORDS : RESTORE_ZONE_C_COORDS;
+        }
+        return {
+          id: z.zone_id,
+          name: z.name,
+          area: `${z.area_ha ?? 6.0} HA`,
+          type: z.project_type || 'Canopy Density',
+          progress: z.progress_pct || 70,
+          survival: `${z.survival_rate_pct || 85}%`,
+          trees: (z.tree_count || 1000).toLocaleString(),
+          carbon: `${z.carbon_offset_tco2e || 30.0} tCO2e`,
+          status: z.progress_pct > 80 ? 'Optimal Growth' : 'Active Care',
+          color: z.progress_pct > 80 ? '#16A34A' : '#EAB308',
+          coords,
+          manager: z.manager || 'Staff',
+          survivalNum: z.survival_rate_pct || 85,
+          insar: z.biodiversity_score ? z.biodiversity_score / 100 : 0.6,
+          gedi: 12,
+          ndwi: 0.25,
+          lulc: 'Forest',
+          eudr: 'Compliant'
+        };
+      });
+    }
     const base = currentTimelineB.ndvi;
     return [
       { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, insar: 0.85, gedi: 18, ndwi: 0.35, lulc: 'Forest', eudr: 'Compliant' },
       { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, insar: 0.62, gedi: 12, ndwi: 0.22, lulc: 'Shrubland', eudr: 'Warning' },
       { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, insar: 0.38, gedi: 4, ndwi: -0.15, lulc: 'Cropland', eudr: 'Deforested' }
     ];
-  }, [currentTimelineB]);
+  }, [restorationZones, currentTimelineB]);
 
   const restorationPlotsData = restorationPlotsDataA;
 
