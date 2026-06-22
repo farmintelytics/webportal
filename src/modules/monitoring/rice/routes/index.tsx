@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { MapView, ActiveLayers, LayerId } from "../components/MapView";
-import { Plot, alertColors, stageColors } from "../lib/mockData";
+import { Plot, alertColors, stageColors, plots } from "../lib/mockData";
 import {
   Layers, Droplets, Sprout, Activity, X, ChevronRight, MapPin,
   Eye, EyeOff, Satellite, FileText
@@ -10,7 +10,7 @@ import {
 
 import { Dashboard } from "./dashboard";
 import { cn } from "@monitoring-shared/lib/utils";
-
+import { fetchPlotsIntelligence } from "../../../../services/agromonitorApi";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -88,6 +88,55 @@ export function MapHome() {
   const [sel, setSel] = useState<Plot | null>(null);
   const [source, setSource] = useState<"sentinel" | "landsat">("sentinel");
   const [date, setDate] = useState("Now · Dec '25");
+  const [plotsData, setPlotsData] = useState<Plot[]>(plots);
+
+  useEffect(() => {
+    fetchPlotsIntelligence()
+      .then((res) => {
+        if (res && res.length > 0) {
+          const mapped = res.map((p: any) => {
+            let polygon: [number, number][] = [];
+            if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+              polygon = p.boundary.coordinates[0].map(([lng, lat]: [number, number]) => [lat, lng]);
+            }
+            const latSum = polygon.reduce((s, pt) => s + pt[0], 0);
+            const lngSum = polygon.reduce((s, pt) => s + pt[1], 0);
+            const centroid: [number, number] = polygon.length > 0
+              ? [latSum / polygon.length, lngSum / polygon.length]
+              : [10.45, 105.63];
+
+            const ndvi = p.indices?.ndvi ?? 0.65;
+            const ndmi = p.indices?.ndmi ?? 0.45;
+            const alert = p.indices?.uas_anomaly_score > 0.4 ? "critical" : p.indices?.uas_anomaly_score > 0.15 ? "stressed" : "healthy";
+
+            return {
+              id: p.plot_id,
+              name: p.name,
+              area: p.area_ha ?? 10.0,
+              polygon,
+              centroid,
+              suitability: ndvi > 0.6 ? "High" : ndvi > 0.4 ? "Moderate" : "Low",
+              suitabilityScore: Math.round(ndvi * 100),
+              ndvi,
+              ndre: +(ndvi * 0.7).toFixed(2),
+              lswi: ndmi,
+              vhi: Math.round(ndvi * 100),
+              stage: p.stage ?? "Vegetative",
+              daysSincePlanting: 45,
+              predictedYield: +(ndvi * 5.2).toFixed(2),
+              lastSeasonYield: +(ndvi * 4.8).toFixed(2),
+              alert,
+              recommendedPlanting: "May",
+              soilScore: 85,
+              waterScore: 80,
+              climateScore: 78,
+            };
+          });
+          setPlotsData(mapped);
+        }
+      })
+      .catch((err) => console.error("Error fetching plots intelligence:", err));
+  }, []);
 
   const toggle = (id: LayerId) => {
     setActive((a) => {
@@ -105,7 +154,7 @@ export function MapHome() {
   return (
     <AppLayout title="Map View" subtitle="Sentinel-1 · Sentinel-2 · MODIS · CHIRPS · SoilGrids">
       <div className="relative rounded-xl border border-border bg-card overflow-hidden shadow-soft" style={{ height: "calc(100vh - 180px)", minHeight: 560 }}>
-        <MapView layers={active} basemap={basemap} onSelect={setSel} selectedId={sel?.id} />
+        <MapView layers={active} basemap={basemap} onSelect={setSel} selectedId={sel?.id} plots={plotsData} />
 
         {/* Imagery Explorer (Top Left) */}
         <div className="absolute top-4 left-4 z-[1000] pointer-events-none">

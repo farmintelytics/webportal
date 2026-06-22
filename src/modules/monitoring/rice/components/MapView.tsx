@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, Polygon, Tooltip, LayerGroup, Pane } from "react-leaflet";
-import { plots, alertColors, stageColors, Plot } from "../lib/mockData";
+import { alertColors, stageColors, Plot } from "../lib/mockData";
 
 export type LayerId = "alert" | "stage" | "yield" | "ndvi" | "suitability" | "lswi";
 
@@ -29,12 +29,14 @@ export function MapView({
   onSelect,
   selectedId,
   height = "100%",
+  plots = [],
 }: {
   layers: ActiveLayers;
   basemap?: "satellite" | "street" | "terrain";
   onSelect?: (p: Plot) => void;
   selectedId?: string;
   height?: string | number;
+  plots?: Plot[];
 }) {
   const baseUrl =
     basemap === "street"

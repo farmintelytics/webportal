@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { KpiCard } from "../components/KpiCard";
 import { plots, ndviTimeSeries, rainfallData, yieldByStage, stageColors } from "../lib/mockData";
@@ -11,6 +11,8 @@ import {
 } from "recharts";
 
 import { MapHome } from "./index";
+import { fetchPlotsIntelligence, fetchDashboardTrends } from "../../../../services/agromonitorApi";
+
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -33,28 +35,95 @@ export function Dashboard() {
   const [enabled, setEnabled] = useState<Record<string, boolean>>({ ndvi: true, evi: true, ndre: true });
   const [compareLast, setCompareLast] = useState(true);
 
+  const [plotsData, setPlotsData] = useState<any[]>(plots);
+  const [trendsData, setTrendsData] = useState<any>(null);
+
+  useEffect(() => {
+    fetchPlotsIntelligence()
+      .then((res) => {
+        if (res && res.length > 0) {
+          const mapped = res.map((p: any) => {
+            const ndvi = p.indices?.ndvi ?? 0.65;
+            const ndmi = p.indices?.ndmi ?? 0.45;
+            const alert = p.indices?.uas_anomaly_score > 0.4 ? "critical" : p.indices?.uas_anomaly_score > 0.15 ? "stressed" : "healthy";
+            return {
+              id: p.plot_id,
+              name: p.name,
+              area: p.area_ha ?? 10.0,
+              ndvi,
+              ndre: +(ndvi * 0.7).toFixed(2),
+              lswi: ndmi,
+              vhi: Math.round(ndvi * 100),
+              stage: p.stage ?? "Vegetative",
+              predictedYield: +(ndvi * 5.2).toFixed(2),
+              lastSeasonYield: +(ndvi * 4.8).toFixed(2),
+              alert,
+              soilScore: 85,
+              waterScore: 80,
+              climateScore: 78,
+            };
+          });
+          setPlotsData(mapped);
+        }
+      })
+      .catch((err) => console.error("Error fetching plots intelligence:", err));
+
+    fetchDashboardTrends()
+      .then((res) => {
+        if (res) {
+          setTrendsData(res);
+        }
+      })
+      .catch((err) => console.error("Error fetching dashboard trends:", err));
+  }, []);
+
+  const activeNdviTimeSeries = useMemo(() => {
+    if (trendsData && trendsData.ndvi_vigor_trends) {
+      return trendsData.ndvi_vigor_trends.map((t: any) => ({
+        week: t.label,
+        ndvi: t.ndvi,
+        evi: +(t.ndvi * 0.85).toFixed(2),
+        ndre: +(t.ndvi * 0.75).toFixed(2)
+      }));
+    }
+    return ndviTimeSeries;
+  }, [trendsData]);
+
+  const activeRainfallData = useMemo(() => {
+    return rainfallData;
+  }, []);
+
+  const activeYieldByStage = useMemo(() => {
+    return [
+      { stage: "Flooded", plots: plotsData.filter(p => p.stage === "Flooded").length },
+      { stage: "Vegetative", plots: plotsData.filter(p => p.stage === "Vegetative").length },
+      { stage: "Heading", plots: plotsData.filter(p => p.stage === "Heading").length },
+      { stage: "Ripening", plots: plotsData.filter(p => p.stage === "Ripening").length },
+    ];
+  }, [plotsData]);
+
   const series = useMemo(() => {
     const len = range === "4w" ? 4 : range === "12w" ? 12 : 16;
-    return ndviTimeSeries.slice(-len).map((d) => ({
+    return activeNdviTimeSeries.slice(-len).map((d: any) => ({
       ...d,
       ndviPrev: +(d.ndvi * (0.82 + Math.sin(parseInt(d.week.slice(1)) / 2) * 0.05)).toFixed(2),
     }));
-  }, [range]);
+  }, [range, activeNdviTimeSeries]);
 
-  const totalArea = plots.reduce((s, p) => s + p.area, 0);
-  const totalYield = plots.reduce((s, p) => s + p.predictedYield * p.area, 0);
-  const stressed = plots.filter(p => p.alert !== "healthy").length;
-  const avgNdvi = +(plots.reduce((s,p)=>s+p.ndvi,0)/plots.length).toFixed(2);
+  const totalArea = plotsData.reduce((s, p) => s + p.area, 0);
+  const totalYield = plotsData.reduce((s, p) => s + p.predictedYield * p.area, 0);
+  const stressed = plotsData.filter(p => p.alert !== "healthy").length;
+  const avgNdvi = +(plotsData.reduce((s,p)=>s+p.ndvi,0)/plotsData.length).toFixed(2);
 
   const radarData = ["soilScore","waterScore","climateScore","suitabilityScore"].map(k => ({
     metric: k.replace("Score",""),
-    score: Math.round(plots.reduce((s,p)=>s+(p as any)[k],0)/plots.length),
+    score: Math.round(plotsData.reduce((s,p)=>s+(p as any)[k],0)/plotsData.length),
   }));
 
   return (
     <AppLayout title="Dashboard" subtitle="Trends · comparisons · time-series intelligence">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Plots Monitored" value={plots.length} icon={Sprout} accent="primary" trend={{value:8,direction:"up"}} />
+        <KpiCard label="Plots Monitored" value={plotsData.length} icon={Sprout} accent="primary" trend={{value:8,direction:"up"}} />
         <KpiCard label="Total Area" value={totalArea.toFixed(1)} unit="ha" icon={Droplets} accent="water" />
         <KpiCard label="Predicted Harvest" value={totalYield.toFixed(0)} unit="tonnes" icon={Wheat} accent="soil" trend={{value:12,direction:"up"}} />
         <KpiCard label="Stress Alerts" value={stressed} icon={AlertTriangle} accent="stress" trend={{value:3,direction:"down"}} />
@@ -120,13 +189,13 @@ export function Dashboard() {
           <h3 className="font-display font-semibold">Growth Stages</h3>
           <p className="text-xs text-muted-foreground mt-0.5">Plots per phenological stage</p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={yieldByStage} margin={{ top: 16, right: 10, left: -20, bottom: 0 }}>
+            <BarChart data={activeYieldByStage} margin={{ top: 16, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.01 130)" />
               <XAxis dataKey="stage" fontSize={11} stroke="#94a3b8"/>
               <YAxis fontSize={10} stroke="#94a3b8"/>
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }}/>
               <Bar dataKey="plots" radius={[6,6,0,0]}>
-                {yieldByStage.map((s, i) => <Cell key={i} fill={stageColors[s.stage as keyof typeof stageColors]}/>)}
+                {activeYieldByStage.map((s, i) => <Cell key={i} fill={stageColors[s.stage as keyof typeof stageColors]}/>)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -136,7 +205,7 @@ export function Dashboard() {
           <h3 className="font-display font-semibold">Climate Context (CHIRPS · ERA5)</h3>
           <p className="text-xs text-muted-foreground mt-0.5">Monthly rainfall vs temperature</p>
           <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={rainfallData} margin={{ top: 16, right: 10, left: -10, bottom: 0 }}>
+            <ComposedChart data={activeRainfallData} margin={{ top: 16, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.01 130)" />
               <XAxis dataKey="month" fontSize={11} stroke="#94a3b8"/>
               <YAxis yAxisId="l" fontSize={10} stroke="#94a3b8"/>
@@ -155,7 +224,7 @@ export function Dashboard() {
           <h3 className="font-display font-semibold">Yield: This vs Last Season</h3>
           <p className="text-xs text-muted-foreground mt-0.5">Per-plot tonnes per hectare</p>
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={plots.map(p=>({name:p.name.replace("Plot ",""), now:p.predictedYield, last:p.lastSeasonYield}))}>
+            <BarChart data={plotsData.map(p=>({name:p.name.replace("Plot ",""), now:p.predictedYield, last:p.lastSeasonYield}))}>
               <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.01 130)"/>
               <XAxis dataKey="name" fontSize={10} stroke="#94a3b8"/>
               <YAxis fontSize={10} stroke="#94a3b8"/>
