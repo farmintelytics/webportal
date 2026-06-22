@@ -1,5 +1,6 @@
 import { MapContainer, TileLayer, Polygon, Tooltip, LayerGroup, Pane } from "react-leaflet";
 import { alertColors, stageColors, Plot } from "../lib/fallbackData";
+import { SATELLITE_TILE_URL, BOUNDARIES_TILE_URL, BASE_MAP_ATTRIBUTION } from "../../../../constants/map";
 
 export type LayerId = "alert" | "stage" | "yield" | "ndvi" | "suitability" | "lswi";
 
@@ -14,36 +15,32 @@ const colorFor = (p: Plot, mode: LayerId) => {
     const v = p.ndvi;
     return v > 0.7 ? "#15803d" : v > 0.5 ? "#84cc16" : v > 0.35 ? "#f59e0b" : "#a16207";
   }
-  if (mode === "lswi") {
-    const v = p.lswi;
-    return v > 0.4 ? "#1e40af" : v > 0.25 ? "#3b82f6" : v > 0.15 ? "#93c5fd" : "#fde68a";
-  }
-  return p.suitability === "High" ? "#15803d" : p.suitability === "Moderate" ? "#f59e0b" : "#dc2626";
+  if (mode === "suitability") return p.suitability === "High" ? "#16a34a" : p.suitability === "Medium" ? "#f59e0b" : "#dc2626";
+  const w = p.lswi;
+  return w > 0.4 ? "#0284c7" : w > 0.2 ? "#bae6fd" : "#fca5a5";
 };
 
-export type ActiveLayers = Partial<Record<LayerId, number>>; // id -> opacity 0..1
-
 export function MapView({
-  layers,
+  plots = [],
+  layers = {},
   basemap = "satellite",
   onSelect,
   selectedId,
-  height = "100%",
-  plots = [],
+  height = "400px",
 }: {
-  layers: ActiveLayers;
-  basemap?: "satellite" | "street" | "terrain";
+  plots?: Plot[];
+  layers?: Record<LayerId, number> | any;
+  basemap?: "street" | "terrain" | "satellite";
   onSelect?: (p: Plot) => void;
   selectedId?: string;
-  height?: string | number;
-  plots?: Plot[];
+  height?: string;
 }) {
   const baseUrl =
     basemap === "street"
       ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       : basemap === "terrain"
       ? "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
-      : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+      : SATELLITE_TILE_URL;
 
   const order: LayerId[] = ["suitability", "yield", "ndvi", "lswi", "stage", "alert"];
   const active = order.filter((id) => layers[id] !== undefined && (layers[id] as number) > 0);
@@ -61,13 +58,13 @@ export function MapView({
             ? "© OpenStreetMap"
             : basemap === "terrain"
             ? "© OpenTopoMap"
-            : "© Esri World Imagery"
+            : BASE_MAP_ATTRIBUTION
         }
         url={baseUrl}
       />
       <TileLayer 
         attribution="&copy; Esri Boundaries"
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+        url={BOUNDARIES_TILE_URL}
         opacity={0.6}
       />
       {active.map((id, idx) => (

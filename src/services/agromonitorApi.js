@@ -17,6 +17,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import proj4 from 'proj4';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/farmintelytics-engine/agromonitoring';
 
 /** Generic fetch helper with JSON parsing and error handling */
@@ -291,9 +293,27 @@ export async function askAiAssistant(payload) {
 
 // ─── Coordinate Helper ───────────────────────────────────────────────────────
 
+// Define standard projections: WGS84 (EPSG:4326) and Web Mercator (EPSG:3857)
+const EPSG4326 = 'EPSG:4326';
+const EPSG3857 = 'EPSG:3857';
+proj4.defs(EPSG4326, '+proj=longlat +datum=WGS84 +no_defs');
+proj4.defs(EPSG3857, '+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs');
+
+/**
+ * Transforms coordinates between EPSG:4326 and EPSG:3857 using proj4
+ * @param {[number, number]} coord - The coordinate pair to transform
+ * @param {string} from - Source projection name
+ * @param {string} to - Target projection name
+ * @returns {[number, number]} Transformed coordinate pair
+ */
+export function transformCoordinate(coord, from = EPSG4326, to = EPSG3857) {
+  return proj4(from, to, coord);
+}
+
 /**
  * Converts GeoJSON [lng, lat] pairs from the backend into
  * Leaflet-compatible [lat, lng] pairs used by the frontend Polygon component.
+ * Uses proj4 to guarantee projection standards and avoid coordinate shift.
  *
  * Usage:
  *   const coords = geoJsonToLeaflet(plot.boundary.coordinates[0]);
@@ -302,5 +322,39 @@ export async function askAiAssistant(payload) {
  * @returns {Array<[number, number]>}             Array of [lat, lng] for Leaflet
  */
 export function geoJsonToLeaflet(geoJsonRing) {
-  return geoJsonRing.map(([lng, lat]) => [lat, lng]);
+  return geoJsonRing.map(coord => {
+    const [lng, lat] = proj4(EPSG4326, EPSG4326, coord);
+    return [lat, lng];
+  });
 }
+
+/**
+ * GET /tenants
+ * Returns list of dynamic tenants/organizations.
+ * @returns {Promise<Array<{id: string, title: string, crop: string, active: boolean}>>}
+ */
+export async function fetchTenants() {
+  return apiFetch('/tenants');
+}
+
+/**
+ * GET /timeseries/slider/?farm={farm}&index={index}&start={start}&end={end}
+ * Returns timeseries slider URLs and stats.
+ */
+export async function fetchTimeseriesSlider({ farm, index, start, end } = {}) {
+  const params = new URLSearchParams({ farm, index });
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+  return apiFetch(`/timeseries/slider?${params}`);
+}
+
+/**
+ * GET /timeseries/pixel/?farm={farm}&index={index}&lat={lat}&lon={lon}
+ * Returns pixel-level Zarr time series data.
+ */
+export async function fetchPixelTimeseries({ farm, index, lat, lon } = {}) {
+  const params = new URLSearchParams({ farm, index, lat: lat.toString(), lon: lon.toString() });
+  return apiFetch(`/timeseries/pixel?${params}`);
+}
+
+

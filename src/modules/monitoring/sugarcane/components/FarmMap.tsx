@@ -39,10 +39,12 @@ function FitBounds({ blocks }: { blocks: Block[] }) {
   return null;
 }
 
+import { SATELLITE_TILE_URL, BOUNDARIES_TILE_URL, BASE_MAP_ATTRIBUTION } from "../../../../constants/map";
+
 const basemapTiles: Record<Basemap, { url: string; attribution: string; overlay?: string }> = {
   satellite: {
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "&copy; Esri",
+    url: SATELLITE_TILE_URL,
+    attribution: BASE_MAP_ATTRIBUTION,
   },
   streets: {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -53,11 +55,63 @@ const basemapTiles: Record<Basemap, { url: string; attribution: string; overlay?
     attribution: "&copy; OpenTopoMap (CC-BY-SA)",
   },
   hybrid: {
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "&copy; Esri",
-    overlay: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+    url: SATELLITE_TILE_URL,
+    attribution: BASE_MAP_ATTRIBUTION,
+    overlay: BOUNDARIES_TILE_URL,
   },
 };
+
+
+// Ramer-Douglas-Peucker geometry simplification algorithm to optimize rendering
+function getSqDist(p1: [number, number], p2: [number, number]) {
+  const dx = p1[0] - p2[0];
+  const dy = p1[1] - p2[1];
+  return dx * dx + dy * dy;
+}
+function getSqSegDist(p: [number, number], p1: [number, number], p2: [number, number]) {
+  let x = p1[0];
+  let y = p1[1];
+  let dx = p2[0] - x;
+  let dy = p2[1] - y;
+  if (dx !== 0 || dy !== 0) {
+    const t = ((p[0] - x) * dx + (p[1] - y) * dy) / (dx * dx + dy * dy);
+    if (t > 1) {
+      x = p2[0];
+      y = p2[1];
+    } else if (t > 0) {
+      x += dx * t;
+      y += dy * t;
+    }
+  }
+  dx = p[0] - x;
+  dy = p[1] - y;
+  return dx * dx + dy * dy;
+}
+function simplifyDPStep(points: [number, number][], first: number, last: number, sqTolerance: number, simplified: [number, number][]) {
+  let maxSqDist = sqTolerance;
+  let index = -1;
+  for (let i = first + 1; i < last; i++) {
+    const sqDist = getSqSegDist(points[i], points[first], points[last]);
+    if (sqDist > maxSqDist) {
+      index = i;
+      maxSqDist = sqDist;
+    }
+  }
+  if (maxSqDist > sqTolerance) {
+    if (index - first > 1) simplifyDPStep(points, first, index, sqTolerance, simplified);
+    simplified.push(points[index]);
+    if (last - index > 1) simplifyDPStep(points, index, last, sqTolerance, simplified);
+  }
+}
+function simplifyPolygon(points: [number, number][], tolerance: number = 0.00005): [number, number][] {
+  if (points.length <= 4) return points;
+  const sqTolerance = tolerance * tolerance;
+  const last = points.length - 1;
+  const simplified = [points[0]];
+  simplifyDPStep(points, 0, last, sqTolerance, simplified);
+  simplified.push(points[last]);
+  return simplified;
+}
 
 export function FarmMap({
   layers, onSelect, selectedId, basemap = "satellite", blocks = [],
@@ -91,10 +145,14 @@ export function FarmMap({
         if (enabled("suitability")) { fill = colorForSuitability(b.suitability); fillOpacity = opacity("suitability"); }
         const stroke = enabled("boundaries") ? "#fcd34d" : "transparent";
         const isSel = selectedId === b.id;
+        
+        // Apply Ramer-Douglas-Peucker simplification to improve rendering performance and minimize lag
+        const simplifiedPolygon = simplifyPolygon(b.polygon as [number, number][]);
+
         return (
           <Polygon
             key={b.id}
-            positions={b.polygon}
+            positions={simplifiedPolygon}
             pathOptions={{
               color: isSel ? "#fef08a" : stroke,
               weight: isSel ? 3 : 2,

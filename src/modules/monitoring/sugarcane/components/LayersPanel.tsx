@@ -76,8 +76,8 @@ export function LayersPanel({
                         <div className="mt-2 space-y-1">
                           {l.legend.map((lg) => (
                             <div key={lg.label} className="flex items-center gap-2 text-[11px]">
-                              <span className="h-3 w-4 rounded-sm border border-border" style={{ background: lg.color }} />
-                              <span className="text-muted-foreground">{lg.label}</span>
+                              <span className="h-3 w-4 rounded-sm border border-border" style={{ background: lg.color, opacity: l.opacity }} />
+                              <span className="text-muted-foreground" style={{ opacity: Math.max(0.4, l.opacity) }}>{lg.label}</span>
                             </div>
                           ))}
                         </div>

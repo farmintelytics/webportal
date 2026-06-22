@@ -69,7 +69,7 @@ import {
   Columns,
   Wind
 } from 'lucide-react';
-import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap, Pane } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap, Pane, ImageOverlay } from 'react-leaflet';
 import ReactDOM from 'react-dom';
 import * as api from '../../services/agromonitorApi';
 
@@ -834,6 +834,20 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const tenant = localStorage.getItem('fi_tenant') || 'okomu';
   const tenantDisplayName = tenant.charAt(0).toUpperCase() + tenant.slice(1);
 
+  // Helper to map plot IDs to backend IDs
+  const getBackendFarmId = (plotId) => {
+    if (!plotId) return '1';
+    if (plotId === 'PLOT-ALPHA') return '1';
+    if (plotId === 'PLOT-BETA') return '2';
+    if (plotId === 'PLOT-GAMMA') return '3';
+    const match = plotId.match(/\d+/);
+    return match ? match[0] : '1';
+  };
+
+  const [sliderData, setSliderData] = useState(null);
+  const [pixelTimeseries, setPixelTimeseries] = useState(null);
+
+
   const [activeSidebarItem, setActiveSidebarItem] = useState('analytics');
   const [activeTab, setActiveTab] = useState('monitor');
 
@@ -884,6 +898,65 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     loadBackendData();
     return () => { active = false; };
   }, []);
+  // Fetch timeseries slider and pre-rendered raster overlays
+  useEffect(() => {
+    async function loadSliderData() {
+      try {
+        const farmId = getBackendFarmId(selectedPlot?.id || 'PLOT-ALPHA');
+        const indexName = (selectedIndex || 'ndvi').toLowerCase();
+        const data = await api.fetchTimeseriesSlider({
+          farm: `farm_${farmId}`,
+          index: indexName,
+          start: '2024-01-01',
+          end: '2026-12-31'
+        });
+        setSliderData(data);
+      } catch (err) {
+        console.error("Failed to fetch timeseries slider data:", err);
+      }
+    }
+    loadSliderData();
+  }, [selectedPlot, selectedIndex]);
+
+  // Click handler to fetch Zarr pixel timeseries
+  const handlePlotClick = async (plot, lat, lng) => {
+    setSelectedPlot(plot);
+    try {
+      const farmId = getBackendFarmId(plot.id);
+      const indexName = (selectedIndex || 'ndvi').toLowerCase();
+      const data = await api.fetchPixelTimeseries({
+        farm: `farm_${farmId}`,
+        index: indexName,
+        lat,
+        lon: lng
+      });
+      if (data && data.series) {
+        setPixelTimeseries(data.series);
+      } else {
+        setPixelTimeseries(null);
+      }
+    } catch (err) {
+      console.error("Failed to fetch pixel timeseries:", err);
+      setPixelTimeseries(null);
+    }
+  };
+
+  const currentTileUrl = useMemo(() => {
+    if (!sliderData || !sliderData.tiles || !currentTimeline) return null;
+    return sliderData.tiles[currentTimeline.date] || null;
+  }, [sliderData, currentTimeline]);
+
+  const activePlotBounds = useMemo(() => {
+    const activePlot = selectedPlot || plotsData[0];
+    if (!activePlot || !activePlot.coords) return null;
+    const lats = activePlot.coords.map(c => c[0]);
+    const lngs = activePlot.coords.map(c => c[1]);
+    return [
+      [Math.min(...lats), Math.min(...lngs)],
+      [Math.max(...lats), Math.max(...lngs)]
+    ];
+  }, [selectedPlot, plotsData]);
+
 
   const renderInfoTooltip = (title) => {
     let lookupKey = title;
@@ -1698,7 +1771,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             <Polygon 
               positions={plot.coords}
               pathOptions={getIntelPlotStyleOutline()}
-              eventHandlers={{ click: () => setSelectedPlot(plot) }}
+              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             />
           )}
           {/* Active Fill Layers */}
@@ -1707,7 +1780,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               key={`${keyPrefix}-${layer}`}
               positions={plot.coords}
               pathOptions={getIntelPlotStyleFill(plot, layer)}
-              eventHandlers={{ click: () => setSelectedPlot(plot) }}
+              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             >
                           <Popup>
               <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
@@ -1734,9 +1807,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 <div className="h-24 bg-gray-50 rounded-xl p-1.5">
                   <Line data={{
-                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
                     datasets: [{
-                      data: TIMELINE_DATA.map(t =>
+                      data: pixelTimeseries ? pixelTimeseries.map(pt => pt.value) : TIMELINE_DATA.map(t =>
                         plot.id === 'PLOT-ALPHA' ? t.ndvi + 0.04 :
                         plot.id === 'PLOT-BETA'  ? t.ndvi - 0.15 : t.ndvi - 0.05),
                       borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
@@ -1786,7 +1859,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             <Polygon 
               positions={plot.coords}
               pathOptions={getHealthPlotStyleOutline()}
-              eventHandlers={{ click: () => activePlotHandler(plot) }}
+              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             />
           )}
           {/* Active Fill Layers */}
@@ -1795,7 +1868,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               key={`${keyPrefix}-${layer}`}
               positions={plot.coords}
               pathOptions={getHealthPlotStyleFill(plot, layer)}
-              eventHandlers={{ click: () => activePlotHandler(plot) }}
+              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             >
                           <Popup>
               <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
@@ -1822,9 +1895,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 <div className="h-24 bg-gray-50 rounded-xl p-1.5">
                   <Line data={{
-                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
                     datasets: [{
-                      data: TIMELINE_DATA.map(t =>
+                      data: pixelTimeseries ? pixelTimeseries.map(pt => pt.value) : TIMELINE_DATA.map(t =>
                         plot.id === 'PLOT-ALPHA' ? t.ndvi + 0.04 :
                         plot.id === 'PLOT-BETA'  ? t.ndvi - 0.15 : t.ndvi - 0.05),
                       borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
@@ -1872,7 +1945,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             <Polygon 
               positions={plot.coords}
               pathOptions={getYieldPlotStyleOutline()}
-              eventHandlers={{ click: () => activePlotHandler(plot) }}
+              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             />
           )}
           {/* Active Fill Layers */}
@@ -1881,7 +1954,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               key={`${keyPrefix}-${layer}`}
               positions={plot.coords}
               pathOptions={getYieldPlotStyleFill(plot, layer)}
-              eventHandlers={{ click: () => activePlotHandler(plot) }}
+              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             >
                           <Popup>
               <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
@@ -1908,7 +1981,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 <div className="h-24 bg-gray-50 rounded-xl p-1.5">
                   <Line data={{
-                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
                     datasets: [{
                       data: TIMELINE_DATA.map(t =>
                         plot.id === 'PLOT-ALPHA' ? t.ndvi * 24.5 :
@@ -1999,7 +2072,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 <div className="h-24 bg-gray-50 rounded-xl p-1.5">
                   <Line data={{
-                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
                     datasets: [{
                       data: TIMELINE_DATA.map(t =>
                         zone.id === 'ZONE-ALPHA' ? Math.min(100, Math.round(t.ndvi * 125)) :
@@ -2052,7 +2125,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             <Polygon 
               positions={plot.coords}
               pathOptions={getClimatePlotStyleOutline()}
-              eventHandlers={{ click: () => activePlotHandler(plot) }}
+              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             />
           )}
           {/* Active Fill Layers */}
@@ -2061,7 +2134,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               key={`${keyPrefix}-${layer}`}
               positions={plot.coords}
               pathOptions={getClimatePlotStyleFill(plot, layer)}
-              eventHandlers={{ click: () => activePlotHandler(plot) }}
+              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             >
                           <Popup>
               <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
@@ -2088,7 +2161,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 <div className="h-24 bg-gray-50 rounded-xl p-1.5">
                   <Line data={{
-                    labels: ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
                     datasets: [{
                       data: TIMELINE_DATA.map((t, idx) =>
                         plot.id === 'PLOT-ALPHA' ? 12 + idx * 4 :
@@ -2267,7 +2340,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return plots.map(p => {
         let coords = [];
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
           coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
         }
@@ -2287,12 +2360,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    const health = currentTimelineA.plotsHealth;
-    return [
-      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: currentTimelineA.ndvi + 0.04, ndmi: currentTimelineA.ndmi + 0.02, color: health.alpha, coords: PLOT_ALPHA_COORDS },
-      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: currentTimelineA.ndvi < 0.65 ? 'Stressed' : 'Good', ndvi: currentTimelineA.ndvi - 0.15, ndmi: currentTimelineA.ndmi - 0.10, color: health.beta, coords: PLOT_BETA_COORDS },
-      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: currentTimelineA.ndvi - 0.05, ndmi: currentTimelineA.ndmi - 0.04, color: health.gamma, coords: PLOT_GAMMA_COORDS }
-    ];
+    return [];
   }, [plots, currentTimelineA]);
 
   const plotsDataB = useMemo(() => {
@@ -2300,7 +2368,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return plots.map(p => {
         let coords = [];
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
           coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
         }
@@ -2320,12 +2388,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    const health = currentTimelineB.plotsHealth;
-    return [
-      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: currentTimelineB.ndvi + 0.04, ndmi: currentTimelineB.ndmi + 0.02, color: health.alpha, coords: PLOT_ALPHA_COORDS },
-      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: currentTimelineB.ndvi < 0.65 ? 'Stressed' : 'Good', ndvi: currentTimelineB.ndvi - 0.15, ndmi: currentTimelineB.ndmi - 0.10, color: health.beta, coords: PLOT_BETA_COORDS },
-      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: currentTimelineB.ndvi - 0.05, ndmi: currentTimelineB.ndmi - 0.04, color: health.gamma, coords: PLOT_GAMMA_COORDS }
-    ];
+    return [];
   }, [plots, currentTimelineB]);
 
   const plotsData = plotsDataA;
@@ -2335,7 +2398,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return plots.map(p => {
         let coords = [];
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
           coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
         }
@@ -2354,13 +2417,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    const baseNdvi = currentTimelineA.ndvi;
-    const baseNdmi = currentTimelineA.ndmi;
-    return [
-      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: baseNdvi + 0.04, chlorophyll: parseFloat((baseNdvi * 0.95).toFixed(2)), waterStress: parseFloat((baseNdmi + 0.02).toFixed(2)), pestRisk: 'Low Risk', coords: PLOT_ALPHA_COORDS },
-      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: baseNdvi < 0.65 ? 'Stressed' : 'Good', ndvi: baseNdvi - 0.15, chlorophyll: parseFloat(((baseNdvi - 0.15) * 0.9).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.10)).toFixed(2)), pestRisk: 'High Risk', coords: PLOT_BETA_COORDS },
-      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: baseNdvi - 0.05, chlorophyll: parseFloat(((baseNdvi - 0.05) * 0.92).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.04)).toFixed(2)), pestRisk: 'Moderate Risk', coords: PLOT_GAMMA_COORDS }
-    ];
+    return [];
   }, [plots, currentTimelineA]);
 
   const healthPlotsDataB = useMemo(() => {
@@ -2368,7 +2425,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return plots.map(p => {
         let coords = [];
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
           coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
         }
@@ -2387,13 +2444,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    const baseNdvi = currentTimelineB.ndvi;
-    const baseNdmi = currentTimelineB.ndmi;
-    return [
-      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', health: 'Optimal',  ndvi: baseNdvi + 0.04, chlorophyll: parseFloat((baseNdvi * 0.95).toFixed(2)), waterStress: parseFloat((baseNdmi + 0.02).toFixed(2)), pestRisk: 'Low Risk', coords: PLOT_ALPHA_COORDS },
-      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  health: baseNdvi < 0.65 ? 'Stressed' : 'Good', ndvi: baseNdvi - 0.15, chlorophyll: parseFloat(((baseNdvi - 0.15) * 0.9).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.10)).toFixed(2)), pestRisk: 'High Risk', coords: PLOT_BETA_COORDS },
-      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', health: 'Moderate', ndvi: baseNdvi - 0.05, chlorophyll: parseFloat(((baseNdvi - 0.05) * 0.92).toFixed(2)), waterStress: parseFloat(((baseNdmi - 0.04)).toFixed(2)), pestRisk: 'Moderate Risk', coords: PLOT_GAMMA_COORDS }
-    ];
+    return [];
   }, [plots, currentTimelineB]);
 
   const healthPlotsData = healthPlotsDataA;
@@ -2403,7 +2454,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return plots.map(p => {
         let coords = [];
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
           coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
         }
@@ -2424,12 +2475,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    const base = currentTimelineA.ndvi;
-    return [
-      { id: 'PLOT-ALPHA', name: 'West Valley Plot', area: '12.5 HA', yieldValue: parseFloat((base * 25).toFixed(1)), biomass: parseFloat((base * 2.8).toFixed(2)), readiness: Math.min(100, Math.round(base * 120)), growth: parseFloat(base.toFixed(2)), coords: PLOT_ALPHA_COORDS, predAccuracy: '95.4%', predictedYield: parseFloat((base * 25 * 12.5).toFixed(1)), yieldStatus: 'Optimal (On Track)' },
-      { id: 'PLOT-BETA',  name: 'East Ridge Plot', area: '8.2 HA', yieldValue: parseFloat(((base - 0.15) * 20).toFixed(1)), biomass: parseFloat(((base - 0.15) * 2.2).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.1) * 100)), growth: parseFloat((base - 0.15).toFixed(2)), coords: PLOT_BETA_COORDS, predAccuracy: '89.2%', predictedYield: parseFloat(((base - 0.15) * 20 * 8.2).toFixed(1)), yieldStatus: 'Underperforming (Water Stress)' },
-      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', yieldValue: parseFloat(((base - 0.05) * 22).toFixed(1)), biomass: parseFloat(((base - 0.05) * 2.4).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.05) * 110)), growth: parseFloat((base - 0.05).toFixed(2)), coords: PLOT_GAMMA_COORDS, predAccuracy: '92.1%', predictedYield: parseFloat(((base - 0.05) * 22 * 15.0).toFixed(1)), yieldStatus: 'Moderate (Minor Anomaly)' }
-    ];
+    return [];
   }, [plots, currentTimelineA]);
 
   const yieldPlotsDataB = useMemo(() => {
@@ -2437,7 +2483,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return plots.map(p => {
         let coords = [];
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
           coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
         }
@@ -2458,12 +2504,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    const base = currentTimelineB.ndvi;
-    return [
-      { id: 'PLOT-ALPHA', name: 'West Valley Plot', area: '12.5 HA', yieldValue: parseFloat((base * 25).toFixed(1)), biomass: parseFloat((base * 2.8).toFixed(2)), readiness: Math.min(100, Math.round(base * 120)), growth: parseFloat(base.toFixed(2)), coords: PLOT_ALPHA_COORDS, predAccuracy: '95.4%', predictedYield: parseFloat((base * 25 * 12.5).toFixed(1)), yieldStatus: 'Optimal (On Track)' },
-      { id: 'PLOT-BETA',  name: 'East Ridge Plot', area: '8.2 HA', yieldValue: parseFloat(((base - 0.15) * 20).toFixed(1)), biomass: parseFloat(((base - 0.15) * 2.2).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.1) * 100)), growth: parseFloat((base - 0.15).toFixed(2)), coords: PLOT_BETA_COORDS, predAccuracy: '89.2%', predictedYield: parseFloat(((base - 0.15) * 20 * 8.2).toFixed(1)), yieldStatus: 'Underperforming (Water Stress)' },
-      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', yieldValue: parseFloat(((base - 0.05) * 22).toFixed(1)), biomass: parseFloat(((base - 0.05) * 2.4).toFixed(2)), readiness: Math.min(100, Math.round((base - 0.05) * 110)), growth: parseFloat((base - 0.05).toFixed(2)), coords: PLOT_GAMMA_COORDS, predAccuracy: '92.1%', predictedYield: parseFloat(((base - 0.05) * 22 * 15.0).toFixed(1)), yieldStatus: 'Moderate (Minor Anomaly)' }
-    ];
+    return [];
   }, [plots, currentTimelineB]);
 
   const yieldPlotsData = yieldPlotsDataA;
@@ -2473,7 +2514,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return plots.map((p, idx) => {
         let coords = [];
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
           coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
         }
@@ -2489,11 +2530,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    return [
-      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', rainfall: 12 + selectedTimelineIndex * 4, soilTemp: 24 + (5 - selectedTimelineIndex), lst: 26 + (5 - selectedTimelineIndex), vpd: parseFloat((1.2 + selectedTimelineIndex * 0.2).toFixed(1)), coords: PLOT_ALPHA_COORDS },
-      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  rainfall: 10 + selectedTimelineIndex * 3, soilTemp: 28 + (5 - selectedTimelineIndex), lst: 32 + (5 - selectedTimelineIndex), vpd: parseFloat((2.5 - selectedTimelineIndex * 0.1).toFixed(1)), coords: PLOT_BETA_COORDS },
-      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', rainfall: 11 + selectedTimelineIndex * 4, soilTemp: 26 + (5 - selectedTimelineIndex), lst: 28 + (5 - selectedTimelineIndex), vpd: parseFloat((1.6 + selectedTimelineIndex * 0.15).toFixed(1)), coords: PLOT_GAMMA_COORDS }
-    ];
+    return [];
   }, [plots, currentTimelineA, selectedTimelineIndex]);
 
   const climatePlotsDataB = useMemo(() => {
@@ -2501,7 +2538,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return plots.map((p, idx) => {
         let coords = [];
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = p.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
           coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
         }
@@ -2517,11 +2554,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    return [
-      { id: 'PLOT-ALPHA', name: 'West Valley Plot',   area: '12.5 HA', rainfall: 12 + compareTimelineIndex * 4, soilTemp: 24 + (5 - compareTimelineIndex), lst: 26 + (5 - compareTimelineIndex), vpd: parseFloat((1.2 + compareTimelineIndex * 0.2).toFixed(1)), coords: PLOT_ALPHA_COORDS },
-      { id: 'PLOT-BETA',  name: 'East Ridge Plot',   area: '8.2 HA',  rainfall: 10 + compareTimelineIndex * 3, soilTemp: 28 + (5 - compareTimelineIndex), lst: 32 + (5 - compareTimelineIndex), vpd: parseFloat((2.5 - compareTimelineIndex * 0.1).toFixed(1)), coords: PLOT_BETA_COORDS },
-      { id: 'PLOT-GAMMA', name: 'South Slope Plot', area: '15.0 HA', rainfall: 11 + compareTimelineIndex * 4, soilTemp: 26 + (5 - compareTimelineIndex), lst: 28 + (5 - compareTimelineIndex), vpd: parseFloat((1.6 + compareTimelineIndex * 0.15).toFixed(1)), coords: PLOT_GAMMA_COORDS }
-    ];
+    return [];
   }, [plots, currentTimelineB, compareTimelineIndex]);
 
   const climatePlotsData = climatePlotsDataA;
@@ -2531,7 +2564,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return restorationZones.map(z => {
         let coords = [];
         if (z.boundary && z.boundary.coordinates && z.boundary.coordinates[0]) {
-          coords = z.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(z.boundary.coordinates[0]);
         } else {
           coords = z.zone_id === 'ZONE-ALPHA' ? RESTORE_ZONE_A_COORDS : z.zone_id === 'ZONE-BETA' ? RESTORE_ZONE_B_COORDS : RESTORE_ZONE_C_COORDS;
         }
@@ -2557,12 +2590,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    const base = currentTimelineA.ndvi;
-    return [
-      { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, insar: 0.85, gedi: 18, ndwi: 0.35, lulc: 'Forest', eudr: 'Compliant' },
-      { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, insar: 0.62, gedi: 12, ndwi: 0.22, lulc: 'Shrubland', eudr: 'Warning' },
-      { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, insar: 0.38, gedi: 4, ndwi: -0.15, lulc: 'Cropland', eudr: 'Deforested' }
-    ];
+    return [];
   }, [restorationZones, currentTimelineA]);
 
   const restorationPlotsDataB = useMemo(() => {
@@ -2570,7 +2598,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       return restorationZones.map(z => {
         let coords = [];
         if (z.boundary && z.boundary.coordinates && z.boundary.coordinates[0]) {
-          coords = z.boundary.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          coords = api.geoJsonToLeaflet(z.boundary.coordinates[0]);
         } else {
           coords = z.zone_id === 'ZONE-ALPHA' ? RESTORE_ZONE_A_COORDS : z.zone_id === 'ZONE-BETA' ? RESTORE_ZONE_B_COORDS : RESTORE_ZONE_C_COORDS;
         }
@@ -2596,12 +2624,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         };
       });
     }
-    const base = currentTimelineB.ndvi;
-    return [
-      { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: Math.min(100, Math.round(base * 125)), survival: '94%', trees: '1,200', carbon: parseFloat((base * 60).toFixed(1)), status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa', survivalNum: 94, insar: 0.85, gedi: 18, ndwi: 0.35, lulc: 'Forest', eudr: 'Compliant' },
-      { id: 'ZONE-BETA',  name: 'Native Species Agroforestry', area: '5.8 HA', type: 'Species Diversification', progress: Math.min(100, Math.round((base - 0.15) * 115)), survival: '89%', trees: '980', carbon: parseFloat(((base - 0.15) * 50).toFixed(1)), status: 'Active Care', color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters', survivalNum: 89, insar: 0.62, gedi: 12, ndwi: 0.22, lulc: 'Shrubland', eudr: 'Warning' },
-      { id: 'ZONE-GAMMA', name: 'Riparian Buffer Restoration', area: '8.1 HA', type: 'Soil Stabilization', progress: Math.min(100, Math.round((base - 0.05) * 105)), survival: '81%', trees: '1,550', carbon: parseFloat(((base - 0.05) * 35).toFixed(1)), status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu', survivalNum: 81, insar: 0.38, gedi: 4, ndwi: -0.15, lulc: 'Cropland', eudr: 'Deforested' }
-    ];
+    return [];
   }, [restorationZones, currentTimelineB]);
 
   const restorationPlotsData = restorationPlotsDataA;
@@ -4307,6 +4330,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+          {currentTileUrl && activePlotBounds && (
+            <ImageOverlay
+              url={currentTileUrl}
+              bounds={activePlotBounds}
+              opacity={mapOpacity / 100}
+            />
+          )}
                     
                     {isCompareMode ? (
                       <>
@@ -5062,6 +5092,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+          {currentTileUrl && activePlotBounds && (
+            <ImageOverlay
+              url={currentTileUrl}
+              bounds={activePlotBounds}
+              opacity={mapOpacity / 100}
+            />
+          )}
                     
                     {isCompareMode ? (
                       <>
@@ -5509,6 +5546,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+          {currentTileUrl && activePlotBounds && (
+            <ImageOverlay
+              url={currentTileUrl}
+              bounds={activePlotBounds}
+              opacity={mapOpacity / 100}
+            />
+          )}
                     
                     {isCompareMode ? (
                       <>
@@ -5857,6 +5901,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <MapContainer center={[7.138, 3.356]} zoom={15} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+          {currentTileUrl && activePlotBounds && (
+            <ImageOverlay
+              url={currentTileUrl}
+              bounds={activePlotBounds}
+              opacity={mapOpacity / 100}
+            />
+          )}
                     
                     {isCompareMode ? (
                       <>
@@ -6919,6 +6970,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+          {currentTileUrl && activePlotBounds && (
+            <ImageOverlay
+              url={currentTileUrl}
+              bounds={activePlotBounds}
+              opacity={mapOpacity / 100}
+            />
+          )}
                     
                     {isCompareMode ? (
                       <>

@@ -19,6 +19,8 @@ import {
   ChevronDown,
   Trees
 } from 'lucide-react';
+import { fetchTenants } from '../services/agromonitorApi';
+
 
 const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (
   <button 
@@ -55,6 +57,31 @@ const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (
 
 const PortalHub = ({ onSelectModule }) => {
   const [activeTab, setActiveTab] = React.useState('management');
+  const [customModules, setCustomModules] = React.useState([
+    { id: 'custom-agromonitor-olam', title: 'Olam Agro Monitoring', crop: 'Olam', icon: <Satellite />, active: true },
+    { id: 'custom-agromonitor-okomu', title: 'Okomu Agro Monitoring', crop: 'Okomu', icon: <Satellite />, active: true },
+  ]);
+
+  React.useEffect(() => {
+    async function loadTenants() {
+      try {
+        const tenants = await fetchTenants();
+        if (tenants && Array.isArray(tenants)) {
+          const mapped = tenants.map(t => ({
+            id: t.id,
+            title: t.title,
+            crop: t.crop,
+            icon: <Satellite />,
+            active: t.active
+          }));
+          setCustomModules(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to fetch tenants, using static fallback:", err);
+      }
+    }
+    loadTenants();
+  }, []);
 
   const sections = [
     {
@@ -122,10 +149,7 @@ const PortalHub = ({ onSelectModule }) => {
       id: 'custom',
       title: 'Custom Solutions',
       description: 'Bespoke operational gateways and proprietary analytics models tailored for specific agri-businesses.',
-      modules: [
-        { id: 'custom-agromonitor-olam', title: 'Olam Agro Monitoring', crop: 'Olam', icon: <Satellite />, active: true },
-        { id: 'custom-agromonitor-okomu', title: 'Okomu Agro Monitoring', crop: 'Okomu', icon: <Satellite />, active: true },
-      ]
+      modules: customModules,
     },
   ];
 
