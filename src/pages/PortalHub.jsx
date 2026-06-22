@@ -123,7 +123,8 @@ const PortalHub = ({ onSelectModule }) => {
       title: 'Custom Solutions',
       description: 'Bespoke operational gateways and proprietary analytics models tailored for specific agri-businesses.',
       modules: [
-        { id: 'custom-agromonitor', title: 'Agro Monitoring', crop: 'Custom', icon: <Satellite />, active: true },
+        { id: 'custom-agromonitor-olam', title: 'Olam Agro Monitoring', crop: 'Olam', icon: <Satellite />, active: true },
+        { id: 'custom-agromonitor-okomu', title: 'Okomu Agro Monitoring', crop: 'Okomu', icon: <Satellite />, active: true },
       ]
     },
   ];

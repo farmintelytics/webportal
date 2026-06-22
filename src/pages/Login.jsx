@@ -2,12 +2,17 @@ import React, { useState } from 'react';
 import { ArrowRight, Lock, Mail, Eye, EyeOff, ShieldCheck, Globe, Zap, CreditCard, Landmark, Coins, Plane, Radar, Satellite, Users, Layers, UserCheck, Grid } from 'lucide-react';
 import { login } from '../services/agromonitorApi';
 
-const Login = ({ onLogin, moduleName, onBack }) => {
+const Login = ({ onLogin, moduleName, onBack, defaultEmail = '', defaultCode = '' }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [accessCode, setAccessCode] = useState('');
+  const [email, setEmail] = useState(defaultEmail);
+  const [accessCode, setAccessCode] = useState(defaultCode);
   const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    setEmail(defaultEmail);
+    setAccessCode(defaultCode);
+  }, [defaultEmail, defaultCode]);
 
   const displayName = moduleName?.toUpperCase() || 'AGRICULTURAL';
   const isFinance = moduleName?.toLowerCase().includes('finance') || moduleName?.toLowerCase().includes('payment');

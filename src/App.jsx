@@ -80,6 +80,8 @@ const MODULE_NAMES = {
   'activity-ffb':         'Operations Logs',
   'advisor':              'Farm Advisor',
   'custom-agromonitor':   'Agro Monitoring',
+  'custom-agromonitor-olam': 'Olam Agro Monitoring',
+  'custom-agromonitor-okomu': 'Okomu Agro Monitoring',
 };
 
 // ─── Build-time access restriction ──────────────────────────────────────────
@@ -114,18 +116,30 @@ const LoginPage = () => {
   const moduleName = MODULE_NAMES[moduleId] || moduleId;
 
   // Where does the portal land after login?
-  const portalPath = moduleId === 'custom-agromonitor'
+  const portalPath = (moduleId && moduleId.startsWith('custom-agromonitor'))
     ? AGROMONITOR_PATH
     : '/portal';
 
   const handleLogin = () => navigate(portalPath);
   const handleBack  = RESTRICTED_MODULE ? null : () => navigate('/');
 
+  let defaultEmail = "";
+  let defaultCode = "";
+  if (moduleId === 'custom-agromonitor-olam') {
+    defaultEmail = "olam@farmintelytics.com";
+    defaultCode = "olam123";
+  } else if (moduleId === 'custom-agromonitor-okomu') {
+    defaultEmail = "okomu@farmintelytics.com";
+    defaultCode = "okomu123";
+  }
+
   return (
     <Login
       onLogin={handleLogin}
       moduleName={moduleName}
       onBack={handleBack}
+      defaultEmail={defaultEmail}
+      defaultCode={defaultCode}
     />
   );
 };
