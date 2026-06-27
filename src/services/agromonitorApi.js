@@ -111,7 +111,7 @@ export async function fetchDashboardTrends() {
  *   boundary.coordinates → coords (after lat/lng swap – see note below)
  */
 export async function fetchPlotsIntelligence() {
-  return apiFetch('/plots/intelligence/');
+  return apiFetch('/plots/intelligence');
 }
 
 // ─── Crop Health Analytics ──────────────────────────────────────────────────
@@ -135,7 +135,7 @@ export async function fetchPlotsHealth({ date, plotId } = {}) {
   if (date)   params.set('date', date);
   if (plotId) params.set('plot_id', plotId);
   const qs = params.toString() ? `?${params}` : '';
-  return apiFetch(`/plots/health/${qs}`);
+  return apiFetch(`/plots/health${qs}`);
 }
 
 // ─── Crop Yield Forecasting ─────────────────────────────────────────────────
@@ -161,7 +161,7 @@ export async function fetchPlotsYieldForecast({ date, plotId } = {}) {
   if (date)   params.set('date', date);
   if (plotId) params.set('plot_id', plotId);
   const qs = params.toString() ? `?${params}` : '';
-  return apiFetch(`/plots/yield/forecast/${qs}`);
+  return apiFetch(`/plots/yield/forecast${qs}`);
 }
 
 // ─── Climate & Sensor Telemetry ─────────────────────────────────────────────
@@ -185,7 +185,7 @@ export async function fetchPlotsTelemetry({ date, plotId } = {}) {
   if (date)   params.set('date', date);
   if (plotId) params.set('plot_id', plotId);
   const qs = params.toString() ? `?${params}` : '';
-  return apiFetch(`/plots/telemetry/${qs}`);
+  return apiFetch(`/plots/telemetry${qs}`);
 }
 
 // ─── Land Restoration & Agroforestry ────────────────────────────────────────
@@ -206,7 +206,7 @@ export async function fetchPlotsTelemetry({ date, plotId } = {}) {
  *   manager              → manager
  */
 export async function fetchRestorationZones() {
-  return apiFetch('/restoration/zones/');
+  return apiFetch('/restoration/zones');
 }
 
 // ─── Alerts Command Center ──────────────────────────────────────────────────
@@ -220,7 +220,7 @@ export async function fetchRestorationZones() {
  *              acknowledged, acknowledged_by, acknowledged_at }
  */
 export async function fetchAlerts() {
-  return apiFetch('/alerts/');
+  return apiFetch('/alerts');
 }
 
 /**
@@ -355,6 +355,37 @@ export async function fetchTimeseriesSlider({ farm, index, start, end } = {}) {
 export async function fetchPixelTimeseries({ farm, index, lat, lon } = {}) {
   const params = new URLSearchParams({ farm, index, lat: lat.toString(), lon: lon.toString() });
   return apiFetch(`/timeseries/pixel?${params}`);
+}
+
+/**
+ * GET /farm/boundary
+ * Returns a GeoJSON Feature with the farm's spatial bounding polygon
+ * derived from zarr x/y extents. Used when no individual plot GeoJSONs exist.
+ */
+export async function fetchFarmBoundary() {
+  return apiFetch('/farm/boundary');
+}
+
+/**
+ * Query the LangGraph AI assistant with a natural-language question.
+ * Returns { response: string, sources: string[] }
+ */
+export async function queryAiAgent(question) {
+  return apiFetch('/ai/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  });
+}
+
+/**
+ * GET /raster/indices?tenant={tenant}
+ * Lists available zarr index files for a tenant from MinIO.
+ * Returns { tenant, indices: [{ index, zarr_name, lo, hi, cmap }] }
+ */
+export async function fetchRasterIndices(tenant) {
+  const params = tenant ? `?tenant=${tenant}` : '';
+  return apiFetch(`/raster/indices${params}`);
 }
 
 

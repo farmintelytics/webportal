@@ -1,4 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, Component } from 'react';
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(err) { return { error: err }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 40, fontFamily: 'monospace', background: '#0f172a', color: '#f87171', minHeight: '100vh' }}>
+          <h2 style={{ color: '#fca5a5', marginBottom: 16 }}>Render Error</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{this.state.error?.message}</pre>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11, color: '#94a3b8', marginTop: 12 }}>{this.state.error?.stack}</pre>
+          <button onClick={() => this.setState({ error: null })} style={{ marginTop: 20, padding: '8px 16px', background: '#1e40af', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Retry</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import PortalHub from './pages/PortalHub';
@@ -247,7 +265,7 @@ const AgroMonitorPage = () => {
   const handleSignOut   = () => navigate('/login');
   const handleBackToHub = RESTRICTED_MODULE ? null : () => navigate('/');
 
-  return <AgroMonitor onSignOut={handleSignOut} onBack={handleBackToHub} />;
+  return <ErrorBoundary><AgroMonitor onSignOut={handleSignOut} onBack={handleBackToHub} /></ErrorBoundary>;
 };
 
 

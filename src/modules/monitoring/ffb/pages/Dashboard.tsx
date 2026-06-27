@@ -1,4 +1,5 @@
 import { blocks, alerts, totals, rainfall, ageClassColor, ageClassLabel } from "../lib/mock-data";
+import { useMonitoring } from "../../shared/MonitoringContext";
 import { StatusBadge } from "../components/StatusBadge";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -61,14 +62,23 @@ const diseaseScatter = blocks.map(b => {
 });
 
 export function Dashboard() {
+  const { cropSummary, cropLoading } = useMonitoring();
+
+  // Use real backend data when available, fall back to mock totals
+  const liveArea = cropSummary ? Math.round(cropSummary.total_area_ha).toLocaleString() : `${totals.area}`;
+  const livePlots = cropSummary ? cropSummary.total_plots.toLocaleString() : `${totals.blocks}`;
+  const liveYieldHa = cropSummary ? cropSummary.estimated_yield_t_ha.toFixed(1) : '18.2';
+  const liveAlerts = cropSummary ? cropSummary.high_stress_plots + cropSummary.pest_risk_plots : totals.alertBlocks;
+  const liveNdvi = cropSummary?.average_indices?.ndvi;
+
   return (
     <div className="p-6 space-y-6">
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KPI label="Total Planted Area" value={`${totals.area} ha`} sub="12 active blocks · 2 estates"/>
-        <KPI label="Active Blocks" value={`${totals.blocks}`} sub="2 immature · 8 producing · 2 replant"/>
-        <KPI label="Projected FFB · Q1" value={`${totals.ffbQuarter} t`} sub="Estate avg 18.2 t/ha" accent/>
-        <KPI label="Active Health Alerts" value={`${totals.alertBlocks}`} sub="High-severity blocks" danger={totals.alertBlocks > 0}/>
+        <KPI label="Total Planted Area" value={`${liveArea} ha`} sub={cropSummary ? `${livePlots} monitored plots` : "12 active blocks · 2 estates"}/>
+        <KPI label="Active Plots" value={livePlots} sub={cropSummary ? `Scene: ${cropSummary.scene_date}` : "2 immature · 8 producing · 2 replant"}/>
+        <KPI label={`FFB Yield Est.`} value={`${liveYieldHa} t/ha`} sub={liveNdvi ? `NDVI avg: ${liveNdvi}` : "Estate avg 18.2 t/ha"} accent/>
+        <KPI label="Active Health Alerts" value={`${liveAlerts}`} sub="High-severity plots" danger={liveAlerts > 0}/>
       </div>
 
       {/* Filter bar */}

@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { MapContainer, TileLayer, Polygon, Tooltip, useMap } from "react-leaflet";
-import { blocks, ageClassColor, ageClassLabel, type Block, mapCenter } from "../lib/mock-data";
+import { blocks as mockBlocks, ageClassColor, ageClassLabel, type Block, mapCenter } from "../lib/mock-data";
+import { useMonitoring } from "../../shared/MonitoringContext";
 import { StatusBadge } from "../components/StatusBadge";
 import { Layers, X, Calendar, AlertTriangle, FileText, MapPin, Search } from "lucide-react";
 import { cn } from "@monitoring-shared/lib/utils";
@@ -88,8 +89,28 @@ function FitBounds() {
   return null;
 }
 
+// Convert a real backend block (GeoJSON Polygon) to Leaflet [lat,lng] polygon
+function realBlockToLeaflet(block: any): [number, number][] {
+  const coords = block?.geometry?.coordinates?.[0];
+  if (!coords || !Array.isArray(coords)) return [];
+  return coords.map(([lng, lat]: [number, number]) => [lat, lng] as [number, number]);
+}
+
+// Derive a health-based fill color from real block data
+function realBlockColor(block: any): string {
+  const ndvi = block?.current_indices?.ndvi ?? 0;
+  if (ndvi >= 0.65) return "#15803d";
+  if (ndvi >= 0.45) return "#16a34a";
+  if (ndvi >= 0.30) return "#f59e0b";
+  return "#dc2626";
+}
+
 export function MapView() {
-  const [selected, setSelected] = useState<Block | null>(blocks[6]);
+  const { cropBlocks, cropSummary } = useMonitoring();
+  const hasRealData = cropBlocks && cropBlocks.length > 0;
+  const blocks = hasRealData ? cropBlocks : mockBlocks;
+
+  const [selected, setSelected] = useState<any>(null);
   const [layersOpen, setLayersOpen] = useState(true);
   const [active, setActive] = useState<Record<string, boolean>>({
     ndvi: true, boundaries: true, bsr: true,
@@ -100,11 +121,20 @@ export function MapView() {
 
   const primaryLayer: LayerKey = (active.bsr ? "bsr" : active.yield ? "yield" : active.cire ? "cire" : "ndvi");
 
-  const stats = useMemo(() => ({
-    total: blocks.length,
-    healthy: blocks.filter(b => b.bsrRisk === "low" && b.ageClass !== "declining").length,
-    risk: blocks.filter(b => b.bsrRisk !== "low").length,
-  }), []);
+  const stats = useMemo(() => {
+    if (hasRealData) {
+      return {
+        total: cropBlocks.length,
+        healthy: cropBlocks.filter((b: any) => b.health_class === "Optimal" || b.health_class === "Good").length,
+        risk: cropBlocks.filter((b: any) => b.health_class === "Stressed" || b.health_class === "Critical").length,
+      };
+    }
+    return {
+      total: mockBlocks.length,
+      healthy: mockBlocks.filter(b => b.bsrRisk === "low" && b.ageClass !== "declining").length,
+      risk: mockBlocks.filter(b => b.bsrRisk !== "low").length,
+    };
+  }, [hasRealData, cropBlocks]);
 
   return (
     <div className="relative h-full w-full">
@@ -119,14 +149,22 @@ export function MapView() {
           opacity={0.6}
         />
         <FitBounds />
-        {blocks.map((b) => {
+        {blocks.map((b: any) => {
           const isSelected = selected?.id === b.id;
-          const fill = blockColor(b, primaryLayer);
+          const positions = hasRealData ? realBlockToLeaflet(b) : b.polygon;
+          if (!positions || positions.length < 3) return null;
+          const fill = hasRealData ? realBlockColor(b) : blockColor(b, primaryLayer);
           const layerOpacity = opacity[primaryLayer] ?? 70;
+          const tooltipLabel = hasRealData
+            ? `Plot ${b.plot_nb || b.id} · ${b.estate}`
+            : `${b.id} · ${b.estate}`;
+          const tooltipSub = hasRealData
+            ? `NDVI: ${(b.current_indices?.ndvi ?? 0).toFixed(3)} · ${b.health_class}`
+            : ageClassLabel[b.ageClass];
           return (
             <Polygon
               key={b.id}
-              positions={b.polygon}
+              positions={positions}
               pathOptions={{
                 fillColor: fill,
                 fillOpacity: layerOpacity / 100,
@@ -138,8 +176,8 @@ export function MapView() {
             >
               <Tooltip direction="top" offset={[0, -10]} opacity={0.9}>
                 <div className="text-xs font-semibold">
-                  {b.id} · {b.estate}
-                  <div className="font-normal opacity-80">{ageClassLabel[b.ageClass]}</div>
+                  {tooltipLabel}
+                  <div className="font-normal opacity-80">{tooltipSub}</div>
                 </div>
               </Tooltip>
             </Polygon>

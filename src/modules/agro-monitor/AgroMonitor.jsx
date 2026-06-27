@@ -69,9 +69,25 @@ import {
   Columns,
   Wind
 } from 'lucide-react';
-import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap, Pane, ImageOverlay } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, Tooltip, useMap, Pane } from 'react-leaflet';
 import ReactDOM from 'react-dom';
 import * as api from '../../services/agromonitorApi';
+import 'leaflet/dist/leaflet.css';
+import { Line, Bar, Radar, Doughnut } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  RadialLinearScale,
+  ArcElement,
+  Title,
+  Tooltip as ChartTooltip,
+  Legend as ChartLegend,
+  Filler
+} from 'chart.js';
 
 /* ─── Portal-based Info Tooltip ─────────────────────────────────────────── */
 const InfoTooltipPortal = ({ title, desc, done, formula }) => {
@@ -239,7 +255,7 @@ const SwipeSliderOverlay = ({ isCompareMode, splitPosition, currentTimelineA, cu
       {/* Floating Date Badges (At the lower side, square, smaller, and no colors) */}
       {/* Left Badge */}
       <div
-        className="absolute bg-white/90 backdrop-blur-sm border border-gray-200 px-2 py-1 rounded-sm shadow-md flex flex-col pointer-events-none animate-in fade-in duration-200"
+        className="absolute bg-white/90 backdrop-blur-sm border border-gray-200 px-2 py-1 rounded-sm shadow-md flex flex-col pointer-events-none"
         style={{ left: '12px', bottom: '12px', zIndex: 20000 }}
       >
         <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Left</span>
@@ -248,7 +264,7 @@ const SwipeSliderOverlay = ({ isCompareMode, splitPosition, currentTimelineA, cu
 
       {/* Right Badge */}
       <div
-        className="absolute bg-white/90 backdrop-blur-sm border border-gray-200 px-2 py-1 rounded-sm shadow-md flex flex-col pointer-events-none text-right animate-in fade-in duration-200"
+        className="absolute bg-white/90 backdrop-blur-sm border border-gray-200 px-2 py-1 rounded-sm shadow-md flex flex-col pointer-events-none text-right"
         style={{ right: '55px', bottom: '12px', zIndex: 20000 }}
       >
         <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Right</span>
@@ -257,22 +273,6 @@ const SwipeSliderOverlay = ({ isCompareMode, splitPosition, currentTimelineA, cu
     </>
   );
 };
-import 'leaflet/dist/leaflet.css';
-import { Line, Bar, Radar, Doughnut } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  RadialLinearScale,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend as ChartLegend,
-  Filler
-} from 'chart.js';
 
 ChartJS.register(
   CategoryScale,
@@ -283,7 +283,7 @@ ChartJS.register(
   RadialLinearScale,
   ArcElement,
   Title,
-  Tooltip,
+  ChartTooltip,
   ChartLegend,
   Filler
 );
@@ -291,20 +291,57 @@ ChartJS.register(
 // TIMELINE_DATA has been moved inside the AgroMonitor component for dynamic month/year calculations.
 
 // ── Default Farm Plots Coordinates ────────────────────────────────────────
-const PLOT_ALPHA_COORDS = [[7.145, 3.355],[7.150, 3.355],[7.150, 3.360],[7.145, 3.360]];
-const PLOT_BETA_COORDS  = [[7.145, 3.362],[7.150, 3.362],[7.150, 3.367],[7.145, 3.367]];
-const PLOT_GAMMA_COORDS = [[7.138, 3.355],[7.143, 3.355],[7.143, 3.360],[7.138, 3.360]];
 
-// ── Land Restoration Zones Coordinates ─────────────────────────────────────
-const RESTORE_ZONE_A_COORDS = [[7.141, 3.350],[7.144, 3.350],[7.144, 3.354],[7.141, 3.354]];
-const RESTORE_ZONE_B_COORDS = [[7.141, 3.356],[7.144, 3.356],[7.144, 3.361],[7.141, 3.361]];
-const RESTORE_ZONE_C_COORDS = [[7.135, 3.350],[7.139, 3.350],[7.139, 3.355],[7.135, 3.355]];
+// ── Auto-fit map to loaded plots ─────────────────────────────────────────
+function FitBoundsToPlots({ plotsData, farmBoundary }) {
+  const map = useMap();
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (fitted.current) return;
+    // Priority 1: fit to real plot polygons
+    if (plotsData && plotsData.length > 0) {
+      const allCoords = plotsData.flatMap(p => p.coords || []);
+      if (allCoords.length > 0) {
+        let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+        for (const [lat, lng] of allCoords) {
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+          if (lng < minLng) minLng = lng;
+          if (lng > maxLng) maxLng = lng;
+        }
+        map.fitBounds([[minLat, minLng], [maxLat, maxLng]], { padding: [30, 30], maxZoom: 15 });
+        fitted.current = true;
+        return;
+      }
+    }
+    // Priority 2: fit to farm boundary bbox (e.g. Olam)
+    if (farmBoundary?.properties?.bbox) {
+      const { min_lat, max_lat, min_lng, max_lng } = farmBoundary.properties.bbox;
+      map.fitBounds([[min_lat, min_lng], [max_lat, max_lng]], { padding: [40, 40], maxZoom: 13 });
+      fitted.current = true;
+    }
+  }, [plotsData, farmBoundary, map]);
+  return null;
+}
 
-const RESTORATION_ZONES = [
-  { id: 'ZONE-ALPHA', name: 'Canopy Reforestation', area: '6.4 HA', type: 'Canopy Density', progress: 88, survival: '94%', trees: '1,200', carbon: '45.2 tCO2e', status: 'Optimal Growth', color: '#16A34A', coords: RESTORE_ZONE_A_COORDS, manager: 'John Musa' },
-  { id: 'ZONE-BETA',  name: 'Agroforestry Zone', area: '5.8 HA', type: 'Species Diversification', progress: 74, survival: '89%', trees: '980',   carbon: '32.8 tCO2e', status: 'Active Care',   color: '#EAB308', coords: RESTORE_ZONE_B_COORDS, manager: 'Alice Peters' },
-  { id: 'ZONE-GAMMA', name: 'Riparian Buffer Zone',  area: '8.1 HA', type: 'Soil Stabilization', progress: 62, survival: '81%', trees: '1,550', carbon: '21.5 tCO2e', status: 'Initial Phase', color: '#0284C7', coords: RESTORE_ZONE_C_COORDS, manager: 'David Kalu' }
-];
+// Flies to zarr bounds only when the map center is outside them (avoids zooming out when already viewing the data).
+function FitToZarrBounds({ zarrBounds }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!zarrBounds) return;
+    const center = map.getCenter();
+    const [[swLat, swLng], [neLat, neLng]] = zarrBounds;
+    const centerInBounds =
+      center.lat >= swLat && center.lat <= neLat &&
+      center.lng >= swLng && center.lng <= neLng;
+    if (!centerInBounds) {
+      map.fitBounds(zarrBounds, { padding: [30, 30], maxZoom: 15 });
+    }
+  }, [zarrBounds, map]);
+  return null;
+}
+
+// Restoration zone fallback coords removed — coords must come from backend boundary geometry.
 
 const TOOLTIP_DESCRIPTIONS = {
   // ── REMOTE SENSING SUBPAGE ──────────────────────────────────────────────────
@@ -832,20 +869,21 @@ const MONTH_NAMES = [
 
 const AgroMonitor = ({ onBack, onSignOut }) => {
   const tenant = localStorage.getItem('fi_tenant') || 'okomu';
-  const tenantDisplayName = tenant.charAt(0).toUpperCase() + tenant.slice(1);
+  const TENANT_DISPLAY_NAMES = { okomu: 'Okomu', olam: 'Olam' };
+  const tenantDisplayName = TENANT_DISPLAY_NAMES[tenant] || tenant.charAt(0).toUpperCase() + tenant.slice(1);
+  // Default map center per tenant — prevents olam maps starting 200 km from their data
+  const defaultMapCenter = tenant === 'olam' ? [7.873, 8.325] : [6.436, 5.273];
 
-  // Helper to map plot IDs to backend IDs
+  // Extract numeric farm ID from real plot IDs like PLOT-042 → '42', or fall back to '1'
   const getBackendFarmId = (plotId) => {
     if (!plotId) return '1';
-    if (plotId === 'PLOT-ALPHA') return '1';
-    if (plotId === 'PLOT-BETA') return '2';
-    if (plotId === 'PLOT-GAMMA') return '3';
     const match = plotId.match(/\d+/);
     return match ? match[0] : '1';
   };
 
   const [sliderData, setSliderData] = useState(null);
   const [pixelTimeseries, setPixelTimeseries] = useState(null);
+  const [farmBoundary, setFarmBoundary] = useState(null); // GeoJSON Feature for tenants with no plot polygons
 
 
   const [activeSidebarItem, setActiveSidebarItem] = useState('analytics');
@@ -873,10 +911,15 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           setTrends(trendsRes);
           setPlots(plotsRes);
           setRestorationZones(zonesRes);
+          // Always fetch the farm boundary — used as overall outline for all tenants
+          try {
+            const boundary = await api.fetchFarmBoundary();
+            if (active && boundary && boundary.geometry) setFarmBoundary(boundary);
+          } catch (_) {}
           // Map backend alert items to frontend structure
           const mappedAlerts = (alertsRes.feed || []).map(a => ({
             id: a.alert_id,
-            estate: 'Okomu Estate',
+            estate: `${tenantDisplayName} Estate`,
             plot: a.plot_id,
             category: a.type,
             severity: a.severity,
@@ -898,19 +941,40 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     loadBackendData();
     return () => { active = false; };
   }, []);
+  const [selectedBasemap, setSelectedBasemap] = useState('sentinel-2');
+  const [selectedIndex, setSelectedIndex] = useState('ndvi');
+  const [mapOpacity, setMapOpacity] = useState(80);
+  const [showRasterLayer, setShowRasterLayer] = useState(true);
+  const [selectedPlot, setSelectedPlot] = useState(null);
+  const [availableIndices, setAvailableIndices] = useState([]);
+
+  // Enumerate available zarr indices for the active tenant
+  useEffect(() => {
+    async function loadIndices() {
+      try {
+        const data = await api.fetchRasterIndices(tenant);
+        if (data?.indices?.length) setAvailableIndices(data.indices);
+      } catch (err) {
+        console.error('Failed to fetch raster indices:', err);
+      }
+    }
+    loadIndices();
+  }, [tenant]);
+
   // Fetch timeseries slider and pre-rendered raster overlays
   useEffect(() => {
     async function loadSliderData() {
       try {
-        const farmId = getBackendFarmId(selectedPlot?.id || 'PLOT-ALPHA');
         const indexName = (selectedIndex || 'ndvi').toLowerCase();
         const data = await api.fetchTimeseriesSlider({
-          farm: `farm_${farmId}`,
+          farm: 'farm_1',
           index: indexName,
           start: '2024-01-01',
-          end: '2026-12-31'
+          end: '2027-12-31'
         });
         setSliderData(data);
+        // Keep zarr bounds in sync when index changes (SAR vs optical extents may differ)
+        if (data?.zarr_bounds) setZarrBounds(data.zarr_bounds);
       } catch (err) {
         console.error("Failed to fetch timeseries slider data:", err);
       }
@@ -941,22 +1005,136 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     }
   };
 
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const [calendarYear,  setCalendarYear]  = useState(new Date().getFullYear());
+
+  // Real timeline loaded from backend zarr/TIF data — no mock values
+  const [TIMELINE_DATA, setTIMELINE_DATA] = useState([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  // Spatial bounds from zarr x/y arrays: [[min_lat, min_lng], [max_lat, max_lng]]
+  const [zarrBounds, setZarrBounds] = useState(null);
+
+  // Build TIMELINE_DATA from sliderData — single source of truth, no separate NDVI fetch.
+  // This guarantees currentTimeline.date always matches sliderData.tiles keys.
+  useEffect(() => {
+    if (!sliderData) return;
+    setTimelineLoading(false);
+    if (!sliderData.timeline?.length) {
+      setTIMELINE_DATA([]);
+      return;
+    }
+    const entries = sliderData.timeline.map((t) => ({
+      date: t.date,
+      label: t.label,
+      satellite: t.satellite || null,
+      quality: '—',
+      ndvi: t.ndvi ?? 0,
+      ndmi: t.ndmi ?? 0,
+      color: '#16A34A',
+      tileUrl: (sliderData.tiles || {})[t.date] || null,
+    }));
+    setTIMELINE_DATA(entries);
+    if (entries.length > 0) {
+      const last = entries[entries.length - 1].date;
+      const d = new Date(last);
+      setCalendarMonth(d.getMonth());
+      setCalendarYear(d.getFullYear());
+    }
+  }, [sliderData]);
+
+  const [selectedTimelineIndex, setSelectedTimelineIndex] = useState(2);
+  const [isCompareMode, setIsCompareMode] = useState(false);
+  const [compareTimelineIndex, setCompareTimelineIndex] = useState(3);
+
+  const clampedTimelineIndex = Math.min(selectedTimelineIndex, TIMELINE_DATA.length - 1);
+  const currentTimelineA = TIMELINE_DATA[clampedTimelineIndex >= 0 ? clampedTimelineIndex : 0];
+  const clampedCompareTimelineIndex = Math.min(compareTimelineIndex, TIMELINE_DATA.length - 1);
+  const currentTimelineB = TIMELINE_DATA[clampedCompareTimelineIndex >= 0 ? clampedCompareTimelineIndex : 0];
+  const currentTimeline = currentTimelineA;
+
+  const plotsDataA = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
+        } else {
+          coords = [];
+        }
+        const ndviVal = p.indices?.ndvi ?? 0;
+        const ndmiVal = p.indices?.ndmi ?? 0;
+        const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
+        const colorVal = healthVal === 'Optimal' ? '#15803d' : healthVal === 'Good' ? '#84cc16' : '#dc2626';
+        return { id: p.plot_id, name: p.name || p.plot_id, area: `${p.area_ha || 10.0} HA`, health: healthVal, ndvi: ndviVal, ndmi: ndmiVal, color: colorVal, coords, indices: p.indices, subfarm: p.subfarm || p.division || null, division: p.division || null, blocId: p.bloc_id || null };
+      });
+    }
+    return [];
+  }, [plots, currentTimelineA]);
+
+  const plotsDataB = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
+        } else {
+          coords = [];
+        }
+        const ndviVal = p.indices?.ndvi ?? 0;
+        const ndmiVal = p.indices?.ndmi ?? 0;
+        const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
+        const colorVal = healthVal === 'Optimal' ? '#15803d' : healthVal === 'Good' ? '#84cc16' : '#dc2626';
+        return { id: p.plot_id, name: p.name || p.plot_id, area: `${p.area_ha || 10.0} HA`, health: healthVal, ndvi: ndviVal, ndmi: ndmiVal, color: colorVal, coords, indices: p.indices, subfarm: p.subfarm || p.division || null, division: p.division || null, blocId: p.bloc_id || null };
+      });
+    }
+    return [];
+  }, [plots, currentTimelineB]);
+
+  const plotsData = plotsDataA;
+
   const currentTileUrl = useMemo(() => {
-    if (!sliderData || !sliderData.tiles || !currentTimeline) return null;
-    return sliderData.tiles[currentTimeline.date] || null;
+    if (!currentTimeline) return null;
+    // sliderData is loaded with selectedIndex — always use it first so index changes take effect
+    if (sliderData?.tiles?.[currentTimeline.date]) return sliderData.tiles[currentTimeline.date];
+    // fallback: NDVI tile baked into the timeline entry
+    if (currentTimeline.tileUrl) return currentTimeline.tileUrl;
+    return null;
   }, [sliderData, currentTimeline]);
 
   const activePlotBounds = useMemo(() => {
-    const activePlot = selectedPlot || plotsData[0];
+    // For the raster overlay we want full-farm coverage, not a single plot.
+    // Priority: all-plots bbox → farm boundary bbox → single plot fallback.
+    if (plotsData && plotsData.length > 0) {
+      const allLats = plotsData.flatMap(p => (p.coords || []).map(c => c[0]));
+      const allLngs = plotsData.flatMap(p => (p.coords || []).map(c => c[1]));
+      if (allLats.length > 0) {
+        return [
+          [Math.min(...allLats), Math.min(...allLngs)],
+          [Math.max(...allLats), Math.max(...allLngs)],
+        ];
+      }
+    }
+    if (farmBoundary?.properties?.bbox) {
+      const { min_lat, max_lat, min_lng, max_lng } = farmBoundary.properties.bbox;
+      return [[min_lat, min_lng], [max_lat, max_lng]];
+    }
+    // Last resort: single selected/first plot
+    const activePlot = selectedPlot || (plotsData && plotsData[0]);
     if (!activePlot || !activePlot.coords) return null;
     const lats = activePlot.coords.map(c => c[0]);
     const lngs = activePlot.coords.map(c => c[1]);
     return [
       [Math.min(...lats), Math.min(...lngs)],
-      [Math.max(...lats), Math.max(...lngs)]
+      [Math.max(...lats), Math.max(...lngs)],
     ];
-  }, [selectedPlot, plotsData]);
+  }, [selectedPlot, plotsData, farmBoundary]);
 
+  // Bounds used for the raster ImageOverlay: prefer zarr-derived bounds (exact pixel coverage)
+  // over GeoJSON-derived bounds which may differ from the zarr spatial extent.
+  const rasterOverlayBounds = useMemo(() => {
+    if (zarrBounds) return zarrBounds;
+    return activePlotBounds;
+  }, [zarrBounds, activePlotBounds]);
 
   const renderInfoTooltip = (title) => {
     let lookupKey = title;
@@ -1040,9 +1218,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     document.addEventListener('mousemove', doDrag);
     document.addEventListener('mouseup', stopDrag);
   };
-  const [selectedTimelineIndex, setSelectedTimelineIndex] = useState(2);
-  const [isCompareMode, setIsCompareMode] = useState(false);
-  const [compareTimelineIndex, setCompareTimelineIndex] = useState(3);
+
   const [activeDateSlot, setActiveDateSlot] = useState('A');
   const [splitPosition, setSplitPosition] = useState(50);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
@@ -1088,10 +1264,6 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     };
   }, [isDraggingSplit]);
 
-  const [selectedBasemap, setSelectedBasemap] = useState('sentinel-2');
-  const [selectedIndex, setSelectedIndex] = useState('CVI');
-  const [mapOpacity, setMapOpacity] = useState(80);
-  const [selectedPlot, setSelectedPlot] = useState(null);
 
   const [showBasemapDropdown, setShowBasemapDropdown] = useState(false);
   const basemapDropdownRef = useRef(null);
@@ -1126,7 +1298,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           <ChevronDown size={11} className={`text-gray-400 transition-transform ${showBasemapDropdown ? 'rotate-180' : ''}`} />
         </button>
         {showBasemapDropdown && (
-          <div className="absolute left-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-sm shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute left-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-sm shadow-lg overflow-hidden">
             <div className="p-1 space-y-0.5">
               {BASEMAPS.map(src => (
                 <button
@@ -1152,7 +1324,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   };
 
   // Reports state
-  const [reportPlot, setReportPlot] = useState('PLOT-ALPHA');
+  const [reportPlot, setReportPlot] = useState('WHOLE-FARM');
   const [reportIndex, setReportIndex] = useState('NDVI');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportProgress, setReportProgress] = useState(0);
@@ -1160,7 +1332,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [generatedReport, setGeneratedReport] = useState(null);
 
   // Verification state
-  const [selectedVerifyPlot, setSelectedVerifyPlot] = useState('PLOT-ALPHA');
+  const [selectedVerifyPlot, setSelectedVerifyPlot] = useState('');
   const [verificationSteps, setVerificationSteps] = useState({
     boundary: { label: 'Boundary Integrity Check', status: 'idle', details: 'Verifying polygon shape match with cadastral registry' },
     forest:   { label: 'Deforestation Compliance Check', status: 'idle', details: 'Scanning for canopy loss anomalies' },
@@ -1182,8 +1354,6 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
   // Map play / calendar / user menu
   const [isPlaying, setIsPlaying]       = useState(false);
-  const [calendarMonth, setCalendarMonth] = useState(4); // May
-  const [calendarYear,  setCalendarYear]  = useState(2026);
   const [showUserMenu,  setShowUserMenu]  = useState(false);
   const userMenuRef = useRef(null);
 
@@ -1218,7 +1388,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [alertsFilterPlot, setAlertsFilterPlot] = useState('All');
   const [alertsFilterCategory, setAlertsFilterCategory] = useState('All');
   const [alertsFilterActiveOnly, setAlertsFilterActiveOnly] = useState(true);
-  const [selectedAlertPlot, setSelectedAlertPlot] = useState(null); // null = no selection, 'PLOT-BETA' = detail view
+  const [selectedAlertPlot, setSelectedAlertPlot] = useState(null);
   const [alertsSearch, setAlertsSearch] = useState('');
 
   // Dropdown layout states
@@ -1259,7 +1429,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [restoreAgbOpacity, setRestoreAgbOpacity] = useState(70);
 
   // Land Restoration states
-  const [selectedRestoreZone, setSelectedRestoreZone] = useState(RESTORATION_ZONES[0]);
+  const [selectedRestoreZone, setSelectedRestoreZone] = useState(null);
   const [restoreIndex, setRestoreIndex] = useState('progress');
   const [restoreMapOpacity, setRestoreMapOpacity] = useState(85);
 
@@ -1318,8 +1488,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [inviteSuccess, setInviteSuccess] = useState(false);
 
   // Configuration API Keys States
-  const [sentinelApiKey, setSentinelApiKey] = useState('s2_live_aud_851k3d99xl1a');
-  const [planetApiKey, setPlanetApiKey] = useState('pl_key_prod_9022xkd8317a');
+  const [sentinelApiKey, setSentinelApiKey] = useState('');
+  const [planetApiKey, setPlanetApiKey] = useState('');
   const [showSentinelKey, setShowSentinelKey] = useState(false);
   const [showPlanetKey, setShowPlanetKey] = useState(false);
 
@@ -1379,12 +1549,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [climateAtmExpanded, setClimateAtmExpanded] = useState(false);
 
 
-  const [telemetryLogs, setTelemetryLogs] = useState([
-    '[SUCCESS] GIS Engine initialized at 2026-05-30T16:00:00Z',
-    '[SUCCESS] Sentinel-2 API connected. RTT: 124ms',
-    '[SUCCESS] Planet Labs RTT check: 89ms',
-    '[SUCCESS] Local tiles cache pre-warmed. 14.8 MB cached'
-  ]);
+  const [telemetryLogs, setTelemetryLogs] = useState([]);
   const [isFlushingCache, setIsFlushingCache] = useState(false);
   const [isCheckingSystem, setIsCheckingSystem] = useState(false);
 
@@ -1397,8 +1562,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   const [exportProgressText, setExportProgressText] = useState('');
   const [showExportSuccess, setShowExportSuccess] = useState(false);
   const [exportHistory, setExportHistory] = useState([
-    { id: 'EXP-2026-104', format: 'GeoJSON', scope: 'All Plots & Zones', size: '2.4 MB', date: 'May 28, 2026', status: 'Completed' },
-    { id: 'EXP-2026-103', format: 'CSV', scope: 'West Valley Plot (PLOT-ALPHA)', size: '480 KB', date: 'May 26, 2026', status: 'Completed' }
+    { id: 'EXP-2026-104', format: 'GeoJSON', scope: 'All Plots & Zones', size: '2.4 MB', date: 'May 28, 2026', status: 'Completed' }
   ]);
 
   const cardStyle = glassmorphismEnabled ? 'glass shadow-premium border border-white/20' : 'bg-white border border-gray-100 shadow-sm';
@@ -1432,7 +1596,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       fillColor = getIndexFiveClasses(plot.ndvi * 0.85, 'NDVI').color;
       fillOpacity = healthNdreOpacity / 100;
     } else if (layer === 'smi') {
-      const dbChange = plot.id === 'PLOT-BETA' ? 6.2 : plot.id === 'PLOT-ALPHA' ? 3.5 : 1.5;
+      const dbChange = plot.ndmi != null ? (plot.ndmi * 4) : 1.5;
       fillColor = dbChange > 6 ? '#1E3A8A' : dbChange > 3 ? '#2563EB' : dbChange > 1 ? '#60A5FA' : dbChange > -1 ? '#86EFAC' : dbChange > -3 ? '#EAB308' : '#DC2626';
       fillOpacity = healthSmiOpacity / 100;
     }
@@ -1540,7 +1704,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       fillColor = val > 25 ? '#1d4ed8' : val > 18 ? '#3b82f6' : '#93c5fd';
       fillOpacity = climateRainfallOpacity / 100;
     } else if (layer === 'flood') {
-      fillColor = plot.id === 'PLOT-BETA' ? '#1e3a8a' : 'transparent';
+      fillColor = (plot.indices?.flood_risk ?? 0) > 0.5 ? '#1e3a8a' : 'transparent';
       fillOpacity = climateFloodOpacity / 100;
     }
     
@@ -1632,7 +1796,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     let fillOpacity = 0;
     
     if (layer === 'biodiversity') {
-      const val = zone.id === 'ZONE-ALPHA' ? 92 : zone.id === 'ZONE-BETA' ? 84 : 76;
+      const val = zone.survivalNum ?? zone.progress ?? 80;
       fillColor = val > 90 ? '#15803d' : val > 80 ? '#22c55e' : '#eab308';
       fillOpacity = restoreBiodiversityOpacity / 100;
     } else if (layer === 'carbon') {
@@ -1668,7 +1832,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       fillColor = val === 'Compliant' ? '#16a34a' : val === 'Warning' ? '#eab308' : '#dc2626';
       fillOpacity = restoreEudrOpacity / 100;
     } else if (layer === 'agb') {
-      fillColor = zone.id === 'ZONE-ALPHA' ? '#14532D' : zone.id === 'ZONE-BETA' ? '#16A34A' : '#86EFAC';
+      const sv = zone.survivalNum ?? zone.progress ?? 80;
+      fillColor = sv > 90 ? '#14532D' : sv > 75 ? '#16A34A' : '#86EFAC';
       fillOpacity = restoreAgbOpacity / 100;
     }
     
@@ -1694,7 +1859,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     let fillOpacity = 0;
     
     if (layer === 'suitability') {
-      fillColor = (plot.id === 'PLOT-BETA') ? '#dc2626' : '#16a34a';
+      fillColor = (plot.ndvi != null && plot.ndvi < 0.5) ? '#dc2626' : '#16a34a';
       fillOpacity = intelSuitabilityOpacity / 100;
     } else if (layer === 'vhi') {
       fillColor = getIndexFiveClasses(plot.ndvi, 'NDVI').color;
@@ -1706,7 +1871,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       fillColor = getIndexFiveClasses(plot.ndvi * 0.95, 'EVI').color;
       fillOpacity = intelEviOpacity / 100;
     } else if (layer === 'growth') {
-      fillColor = (plot.id === 'PLOT-ALPHA') ? '#15803d' : (plot.id === 'PLOT-BETA') ? '#86efac' : '#fbbf24';
+      fillColor = (plot.ndvi ?? 0) > 0.7 ? '#15803d' : (plot.ndvi ?? 0) > 0.5 ? '#86efac' : '#fbbf24';
       fillOpacity = intelGrowthOpacity / 100;
     } else if (layer === 'cvi') {
       fillColor = getIndexFiveClasses(plot.ndvi * 1.05, 'NDVI').color;
@@ -1721,18 +1886,20 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       fillColor = getIndexFiveClasses(plot.ndmi * 1.1, 'LSWI').color;
       fillOpacity = intelWdiOpacity / 100;
     } else if (layer === 'dprvi') {
-      fillColor = (plot.id === 'PLOT-ALPHA') ? '#15803d' : (plot.id === 'PLOT-BETA') ? '#eab308' : '#0284C7';
+      const dprvi = plot.indices?.dprvi ?? plot.ndvi;
+      fillColor = dprvi > 0.6 ? '#15803d' : dprvi > 0.4 ? '#eab308' : '#ef4444';
       fillOpacity = intelDprviOpacity / 100;
     } else if (layer === 'rvi') {
-      const val = plot.id === 'PLOT-ALPHA' ? 0.72 : plot.id === 'PLOT-BETA' ? 0.45 : 0.62;
+      const val = plot.indices?.reci ?? plot.ndvi;
       fillColor = val > 0.70 ? '#14532D' : val > 0.50 ? '#16A34A' : val > 0.30 ? '#86EFAC' : val > 0.15 ? '#EAB308' : '#EF4444';
       fillOpacity = intelRviOpacity / 100;
     } else if (layer === 'flood') {
-      fillColor = plot.id === 'PLOT-BETA' ? '#1e3a8a' : 'transparent';
+      const floodVal = plot.indices?.ndwi ?? 0;
+      fillColor = floodVal > 0 ? '#1e3a8a' : 'transparent';
       fillOpacity = intelFloodOpacity / 100;
     } else if (layer === 'uas') {
-      fillColor = plot.id === 'PLOT-BETA' ? '#dc2626' : 'transparent';
-      fillOpacity = intelUasOpacity / 100;
+      fillColor = 'transparent'; // UAS layer not yet connected
+      fillOpacity = 0;
     }
     
     return {
@@ -1746,449 +1913,101 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
 
   // Helper methods to render overlapping active layers
-  const renderIntelPolygons = (plots, suffix = '') => {
-    const activeLayers = [];
-    if (intelShowGrowth) activeLayers.push('growth');
-    if (intelShowEvi) activeLayers.push('evi');
-    if (intelShowLswi) activeLayers.push('lswi');
-    if (intelShowVhi) activeLayers.push('vhi');
-    if (intelShowSuitability) activeLayers.push('suitability');
-    if (intelShowCvi) activeLayers.push('cvi');
-    if (intelShowCar) activeLayers.push('car');
-    if (intelShowNdre) activeLayers.push('ndre');
-    if (intelShowWdi) activeLayers.push('wdi');
-    if (intelShowDprvi) activeLayers.push('dprvi');
-    if (intelShowRvi) activeLayers.push('rvi');
-    if (intelShowFlood) activeLayers.push('flood');
-    if (intelShowUas) activeLayers.push('uas');
+  const renderFarmBoundary = () => {
+    if (!farmBoundary || !farmBoundary.geometry || !farmBoundary.geometry.coordinates) return null;
+    const ring = farmBoundary.geometry.coordinates[0];
+    // Convert [lng, lat] → Leaflet [lat, lng]
+    const positions = ring.map(([lng, lat]) => [lat, lng]);
+    const name = farmBoundary.properties?.name ?? tenantDisplayName;
+    const center = farmBoundary.properties?.center;
+    return (
+      <Polygon
+        positions={positions}
+        pathOptions={{ color: '#16A34A', weight: 2.5, fillColor: '#16A34A', fillOpacity: 0.08, dashArray: '6 4' }}
+      />
+    );
+  };
 
+  const renderIntelPolygons = (plots, suffix = '') => {
     return plots.map(plot => {
       const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
       return (
         <React.Fragment key={keyPrefix}>
-          {/* Base Boundary outline */}
           {intelShowBoundaries && (
-            <Polygon 
+            <Polygon
               positions={plot.coords}
               pathOptions={getIntelPlotStyleOutline()}
               eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             />
           )}
-          {/* Active Fill Layers */}
-          {activeLayers.map(layer => (
-            <Polygon
-              key={`${keyPrefix}-${layer}`}
-              positions={plot.coords}
-              pathOptions={getIntelPlotStyleFill(plot, layer)}
-              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
-            >
-                          <Popup>
-              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'Intelligence Popup (Left)' : suffix === 'right' ? 'Intelligence Popup (Right)' : 'Intelligence Popup'}
-                  </span>
-                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
-                    WGS 84
-                  </span>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-black text-gray-950 leading-tight">{plot.name}</h4>
-                  <p className="text-[10px] text-gray-400 font-bold">{plot.id}</p>
-                </div>
-
-                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Index Summary</div>
-                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
-                    "{plot.id}: {plot.id === 'PLOT-BETA' ? 'Elevated anomaly score detected in crop water stress index (WDI).' : 'Optimal vigor (CVI) and stable chlorophyll concentration.'}"
-                  </p>
-                </div>
-
-                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
-                  <Line data={{
-                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                    datasets: [{
-                      data: pixelTimeseries ? pixelTimeseries.map(pt => pt.value) : TIMELINE_DATA.map(t =>
-                        plot.id === 'PLOT-ALPHA' ? t.ndvi + 0.04 :
-                        plot.id === 'PLOT-BETA'  ? t.ndvi - 0.15 : t.ndvi - 0.05),
-                      borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
-                      fill: true, tension: 0.3, pointRadius: 2
-                    }]
-                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                </div>
-
-                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
-                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
-                    <div>CVI Vigor:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.ndvi.toFixed(2)}</div>
-                    <div>WDI Deficit:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.ndmi.toFixed(2)}</div>
-                    <div>CAR Chlorophyll:</div>
-                    <div className="text-right text-gray-950 font-bold">{(plot.ndvi * 0.9).toFixed(2)}</div>
-                    <div>UAS Anomaly:</div>
-                    <div className="text-right text-red-600 font-bold">{plot.id === 'PLOT-BETA' ? '0.75' : plot.id === 'PLOT-GAMMA' ? '0.45' : '0.15'}</div>
-                  </div>
-                </div>
-              </div>
-            </Popup>
-            </Polygon>
-          ))}
         </React.Fragment>
       );
     });
   };
 
   const renderHealthPolygons = (plots, suffix = '') => {
-    const activeLayers = [];
-    if (healthShowNdvi) activeLayers.push('ndvi');
-    if (healthShowChlorophyll) activeLayers.push('chlorophyll');
-    if (healthShowWater) activeLayers.push('water');
-    if (healthShowPest) activeLayers.push('pest');
-    if (healthShowNdre) activeLayers.push('ndre');
-    if (healthShowSmi) activeLayers.push('smi');
-
     return plots.map(plot => {
       const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
-      const activePlotHandler = suffix === 'left' || suffix === 'right' ? setSelectedHealthPlot : setSelectedHealthPlot;
       return (
         <React.Fragment key={keyPrefix}>
-          {/* Base Boundary outline */}
           {healthShowBoundaries && (
-            <Polygon 
+            <Polygon
               positions={plot.coords}
               pathOptions={getHealthPlotStyleOutline()}
               eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             />
           )}
-          {/* Active Fill Layers */}
-          {activeLayers.map(layer => (
-            <Polygon
-              key={`${keyPrefix}-${layer}`}
-              positions={plot.coords}
-              pathOptions={getHealthPlotStyleFill(plot, layer)}
-              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
-            >
-                          <Popup>
-              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'Crop Health Popup (Left)' : suffix === 'right' ? 'Crop Health Popup (Right)' : 'Crop Health Popup'}
-                  </span>
-                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
-                    WGS 84
-                  </span>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-black text-gray-950 leading-tight">{plot.name}</h4>
-                  <p className="text-[10px] text-gray-400 font-bold">{plot.id}</p>
-                </div>
-
-                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Agronomic Health Summary</div>
-                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
-                    "{plot.id} currently displays a '{plot.health}' status with pest risk categorized as {plot.pestRisk}."
-                  </p>
-                </div>
-
-                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
-                  <Line data={{
-                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                    datasets: [{
-                      data: pixelTimeseries ? pixelTimeseries.map(pt => pt.value) : TIMELINE_DATA.map(t =>
-                        plot.id === 'PLOT-ALPHA' ? t.ndvi + 0.04 :
-                        plot.id === 'PLOT-BETA'  ? t.ndvi - 0.15 : t.ndvi - 0.05),
-                      borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
-                      fill: true, tension: 0.3, pointRadius: 2
-                    }]
-                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                </div>
-
-                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
-                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
-                    <div>NDVI Index:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.ndvi.toFixed(2)}</div>
-                    <div>Chlorophyll:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.chlorophyll.toFixed(2)}</div>
-                    <div>Water Status:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.waterStress.toFixed(2)}</div>
-                    <div>Pest Risk:</div>
-                    <div className="text-right font-bold text-gray-950">{plot.pestRisk}</div>
-                  </div>
-                </div>
-              </div>
-            </Popup>
-            </Polygon>
-          ))}
         </React.Fragment>
       );
     });
   };
 
   const renderYieldPolygons = (plots, suffix = '') => {
-    const activeLayers = [];
-    if (yieldShowYield) activeLayers.push('yield');
-    if (yieldShowBiomass) activeLayers.push('biomass');
-    if (yieldShowReadiness) activeLayers.push('readiness');
-    if (yieldShowGrowth) activeLayers.push('growth');
-
     return plots.map(plot => {
-      const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
-      const activePlotHandler = setSelectedYieldPlot;
+      const keyPrefix = `${plot.id}`;
       return (
         <React.Fragment key={keyPrefix}>
-          {/* Base Boundary outline */}
           {yieldShowBoundaries && (
-            <Polygon 
+            <Polygon
               positions={plot.coords}
               pathOptions={getYieldPlotStyleOutline()}
               eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             />
           )}
-          {/* Active Fill Layers */}
-          {activeLayers.map(layer => (
-            <Polygon
-              key={`${keyPrefix}-${layer}`}
-              positions={plot.coords}
-              pathOptions={getYieldPlotStyleFill(plot, layer)}
-              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
-            >
-                          <Popup>
-              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'Crop Yield Popup (Left)' : suffix === 'right' ? 'Crop Yield Popup (Right)' : 'Crop Yield Popup'}
-                  </span>
-                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
-                    WGS 84
-                  </span>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-black text-gray-950 leading-tight">{plot.name}</h4>
-                  <p className="text-[10px] text-gray-400 font-bold">{plot.id}</p>
-                </div>
-
-                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Yield Prediction Analysis</div>
-                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
-                    "Plot {plot.id} is projected at {plot.predictedYield} Tonnes total yield ({plot.yieldValue} t/HA) with a prediction accuracy of {plot.predAccuracy}. Status: {plot.yieldStatus}."
-                  </p>
-                </div>
-
-                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
-                  <Line data={{
-                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                    datasets: [{
-                      data: TIMELINE_DATA.map(t =>
-                        plot.id === 'PLOT-ALPHA' ? t.ndvi * 24.5 :
-                        plot.id === 'PLOT-BETA'  ? (t.ndvi - 0.15) * 19.5 : (t.ndvi - 0.05) * 21.5),
-                      borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
-                      fill: true, tension: 0.3, pointRadius: 2
-                    }]
-                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                </div>
-
-                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
-                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
-                    <div>Est. Yield:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.yieldValue} t/HA</div>
-                    <div>Biomass:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.biomass} kg/m²</div>
-                    <div>Maturity Ratio:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.readiness}%</div>
-                    <div>Growth Index:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.growth.toFixed(2)}</div>
-                  </div>
-                </div>
-              </div>
-            </Popup>
-            </Polygon>
-          ))}
         </React.Fragment>
       );
     });
   };
 
   const renderRestorePolygons = (zones, suffix = '') => {
-    const activeLayers = [];
-    if (restoreShowProgress) activeLayers.push('progress');
-    if (restoreShowSurvival) activeLayers.push('survival');
-    if (restoreShowCarbon) activeLayers.push('carbon');
-    if (restoreShowBiodiversity) activeLayers.push('biodiversity');
-    if (restoreShowInSar) activeLayers.push('insar');
-    if (restoreShowGedi) activeLayers.push('gedi');
-    if (restoreShowNdwi) activeLayers.push('ndwi');
-    if (restoreShowLulc) activeLayers.push('lulc');
-    if (restoreShowEudr) activeLayers.push('eudr');
-    if (restoreShowAgb) activeLayers.push('agb');
-
     return zones.map(zone => {
-      const keyPrefix = `${zone.id}${suffix ? '-' + suffix : ''}`;
+      const keyPrefix = `${zone.id}`;
       return (
         <React.Fragment key={keyPrefix}>
-          {/* Base Boundary outline */}
           {restoreShowBoundaries && (
-            <Polygon 
+            <Polygon
               positions={zone.coords}
               pathOptions={getRestorePlotStyleOutline()}
               eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}
             />
           )}
-          {/* Active Fill Layers */}
-          {activeLayers.map(layer => (
-            <Polygon
-              key={`${keyPrefix}-${layer}`}
-              positions={zone.coords}
-              pathOptions={getRestorePlotStyleFill(zone, layer)}
-              eventHandlers={{ click: () => setSelectedRestoreZone(zone) }}
-            >
-                          <Popup>
-              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'Restoration Popup (Left)' : suffix === 'right' ? 'Restoration Popup (Right)' : 'Restoration Popup'}
-                  </span>
-                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
-                    WGS 84
-                  </span>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-black text-gray-950 leading-tight">{zone.name}</h4>
-                  <p className="text-[10px] text-gray-400 font-bold">{zone.id}</p>
-                </div>
-
-                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Progress Summary</div>
-                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
-                    "Managing under supervisor {zone.manager}. Currently showing {zone.status} with {zone.survival} seedling survival. Active carbon sequestered: {zone.carbon} tCO2e."
-                  </p>
-                </div>
-
-                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
-                  <Line data={{
-                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                    datasets: [{
-                      data: TIMELINE_DATA.map(t =>
-                        zone.id === 'ZONE-ALPHA' ? Math.min(100, Math.round(t.ndvi * 125)) :
-                        zone.id === 'ZONE-BETA'  ? Math.min(100, Math.round((t.ndvi - 0.15) * 115)) : Math.min(100, Math.round((t.ndvi - 0.05) * 105))),
-                      borderColor: '#16A34A', borderWidth: 2, backgroundColor: 'rgba(22,163,74,0.06)',
-                      fill: true, tension: 0.3, pointRadius: 2
-                    }]
-                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                </div>
-
-                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
-                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
-                    <div>Canopy Progress:</div>
-                    <div className="text-right text-gray-950 font-bold">{zone.progress}%</div>
-                    <div>Seedling Survival:</div>
-                    <div className="text-right text-gray-950 font-bold">{zone.survival}</div>
-                    <div>Carbon Offset:</div>
-                    <div className="text-right text-gray-950 font-bold">{zone.carbon}</div>
-                    <div>Species Count:</div>
-                    <div className="text-right text-gray-950 font-bold">{zone.trees} trees</div>
-                    <div>Site Manager:</div>
-                    <div className="text-right text-gray-950 font-bold">{zone.manager}</div>
-                  </div>
-                </div>
-              </div>
-            </Popup>
-            </Polygon>
-          ))}
         </React.Fragment>
       );
     });
   };
 
   const renderClimatePolygons = (plots, suffix = '') => {
-    const activeLayers = [];
-    if (climateShowRainfall) activeLayers.push('rainfall');
-    if (climateShowSoilTemp) activeLayers.push('soilTemp');
-    if (climateShowLst) activeLayers.push('lst');
-    if (climateShowVaporDeficit) activeLayers.push('vpd');
-    if (climateShowFlood) activeLayers.push('flood');
-
     return plots.map(plot => {
-      const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
-      const activePlotHandler = setSelectedClimatePlot;
+      const keyPrefix = `${plot.id}`;
       return (
         <React.Fragment key={keyPrefix}>
-          {/* Base Boundary outline */}
           {climateShowBoundaries && (
-            <Polygon 
+            <Polygon
               positions={plot.coords}
               pathOptions={getClimatePlotStyleOutline()}
               eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             />
           )}
-          {/* Active Fill Layers */}
-          {activeLayers.map(layer => (
-            <Polygon
-              key={`${keyPrefix}-${layer}`}
-              positions={plot.coords}
-              pathOptions={getClimatePlotStyleFill(plot, layer)}
-              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
-            >
-                          <Popup>
-              <div className="p-3 w-72 max-h-[350px] overflow-y-auto font-sans text-xs space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">
-                    {suffix === 'left' ? 'Climate Popup (Left)' : suffix === 'right' ? 'Climate Popup (Right)' : 'Climate Popup'}
-                  </span>
-                  <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md">
-                    WGS 84
-                  </span>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-black text-gray-950 leading-tight">{plot.name}</h4>
-                  <p className="text-[10px] text-gray-400 font-bold">{plot.id}</p>
-                </div>
-
-                <div className="bg-slate-900 p-2.5 rounded-xl text-white">
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Microclimate Summary</div>
-                  <p className="text-[10.5px] font-medium italic leading-relaxed text-slate-100">
-                    "Telemetry feed active from Abeokuta MET station. Sensor node battery status: 94%. Current relative humidity: 68%. VPD transpiration stress level: {plot.vpd} kPa."
-                  </p>
-                </div>
-
-                <div className="h-24 bg-gray-50 rounded-xl p-1.5">
-                  <Line data={{
-                    labels: pixelTimeseries ? pixelTimeseries.map(pt => pt.date) : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
-                    datasets: [{
-                      data: TIMELINE_DATA.map((t, idx) =>
-                        plot.id === 'PLOT-ALPHA' ? 12 + idx * 4 :
-                        plot.id === 'PLOT-BETA'  ? 10 + idx * 3 : 11 + idx * 4),
-                      borderColor: '#1D4ED8', borderWidth: 2, backgroundColor: 'rgba(29,78,216,0.06)',
-                      fill: true, tension: 0.3, pointRadius: 2
-                    }]
-                  }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 8 } } } } }} />
-                </div>
-
-                <div className="border border-green-50 rounded-lg p-2 bg-green-50/20 space-y-1">
-                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Average</div>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] font-semibold text-gray-700">
-                    <div>Precipitation:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.rainfall} mm</div>
-                    <div>Soil Temp:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.soilTemp}°C</div>
-                    <div>Surface Temp:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.lst}°C</div>
-                    <div>VPD Stress:</div>
-                    <div className="text-right text-gray-950 font-bold">{plot.vpd} kPa</div>
-                  </div>
-                </div>
-              </div>
-            </Popup>
-            </Polygon>
-          ))}
         </React.Fragment>
       );
     });
@@ -2196,18 +2015,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
   const handleEstateChange = (val) => {
     setFilterEstate(val);
-    if (val === 'West Valley Estate' && filterPlot !== 'PLOT-ALPHA') setFilterPlot('PLOT-ALPHA');
-    else if (val === 'East Ridge Estate' && filterPlot !== 'PLOT-BETA') setFilterPlot('PLOT-BETA');
-    else if (val === 'South Slope Estate' && filterPlot !== 'PLOT-GAMMA') setFilterPlot('PLOT-GAMMA');
-    else if (val === 'All') setFilterPlot('All');
+    setFilterPlot('All');
+    // Estate filter now uses real subfarm names from plotsData
   };
 
   const handlePlotChange = (val) => {
     setFilterPlot(val);
-    if (val === 'PLOT-ALPHA') setFilterEstate('West Valley Estate');
-    else if (val === 'PLOT-BETA') setFilterEstate('East Ridge Estate');
-    else if (val === 'PLOT-GAMMA') setFilterEstate('South Slope Estate');
-    else if (val === 'All') setFilterEstate('All');
   };
 
   const handleSidebarClick = (item) => {
@@ -2277,7 +2090,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           {
             id: newExportId,
             format: exportFormat,
-            scope: exportPlotTarget === 'ALL' ? 'All Plots & Zones' : `${exportPlotTarget === 'PLOT-ALPHA' ? 'West Valley Plot' : exportPlotTarget === 'PLOT-BETA' ? 'East Ridge Plot' : 'South Slope Plot'} (${exportPlotTarget})`,
+            scope: exportPlotTarget === 'ALL' ? 'All Plots & Zones' : exportPlotTarget,
             size: `${(Math.random() * 2 + 0.5).toFixed(1)} MB`,
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             status: 'Completed'
@@ -2289,109 +2102,6 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     }, 600);
   };
 
-  const TIMELINE_DATA = useMemo(() => {
-    const year = calendarYear;
-    const month = calendarMonth;
-    const passes = [];
-    const days = [1, 8, 15, 22, 29];
-    
-    days.forEach((day, idx) => {
-      const date = new Date(year, month, day);
-      if (date.getMonth() === month) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const label = `${MONTH_NAMES[month]} ${day}, ${year}`;
-        const satellite = idx % 2 === 0 ? 'Sentinel-2' : 'Landsat-8';
-        const quality = idx === 2 ? '100% Cloud Free' : `${99 - idx * 3}% Cloud Free`;
-        
-        // Dynamic simulated vegetative and moisture indices
-        const baseNdvi = 0.62 + Math.sin((month + idx) * 0.45) * 0.12;
-        const baseNdmi = 0.40 + Math.cos((month + idx) * 0.45) * 0.08;
-        
-        passes.push({
-          date: dateStr,
-          label,
-          satellite,
-          quality,
-          ndvi: parseFloat(baseNdvi.toFixed(2)),
-          ndmi: parseFloat(baseNdmi.toFixed(2)),
-          color: idx === 2 ? '#14532D' : '#16A34A',
-          plotsHealth: {
-            alpha: baseNdvi > 0.7 ? '#15803d' : '#22c55e',
-            beta: baseNdvi < 0.6 ? '#ef4444' : '#eab308',
-            gamma: '#eab308'
-          }
-        });
-      }
-    });
-    
-    return passes;
-  }, [calendarMonth, calendarYear]);
-
-  const clampedTimelineIndex = Math.min(selectedTimelineIndex, TIMELINE_DATA.length - 1);
-  const currentTimelineA = TIMELINE_DATA[clampedTimelineIndex >= 0 ? clampedTimelineIndex : 0];
-
-  const clampedCompareTimelineIndex = Math.min(compareTimelineIndex, TIMELINE_DATA.length - 1);
-  const currentTimelineB = TIMELINE_DATA[clampedCompareTimelineIndex >= 0 ? clampedCompareTimelineIndex : 0];
-
-  const currentTimeline = currentTimelineA;
-
-  const plotsDataA = useMemo(() => {
-    if (plots && plots.length > 0) {
-      return plots.map(p => {
-        let coords = [];
-        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
-        } else {
-          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
-        }
-        const ndviVal = p.indices?.ndvi ?? (currentTimelineA.ndvi + 0.02);
-        const ndmiVal = p.indices?.ndmi ?? (currentTimelineA.ndmi + 0.01);
-        const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
-        const colorVal = healthVal === 'Optimal' ? '#15803d' : healthVal === 'Good' ? '#84cc16' : '#dc2626';
-        return {
-          id: p.plot_id,
-          name: p.name || p.plot_id,
-          area: `${p.area_ha || 10.0} HA`,
-          health: healthVal,
-          ndvi: ndviVal,
-          ndmi: ndmiVal,
-          color: colorVal,
-          coords
-        };
-      });
-    }
-    return [];
-  }, [plots, currentTimelineA]);
-
-  const plotsDataB = useMemo(() => {
-    if (plots && plots.length > 0) {
-      return plots.map(p => {
-        let coords = [];
-        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
-        } else {
-          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
-        }
-        const ndviVal = p.indices?.ndvi ?? (currentTimelineB.ndvi + 0.02);
-        const ndmiVal = p.indices?.ndmi ?? (currentTimelineB.ndmi + 0.01);
-        const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
-        const colorVal = healthVal === 'Optimal' ? '#15803d' : healthVal === 'Good' ? '#84cc16' : '#dc2626';
-        return {
-          id: p.plot_id,
-          name: p.name || p.plot_id,
-          area: `${p.area_ha || 10.0} HA`,
-          health: healthVal,
-          ndvi: ndviVal,
-          ndmi: ndmiVal,
-          color: colorVal,
-          coords
-        };
-      });
-    }
-    return [];
-  }, [plots, currentTimelineB]);
-
-  const plotsData = plotsDataA;
 
   const healthPlotsDataA = useMemo(() => {
     if (plots && plots.length > 0) {
@@ -2400,9 +2110,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
           coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
-          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+          coords = [];
         }
-        const ndviVal = p.indices?.ndvi ?? (currentTimelineA.ndvi + 0.02);
+        const ndviVal = p.indices?.ndvi ?? 0;
         const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
         return {
           id: p.plot_id,
@@ -2410,8 +2120,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           area: `${p.area_ha || 10.0} HA`,
           health: healthVal,
           ndvi: ndviVal,
-          chlorophyll: p.indices?.chlorophyll ?? parseFloat((ndviVal * 0.9).toFixed(2)),
-          waterStress: p.indices?.ndmi ?? 0.45,
+          chlorophyll: p.indices?.chlorophyll ?? null,
+          waterStress: p.indices?.ndmi ?? null,
           pestRisk: p.indices?.uas_anomaly_score > 0.4 ? 'High Risk' : p.indices?.uas_anomaly_score > 0.15 ? 'Moderate Risk' : 'Low Risk',
           coords
         };
@@ -2427,9 +2137,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
           coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
-          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+          coords = [];
         }
-        const ndviVal = p.indices?.ndvi ?? (currentTimelineB.ndvi + 0.02);
+        const ndviVal = p.indices?.ndvi ?? 0;
         const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
         return {
           id: p.plot_id,
@@ -2437,8 +2147,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           area: `${p.area_ha || 10.0} HA`,
           health: healthVal,
           ndvi: ndviVal,
-          chlorophyll: p.indices?.chlorophyll ?? parseFloat((ndviVal * 0.9).toFixed(2)),
-          waterStress: p.indices?.ndmi ?? 0.45,
+          chlorophyll: p.indices?.chlorophyll ?? null,
+          waterStress: p.indices?.ndmi ?? null,
           pestRisk: p.indices?.uas_anomaly_score > 0.4 ? 'High Risk' : p.indices?.uas_anomaly_score > 0.15 ? 'Moderate Risk' : 'Low Risk',
           coords
         };
@@ -2456,21 +2166,20 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
           coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
-          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+          coords = [];
         }
-        const ndviVal = p.indices?.ndvi ?? 0.65;
-        const yieldVal = parseFloat((ndviVal * 24).toFixed(1));
+        const ndviVal = p.indices?.ndvi ?? 0;
         return {
           id: p.plot_id,
           name: p.name || p.plot_id,
           area: `${p.area_ha || 10.0} HA`,
-          yieldValue: yieldVal,
-          biomass: parseFloat((ndviVal * 2.6).toFixed(2)),
+          yieldValue: null,
+          biomass: null,
           readiness: Math.min(100, Math.round(ndviVal * 115)),
           growth: parseFloat(ndviVal.toFixed(2)),
           coords,
-          predAccuracy: '94.2%',
-          predictedYield: parseFloat((yieldVal * (p.area_ha || 10.0)).toFixed(1)),
+          predAccuracy: null,
+          predictedYield: null,
           yieldStatus: ndviVal > 0.6 ? 'Optimal (On Track)' : 'Underperforming (Water Stress)'
         };
       });
@@ -2485,21 +2194,20 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
           coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
-          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+          coords = [];
         }
-        const ndviVal = p.indices?.ndvi ?? 0.65;
-        const yieldVal = parseFloat((ndviVal * 24).toFixed(1));
+        const ndviVal = p.indices?.ndvi ?? 0;
         return {
           id: p.plot_id,
           name: p.name || p.plot_id,
           area: `${p.area_ha || 10.0} HA`,
-          yieldValue: yieldVal,
-          biomass: parseFloat((ndviVal * 2.6).toFixed(2)),
+          yieldValue: null,
+          biomass: null,
           readiness: Math.min(100, Math.round(ndviVal * 115)),
           growth: parseFloat(ndviVal.toFixed(2)),
           coords,
-          predAccuracy: '94.2%',
-          predictedYield: parseFloat((yieldVal * (p.area_ha || 10.0)).toFixed(1)),
+          predAccuracy: null,
+          predictedYield: null,
           yieldStatus: ndviVal > 0.6 ? 'Optimal (On Track)' : 'Underperforming (Water Stress)'
         };
       });
@@ -2516,16 +2224,16 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
           coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
-          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+          coords = [];
         }
         return {
           id: p.plot_id,
           name: p.name || p.plot_id,
           area: `${p.area_ha || 10.0} HA`,
-          rainfall: 11 + selectedTimelineIndex * 4 + idx,
-          soilTemp: 25 + (5 - selectedTimelineIndex),
-          lst: 27 + (5 - selectedTimelineIndex),
-          vpd: parseFloat((1.4 + selectedTimelineIndex * 0.15).toFixed(1)),
+          rainfall: null,
+          soilTemp: null,
+          lst: null,
+          vpd: null,
           coords
         };
       });
@@ -2540,16 +2248,16 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
           coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
         } else {
-          coords = p.plot_id === 'PLOT-ALPHA' ? PLOT_ALPHA_COORDS : p.plot_id === 'PLOT-BETA' ? PLOT_BETA_COORDS : PLOT_GAMMA_COORDS;
+          coords = [];
         }
         return {
           id: p.plot_id,
           name: p.name || p.plot_id,
           area: `${p.area_ha || 10.0} HA`,
-          rainfall: 11 + compareTimelineIndex * 4 + idx,
-          soilTemp: 25 + (5 - compareTimelineIndex),
-          lst: 27 + (5 - compareTimelineIndex),
-          vpd: parseFloat((1.4 + compareTimelineIndex * 0.15).toFixed(1)),
+          rainfall: null,
+          soilTemp: null,
+          lst: null,
+          vpd: null,
           coords
         };
       });
@@ -2566,27 +2274,27 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         if (z.boundary && z.boundary.coordinates && z.boundary.coordinates[0]) {
           coords = api.geoJsonToLeaflet(z.boundary.coordinates[0]);
         } else {
-          coords = z.zone_id === 'ZONE-ALPHA' ? RESTORE_ZONE_A_COORDS : z.zone_id === 'ZONE-BETA' ? RESTORE_ZONE_B_COORDS : RESTORE_ZONE_C_COORDS;
+          coords = [];
         }
         return {
           id: z.zone_id,
           name: z.name,
           area: `${z.area_ha ?? 6.0} HA`,
-          type: z.project_type || 'Canopy Density',
-          progress: z.progress_pct || 70,
-          survival: `${z.survival_rate_pct || 85}%`,
-          trees: (z.tree_count || 1000).toLocaleString(),
-          carbon: `${z.carbon_offset_tco2e || 30.0} tCO2e`,
-          status: z.progress_pct > 80 ? 'Optimal Growth' : 'Active Care',
-          color: z.progress_pct > 80 ? '#16A34A' : '#EAB308',
+          type: z.project_type ?? null,
+          progress: z.progress_pct ?? null,
+          survival: z.survival_rate_pct != null ? `${z.survival_rate_pct}%` : '—',
+          trees: z.tree_count != null ? z.tree_count.toLocaleString() : '—',
+          carbon: z.carbon_offset_tco2e != null ? `${z.carbon_offset_tco2e} tCO2e` : '—',
+          status: z.progress_pct != null ? (z.progress_pct > 80 ? 'Optimal Growth' : 'Active Care') : '—',
+          color: z.progress_pct != null ? (z.progress_pct > 80 ? '#16A34A' : '#EAB308') : '#9CA3AF',
           coords,
-          manager: z.manager || 'Staff',
-          survivalNum: z.survival_rate_pct || 85,
-          insar: z.biodiversity_score ? z.biodiversity_score / 100 : 0.6,
-          gedi: 12,
-          ndwi: 0.25,
-          lulc: 'Forest',
-          eudr: 'Compliant'
+          manager: z.manager ?? null,
+          survivalNum: z.survival_rate_pct ?? null,
+          insar: z.biodiversity_score != null ? z.biodiversity_score / 100 : null,
+          gedi: null,
+          ndwi: null,
+          lulc: null,
+          eudr: null
         };
       });
     }
@@ -2600,27 +2308,27 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
         if (z.boundary && z.boundary.coordinates && z.boundary.coordinates[0]) {
           coords = api.geoJsonToLeaflet(z.boundary.coordinates[0]);
         } else {
-          coords = z.zone_id === 'ZONE-ALPHA' ? RESTORE_ZONE_A_COORDS : z.zone_id === 'ZONE-BETA' ? RESTORE_ZONE_B_COORDS : RESTORE_ZONE_C_COORDS;
+          coords = [];
         }
         return {
           id: z.zone_id,
           name: z.name,
           area: `${z.area_ha ?? 6.0} HA`,
-          type: z.project_type || 'Canopy Density',
-          progress: z.progress_pct || 70,
-          survival: `${z.survival_rate_pct || 85}%`,
-          trees: (z.tree_count || 1000).toLocaleString(),
-          carbon: `${z.carbon_offset_tco2e || 30.0} tCO2e`,
-          status: z.progress_pct > 80 ? 'Optimal Growth' : 'Active Care',
-          color: z.progress_pct > 80 ? '#16A34A' : '#EAB308',
+          type: z.project_type ?? null,
+          progress: z.progress_pct ?? null,
+          survival: z.survival_rate_pct != null ? `${z.survival_rate_pct}%` : '—',
+          trees: z.tree_count != null ? z.tree_count.toLocaleString() : '—',
+          carbon: z.carbon_offset_tco2e != null ? `${z.carbon_offset_tco2e} tCO2e` : '—',
+          status: z.progress_pct != null ? (z.progress_pct > 80 ? 'Optimal Growth' : 'Active Care') : '—',
+          color: z.progress_pct != null ? (z.progress_pct > 80 ? '#16A34A' : '#EAB308') : '#9CA3AF',
           coords,
-          manager: z.manager || 'Staff',
-          survivalNum: z.survival_rate_pct || 85,
-          insar: z.biodiversity_score ? z.biodiversity_score / 100 : 0.6,
-          gedi: 12,
-          ndwi: 0.25,
-          lulc: 'Forest',
-          eudr: 'Compliant'
+          manager: z.manager ?? null,
+          survivalNum: z.survival_rate_pct ?? null,
+          insar: z.biodiversity_score != null ? z.biodiversity_score / 100 : null,
+          gedi: null,
+          ndwi: null,
+          lulc: null,
+          eudr: null
         };
       });
     }
@@ -2649,7 +2357,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       if (val > 30) return '#22c55e';
       return '#eab308';
     }
-    const val = zone.id === 'ZONE-ALPHA' ? 92 : zone.id === 'ZONE-BETA' ? 84 : 76;
+    const val = zone.survivalNum ?? zone.progress ?? 80;
     if (val > 90) return '#15803d';
     if (val > 80) return '#22c55e';
     return '#eab308';
@@ -2767,15 +2475,24 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <span className="text-xs font-semibold text-gray-500">
                 {isCompareMode 
                   ? (activeDateSlot === 'A' ? currentTimelineA?.satellite : currentTimelineB?.satellite) 
-                  : currentTimeline.satellite}
+                  : currentTimeline?.satellite ?? '—'}
               </span>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                isCompareMode && activeDateSlot === 'B' 
-                  ? 'bg-blue-50 text-blue-700 border-blue-100' 
-                  : 'bg-green-50 text-green-700 border-green-100'
-              }`}>
-                {indexValue}
-              </span>
+              <select
+                value={selectedIndex}
+                onChange={e => setSelectedIndex(e.target.value)}
+                className={`text-xs font-bold px-2 py-1 rounded-full border cursor-pointer focus:outline-none ${
+                  isCompareMode && activeDateSlot === 'B'
+                    ? 'bg-blue-50 text-blue-700 border-blue-100'
+                    : 'bg-green-50 text-green-700 border-green-100'
+                }`}
+              >
+                {availableIndices.length > 0
+                  ? availableIndices.map(idx => (
+                      <option key={idx.index} value={idx.index}>{idx.index.toUpperCase()}</option>
+                    ))
+                  : <option value={selectedIndex}>{selectedIndex.toUpperCase()}</option>
+                }
+              </select>
             </div>
           </div>
         )}
@@ -2853,19 +2570,19 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
               {/* Selected Pass Status Bar */}
               {isCompareMode ? (
-                <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-2 text-[10px] font-semibold text-gray-600 animate-in fade-in duration-200">
+                <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-2 text-[10px] font-semibold text-gray-600">
                   {currentTimelineA && (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-green-600" />
                         <span className="font-bold text-green-700">Date A:</span>
-                        <span className="text-gray-700">{currentTimelineA.label.split(',')[0]}</span>
+                        <span className="text-gray-700">{currentTimelineA?.label?.split(',')[0] ?? '—'}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[8px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded uppercase border border-green-150">
-                          {currentTimelineA.satellite}
+                          {currentTimelineA?.satellite ?? '—'}
                         </span>
-                        <span className="text-gray-450 text-[9px]">{currentTimelineA.quality}</span>
+                        <span className="text-gray-450 text-[9px]">{currentTimelineA?.quality ?? '—'}</span>
                       </div>
                     </div>
                   )}
@@ -2874,25 +2591,25 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-blue-600" />
                         <span className="font-bold text-blue-700">Date B:</span>
-                        <span className="text-gray-700">{currentTimelineB.label.split(',')[0]}</span>
+                        <span className="text-gray-700">{currentTimelineB?.label?.split(',')[0] ?? '—'}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[8px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded uppercase border border-blue-150">
-                          {currentTimelineB.satellite}
+                          {currentTimelineB?.satellite ?? '—'}
                         </span>
-                        <span className="text-gray-450 text-[9px]">{currentTimelineB.quality}</span>
+                        <span className="text-gray-450 text-[9px]">{currentTimelineB?.quality ?? '—'}</span>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
                 currentTimeline && (
-                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-gray-600 animate-in fade-in duration-200">
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-gray-600">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[9px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 uppercase">
-                        {currentTimeline.satellite}
+                        {currentTimeline?.satellite ?? '—'}
                       </span>
-                      <span className="text-gray-450 font-semibold text-[10px]">{currentTimeline.quality}</span>
+                      <span className="text-gray-450 font-semibold text-[10px]">{currentTimeline?.quality ?? '—'}</span>
                     </div>
                   </div>
                 )
@@ -2915,341 +2632,186 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     );
   };
 
-  // Dynamic Dashboard Calculations
+  // Dynamic Dashboard Calculations — real data only, no mock fallback
   const dashboardMetrics = useMemo(() => {
-    let plots = 128;
-    let area = 1280;
-    let carbon = 42.5;
-    let alerts = 7;
-
-    const plot = filterPlot;
-    const date = filterDate;
-
-    if (plot === 'PLOT-ALPHA') {
-      plots = 42;
-      area = 420;
-      carbon = 42.8;
-      alerts = 0;
-    } else if (plot === 'PLOT-BETA') {
-      plots = 36;
-      area = 360;
-      carbon = 31.2;
-      alerts = date === '2026-05-29' ? 8 : 4;
-    } else if (plot === 'PLOT-GAMMA') {
-      plots = 50;
-      area = 500;
-      carbon = 38.5;
-      alerts = 3;
-    } else if (filterEstate === 'West Valley Estate') {
-      plots = 42; area = 420; carbon = 42.8; alerts = 0;
-    } else if (filterEstate === 'East Ridge Estate') {
-      plots = 36; area = 360; carbon = 31.2; alerts = 4;
-    } else if (filterEstate === 'South Slope Estate') {
-      plots = 50; area = 500; carbon = 38.5; alerts = 3;
-    }
-
-    if (date !== 'All') {
-      const dayIndex = TIMELINE_DATA.findIndex(t => t.date === date);
-      plots = Math.round(plots * (0.8 + (dayIndex * 0.1)));
-      area = Math.max(10, Math.round(area * (0.7 + (dayIndex * 0.08))));
-      if (plot === 'All') {
-        const pass = TIMELINE_DATA[dayIndex];
-        alerts = pass.ndvi < 0.65 ? 9 : pass.ndvi > 0.75 ? 2 : 5;
-      }
-    }
-
-    return { plots, area, carbon, alerts };
-  }, [filterEstate, filterPlot, filterDate]);
+    return {
+      plots: plots.length > 0 ? plots.length : (stats ? '—' : '—'),
+      area: stats ? Math.round(stats.total_area_ha) : '—',
+      carbon: stats?.average_carbon_density_tco2e_ha ?? '—',
+      alerts: stats?.active_alerts_count ?? '—',
+    };
+  }, [stats, plots]);
 
   const yieldTrendsData = useMemo(() => {
-    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const datasets = [];
-
-    const alphaData = [0.55, 0.58, 0.64, 0.72, currentTimeline.ndvi + 0.04, 0.78];
-    const betaData = [0.48, 0.52, 0.50, 0.53, currentTimeline.ndvi - 0.15, 0.55];
-    const gammaData = [0.60, 0.62, 0.61, 0.65, currentTimeline.ndvi - 0.05, 0.68];
-    const avgData = labels.map((_, i) => parseFloat(((alphaData[i] + betaData[i] + gammaData[i]) / 3).toFixed(2)));
-
-    const showAlpha = filterPlot === 'All' || filterPlot === 'PLOT-ALPHA';
-    const showBeta = filterPlot === 'All' || filterPlot === 'PLOT-BETA';
-    const showGamma = filterPlot === 'All' || filterPlot === 'PLOT-GAMMA';
-
-    if (showAlpha) {
-      datasets.push({ label: 'West Valley Plot', data: alphaData, borderColor: '#16A34A', tension: 0.4, fill: true, backgroundColor: 'rgba(22, 163, 74, 0.03)', pointRadius: 4, pointBackgroundColor: '#16A34A' });
-    }
-    if (showBeta) {
-      datasets.push({ label: 'East Ridge Plot', data: betaData, borderColor: '#EAB308', tension: 0.4, fill: true, backgroundColor: 'rgba(234, 179, 8, 0.03)', pointRadius: 4, pointBackgroundColor: '#EAB308' });
-    }
-    if (showGamma) {
-      datasets.push({ label: 'South Slope Plot', data: gammaData, borderColor: '#0284C7', tension: 0.4, fill: true, backgroundColor: 'rgba(2, 132, 199, 0.03)', pointRadius: 4, pointBackgroundColor: '#0284C7' });
-    }
-
-    if (filterPlot !== 'All') {
-      datasets.push({ label: 'System Average', data: avgData, borderColor: '#64748B', borderDash: [6, 4], tension: 0.4, fill: false, pointRadius: 0 });
-    }
-
-    return { labels, datasets };
-  }, [filterPlot, currentTimeline]);
-
-  const ndmiTrendsData = useMemo(() => {
-    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const datasets = [];
-
-    const alphaData = [0.38, 0.40, 0.42, 0.44, currentTimeline.ndmi + 0.02, 0.46];
-    const betaData = [0.30, 0.32, 0.31, 0.33, currentTimeline.ndmi - 0.10, 0.35];
-    const gammaData = [0.35, 0.36, 0.37, 0.38, currentTimeline.ndmi - 0.04, 0.40];
-    const avgData = labels.map((_, i) => parseFloat(((alphaData[i] + betaData[i] + gammaData[i]) / 3).toFixed(2)));
-
-    const showAlpha = filterPlot === 'All' || filterPlot === 'PLOT-ALPHA';
-    const showBeta = filterPlot === 'All' || filterPlot === 'PLOT-BETA';
-    const showGamma = filterPlot === 'All' || filterPlot === 'PLOT-GAMMA';
-
-    if (showAlpha) {
-      datasets.push({ label: 'West Valley Plot', data: alphaData, borderColor: '#16A34A', tension: 0.4, fill: true, backgroundColor: 'rgba(22, 163, 74, 0.03)', pointRadius: 4, pointBackgroundColor: '#16A34A' });
-    }
-    if (showBeta) {
-      datasets.push({ label: 'East Ridge Plot', data: betaData, borderColor: '#EAB308', tension: 0.4, fill: true, backgroundColor: 'rgba(234, 179, 8, 0.03)', pointRadius: 4, pointBackgroundColor: '#EAB308' });
-    }
-    if (showGamma) {
-      datasets.push({ label: 'South Slope Plot', data: gammaData, borderColor: '#0284C7', tension: 0.4, fill: true, backgroundColor: 'rgba(2, 132, 199, 0.03)', pointRadius: 4, pointBackgroundColor: '#0284C7' });
-    }
-
-    if (filterPlot !== 'All') {
-      datasets.push({ label: 'System Average', data: avgData, borderColor: '#64748B', borderDash: [6, 4], tension: 0.4, fill: false, pointRadius: 0 });
-    }
-
-    return { labels, datasets };
-  }, [filterPlot, currentTimeline]);
-
-  const rviTrendsData = useMemo(() => {
-    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const datasets = [];
-
-    const alphaData = [0.45, 0.52, 0.60, 0.68, 0.72, 0.75];
-    const betaData = [0.35, 0.40, 0.42, 0.44, 0.45, 0.48];
-    const gammaData = [0.40, 0.45, 0.50, 0.58, 0.62, 0.65];
-    const avgData = labels.map((_, i) => parseFloat(((alphaData[i] + betaData[i] + gammaData[i]) / 3).toFixed(2)));
-
-    const showAlpha = filterPlot === 'All' || filterPlot === 'PLOT-ALPHA';
-    const showBeta = filterPlot === 'All' || filterPlot === 'PLOT-BETA';
-    const showGamma = filterPlot === 'All' || filterPlot === 'PLOT-GAMMA';
-
-    if (showAlpha) {
-      datasets.push({ label: 'West Valley Plot', data: alphaData, borderColor: '#16A34A', tension: 0.4, fill: true, backgroundColor: 'rgba(22, 163, 74, 0.03)', pointRadius: 4, pointBackgroundColor: '#16A34A' });
-    }
-    if (showBeta) {
-      datasets.push({ label: 'East Ridge Plot', data: betaData, borderColor: '#EAB308', tension: 0.4, fill: true, backgroundColor: 'rgba(234, 179, 8, 0.03)', pointRadius: 4, pointBackgroundColor: '#EAB308' });
-    }
-    if (showGamma) {
-      datasets.push({ label: 'South Slope Plot', data: gammaData, borderColor: '#0284C7', tension: 0.4, fill: true, backgroundColor: 'rgba(2, 132, 199, 0.03)', pointRadius: 4, pointBackgroundColor: '#0284C7' });
-    }
-
-    if (filterPlot !== 'All') {
-      datasets.push({ label: 'System Average', data: avgData, borderColor: '#64748B', borderDash: [6, 4], tension: 0.4, fill: false, pointRadius: 0 });
-    }
-
-    return { labels, datasets };
-  }, [filterPlot]);
-
-  const soilTempTrendsData = useMemo(() => {
-    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const expected = [24.5, 25.0, 25.5, 24.8, 25.2, 26.0, 26.5];
-    let actual = [24.0, 24.8, 25.2, 24.5, 25.0, 25.8, 26.2];
-    if (filterPlot === 'PLOT-ALPHA') {
-      actual = [23.8, 24.2, 24.8, 24.2, 24.5, 25.2, 25.5];
-    } else if (filterPlot === 'PLOT-BETA') {
-      actual = [26.5, 27.2, 28.0, 27.5, 28.2, 29.0, 29.5];
-    } else if (filterPlot === 'PLOT-GAMMA') {
-      actual = [24.2, 24.9, 25.4, 24.7, 25.1, 25.9, 26.3];
-    }
-    return {
-      labels,
-      datasets: [
-        { label: 'Optimal Soil Temp Base [°C]', data: expected, borderColor: '#64748B', borderDash: [5, 5], fill: false, tension: 0.1, pointRadius: 0 },
-        { label: 'Actual Soil Temp [°C]', data: actual, borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.05)', fill: true, tension: 0.1, pointRadius: 3 }
-      ]
-    };
-  }, [filterPlot]);
-
-  const vpdTrendsData = useMemo(() => {
-    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const criticalThreshold = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0];
-    let actual = [1.2, 1.4, 1.6, 1.3, 1.5, 1.8, 1.9];
-    if (filterPlot === 'PLOT-ALPHA') {
-      actual = [1.0, 1.1, 1.3, 1.2, 1.2, 1.4, 1.5];
-    } else if (filterPlot === 'PLOT-BETA') {
-      actual = [2.1, 2.3, 2.4, 2.2, 2.3, 2.5, 2.6];
-    } else if (filterPlot === 'PLOT-GAMMA') {
-      actual = [1.3, 1.5, 1.7, 1.4, 1.6, 1.9, 2.0];
-    }
-    return {
-      labels,
-      datasets: [
-        { label: 'Critical Stress Threshold [kPa]', data: criticalThreshold, borderColor: '#EF4444', borderDash: [4, 4], fill: false, tension: 0, pointRadius: 0 },
-        { label: 'Atmospheric VPD [kPa]', data: actual, borderColor: '#8B5CF6', backgroundColor: 'rgba(139, 92, 246, 0.05)', fill: true, tension: 0.2, pointRadius: 4 }
-      ]
-    };
-  }, [filterPlot]);
-
-  const moistureRetentionData = useMemo(() => {
-    const allPlots = [
-      { id: 'PLOT-ALPHA', label: 'Plot Alpha', value: parseFloat((currentTimeline.ndmi + 0.02).toFixed(2)), color: '#16A34A' },
-      { id: 'PLOT-BETA',  label: 'Plot Beta',  value: parseFloat((currentTimeline.ndmi - 0.10).toFixed(2)), color: '#EAB308' },
-      { id: 'PLOT-GAMMA', label: 'Plot Gamma', value: parseFloat((currentTimeline.ndmi - 0.04).toFixed(2)), color: '#0284C7' }
-    ];
-
-    const filtered = allPlots.filter(p => filterPlot === 'All' || filterPlot === p.id);
-    const labels = filtered.map(p => p.label);
-    const data = filtered.map(p => p.value);
-    const bgColors = filtered.map(p => p.color);
-
-    if (filterPlot !== 'All') {
-      labels.push('Standard Target');
-      data.push(0.45);
-      bgColors.push('#64748B');
-    }
-
+    // Real NDVI time series from zarr — one point per observation date
+    const labels = TIMELINE_DATA.map(t => t.label || t.date);
+    const values = TIMELINE_DATA.map(t => t.ndvi ?? 0);
+    if (labels.length === 0) return { labels: [], datasets: [] };
     return {
       labels,
       datasets: [{
-        label: 'Soil/Canopy NDMI',
-        data,
-        backgroundColor: bgColors,
-        borderRadius: 8,
-        borderSkipped: false
+        label: 'NDVI (Farm Average)',
+        data: values,
+        borderColor: '#16A34A',
+        backgroundColor: 'rgba(22, 163, 74, 0.06)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: '#16A34A',
       }]
     };
-  }, [filterPlot, currentTimeline]);
+  }, [TIMELINE_DATA]);
+
+  const ndmiTrendsData = useMemo(() => {
+    // Real NDMI time series from zarr
+    const labels = TIMELINE_DATA.map(t => t.label || t.date);
+    const values = TIMELINE_DATA.map(t => t.ndmi ?? 0);
+    if (labels.length === 0) return { labels: [], datasets: [] };
+    return {
+      labels,
+      datasets: [{
+        label: 'NDMI (Farm Average)',
+        data: values,
+        borderColor: '#0284C7',
+        backgroundColor: 'rgba(2, 132, 199, 0.06)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: '#0284C7',
+      }]
+    };
+  }, [TIMELINE_DATA]);
+
+  const rviTrendsData = useMemo(() => {
+    // Real EVI time series from zarr
+    const labels = TIMELINE_DATA.map(t => t.label || t.date);
+    const values = TIMELINE_DATA.map(t => t.evi ?? 0);
+    if (labels.length === 0) return { labels: [], datasets: [] };
+    return {
+      labels,
+      datasets: [{
+        label: 'EVI (Farm Average)',
+        data: values,
+        borderColor: '#8B5CF6',
+        backgroundColor: 'rgba(139, 92, 246, 0.06)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: '#8B5CF6',
+      }]
+    };
+  }, [TIMELINE_DATA]);
+
+  const soilTempTrendsData = useMemo(() => {
+    // Soil temperature sensor data not yet connected — chart shows no data
+    return { labels: [], datasets: [] };
+  }, []);
+
+  const vpdTrendsData = useMemo(() => {
+    // VPD sensor data not yet connected — chart shows no data
+    return { labels: [], datasets: [] };
+  }, []);
+
+  const moistureRetentionData = useMemo(() => {
+    // Use real NDMI from plotsData — group into buckets by health classification
+    if (!plotsData || plotsData.length === 0) return { labels: [], datasets: [] };
+    const buckets = { 'High (>0.3)': 0, 'Medium (0–0.3)': 0, 'Low (<0)': 0 };
+    plotsData.forEach(p => {
+      const v = p.ndmi ?? 0;
+      if (v > 0.3) buckets['High (>0.3)']++;
+      else if (v >= 0) buckets['Medium (0–0.3)']++;
+      else buckets['Low (<0)']++;
+    });
+    return {
+      labels: Object.keys(buckets),
+      datasets: [{
+        label: 'Plot Count by NDMI',
+        data: Object.values(buckets),
+        backgroundColor: ['#0284C7', '#38BDF8', '#EF4444'],
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    };
+  }, [plotsData]);
 
   const nutrientData = useMemo(() => {
-    let ndviVal = currentTimeline.ndvi;
-    let ndmiVal = currentTimeline.ndmi;
-    let nitrogenFactor = 1.0;
-    let coverFactor = 1.0;
-
-    if (filterPlot === 'PLOT-ALPHA') {
-      ndviVal += 0.04;
-      ndmiVal += 0.02;
-      nitrogenFactor = 1.15;
-      coverFactor = 1.1;
-    } else if (filterPlot === 'PLOT-BETA') {
-      ndviVal -= 0.15;
-      ndmiVal -= 0.10;
-      nitrogenFactor = 0.75;
-      coverFactor = 0.8;
-    } else if (filterPlot === 'PLOT-GAMMA') {
-      ndviVal -= 0.05;
-      ndmiVal -= 0.04;
-      nitrogenFactor = 0.95;
-      coverFactor = 0.95;
-    }
-
+    // Derive radar axes from real zarr index values via currentTimeline
+    const ndvi  = currentTimeline?.ndvi  ?? 0;
+    const ndmi  = currentTimeline?.ndmi  ?? 0;
+    const evi   = currentTimeline?.evi   ?? 0;
+    const reci  = currentTimeline?.reci  ?? 0;
+    const ndre  = currentTimeline?.ndre  ?? 0;
+    const lswi  = currentTimeline?.lswi  ?? 0;
+    // Normalise each index to 0-100 using known physical ranges
+    const norm = (v, lo, hi) => Math.min(100, Math.max(0, Math.round(((v - lo) / (hi - lo)) * 100)));
     return {
-      labels: ['Nitrogen (GCVI)', 'Chlorophyll (NDRE)', 'Water (NDWI)', 'Biomass (EVI)', 'Soil Temp', 'Canopy Cover'],
+      labels: ['Vegetation (NDVI)', 'Chlorophyll (NDRE)', 'Water (NDMI)', 'Biomass (EVI)', 'Red-Edge (RECI)', 'Canopy Water (LSWI)'],
       datasets: [{
-        label: filterPlot === 'All' ? 'System Average' : `${filterPlot} Metric`,
+        label: 'Farm Index Profile',
         data: [
-          Math.min(100, Math.max(0, parseInt((ndviVal * 100 * nitrogenFactor).toFixed(0)))),
-          Math.min(100, Math.max(0, parseInt((ndviVal * 90).toFixed(0)))),
-          Math.min(100, Math.max(0, parseInt((ndmiVal * 120).toFixed(0)))),
-          Math.min(100, Math.max(0, parseInt((ndviVal * 110).toFixed(0)))),
-          filterPlot === 'PLOT-BETA' ? 88 : 82,
-          Math.min(100, Math.max(0, parseInt((75 * coverFactor).toFixed(0))))
+          norm(ndvi,  -0.2, 1.0),
+          norm(ndre,  -0.1, 0.8),
+          norm(ndmi,  -0.6, 0.8),
+          norm(evi,   -0.2, 1.0),
+          norm(reci,   0.0, 5.0),
+          norm(lswi,  -0.6, 0.8),
         ],
         backgroundColor: 'rgba(22, 163, 74, 0.15)',
         borderColor: '#16A34A',
         pointBackgroundColor: '#16A34A',
-        borderWidth: 2.5
+        borderWidth: 2.5,
       }]
     };
-  }, [filterPlot, currentTimeline]);
+  }, [currentTimeline]);
 
   const landClassificationData = useMemo(() => {
-    let labels = ['West Valley Plot', 'East Ridge Plot', 'South Slope Plot', 'Conservation Zone'];
-    let data = [35, 23, 27, 15];
-    let colors = ['#16A34A', '#EAB308', '#0284C7', '#0F172A'];
-
-    if (filterPlot === 'PLOT-ALPHA') {
-      labels = ['West Valley Plot'];
-      data = [100];
-      colors = ['#16A34A'];
-    } else if (filterPlot === 'PLOT-BETA') {
-      labels = ['East Ridge Plot'];
-      data = [100];
-      colors = ['#EAB308'];
-    } else if (filterPlot === 'PLOT-GAMMA') {
-      labels = ['South Slope Plot'];
-      data = [100];
-      colors = ['#0284C7'];
-    } else if (filterEstate === 'West Valley Estate') {
-      labels = ['West Valley Plot', 'Conservation Zone'];
-      data = [80, 20];
-      colors = ['#16A34A', '#0F172A'];
-    } else if (filterEstate === 'East Ridge Estate') {
-      labels = ['East Ridge Plot', 'Conservation Zone'];
-      data = [85, 15];
-      colors = ['#EAB308', '#0F172A'];
-    } else if (filterEstate === 'South Slope Estate') {
-      labels = ['South Slope Plot', 'Conservation Zone'];
-      data = [75, 25];
-      colors = ['#0284C7', '#0F172A'];
-    }
-
+    // Real area distribution from plotsData by health class
+    if (!plotsData || plotsData.length === 0) return { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0 }] };
+    let optimal = 0, good = 0, stressed = 0;
+    plotsData.forEach(p => {
+      const v = p.ndvi ?? 0;
+      if (v > 0.6) optimal++;
+      else if (v > 0.4) good++;
+      else stressed++;
+    });
     return {
-      labels,
+      labels: [`Optimal NDVI (${optimal})`, `Moderate NDVI (${good})`, `Stressed NDVI (${stressed})`],
       datasets: [{
-        data,
-        backgroundColor: colors,
+        data: [optimal, good, stressed],
+        backgroundColor: ['#16A34A', '#EAB308', '#EF4444'],
         borderWidth: 0,
-        hoverOffset: 8
+        hoverOffset: 8,
       }]
     };
-  }, [filterPlot, filterEstate]);
+  }, [plotsData]);
 
   const gddReferenceData = useMemo(() => {
-    const labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8'];
-    const expected = [15, 30, 45, 60, 75, 90, 105, 120];
-    const actual = [14, 28, 42, 58, 76, filterPlot === 'PLOT-BETA' ? 82 : 92, filterPlot === 'PLOT-BETA' ? 95 : 110, filterPlot === 'PLOT-BETA' ? 108 : 124];
-    return {
-      labels,
-      datasets: [
-        { label: 'Expected GDD Curve', data: expected, borderColor: '#64748B', borderDash: [5, 5], fill: false, tension: 0.1, pointRadius: 0 },
-        { label: 'Actual Plot GDD', data: actual, borderColor: '#16A34A', backgroundColor: 'rgba(22, 163, 74, 0.05)', fill: true, tension: 0.1, pointRadius: 3 }
-      ]
-    };
-  }, [filterPlot]);
+    // GDD accumulation sensor data not yet connected
+    return { labels: [], datasets: [] };
+  }, []);
 
   const gddCompletionData = useMemo(() => {
+    // Use real NDVI from plotsData to show vegetation health completion proxy
+    if (!plotsData || plotsData.length === 0) return { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 8 }] };
+    const sample = plotsData.slice(0, 20);
     return {
-      labels: ['West Valley Plot', 'East Ridge Plot', 'South Slope Plot'],
+      labels: sample.map(p => p.id),
       datasets: [{
-        label: 'GDD Completion %',
-        data: [92, filterPlot === 'PLOT-BETA' ? 76 : 85, 89],
-        backgroundColor: ['#16A34A', '#EAB308', '#0284C7'],
-        borderRadius: 8
+        label: 'NDVI Score',
+        data: sample.map(p => Math.round((p.ndvi ?? 0) * 100)),
+        backgroundColor: sample.map(p => {
+          const v = p.ndvi ?? 0;
+          return v > 0.6 ? '#16A34A' : v > 0.4 ? '#EAB308' : '#EF4444';
+        }),
+        borderRadius: 4,
       }]
     };
-  }, [filterPlot]);
+  }, [plotsData]);
 
   const etTimeSeriesData = useMemo(() => {
-    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const baseETc = [4.2, 4.5, 4.8, 4.6, 4.7, 4.9, 5.0];
-    let baseETa = [4.1, 4.3, 4.6, 4.2, 4.0, 4.1, 4.2];
-    if (filterPlot === 'PLOT-ALPHA') {
-      baseETa = [4.2, 4.4, 4.7, 4.6, 4.6, 4.8, 4.9];
-    } else if (filterPlot === 'PLOT-BETA') {
-      baseETa = [3.2, 3.1, 3.0, 2.9, 2.8, 2.7, 2.5];
-    } else if (filterPlot === 'PLOT-GAMMA') {
-      baseETa = [3.9, 4.1, 4.3, 4.1, 3.9, 4.0, 4.1];
-    }
-    return {
-      labels,
-      datasets: [
-        { label: 'Crop Water Demand (ETc) [mm/day]', data: baseETc, borderColor: '#3B82F6', borderDash: [4, 4], fill: false, tension: 0.2, pointRadius: 3 },
-        { label: 'Actual Transpiration (ETa) [mm/day]', data: baseETa, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.05)', fill: true, tension: 0.2, pointRadius: 4 }
-      ]
-    };
-  }, [filterPlot]);
+    // ET sensor data not yet connected
+    return { labels: [], datasets: [] };
+  }, []);
 
   const alertsByCategoryData = useMemo(() => {
     const categories = ['Water Stress', 'Pest Infestation', 'Growth Deficit', 'Cloud Cover'];
@@ -3282,49 +2844,50 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
   }, [selectedBasemap]);
 
-  const triggerReportGeneration = (overridePlot, overrideIndex) => {
+  const triggerReportGeneration = async (overridePlot, overrideIndex) => {
     const targetPlot = overridePlot !== undefined ? overridePlot : reportPlot;
     const targetIndex = overrideIndex !== undefined ? overrideIndex : reportIndex;
 
     setIsGeneratingReport(true);
-    setReportProgress(0);
+    setReportProgress(10);
+    setReportProgressText('Querying satellite data repositories...');
     setGeneratedReport(null);
-    const steps = [
-      { progress: 20,  text: 'Querying Sentinel-2 & Landsat-8 band repositories...' },
-      { progress: 50,  text: 'Executing calculation algorithms for crop indices (NDVI/NDMI)...' },
-      { progress: 80,  text: 'Compiling MRV spatial compliance check ledger...' },
-      { progress: 100, text: 'Assembling final PDF documentation bundle...' }
-    ];
-    steps.forEach((step, idx) => {
-      setTimeout(() => {
-        setReportProgress(step.progress);
-        setReportProgressText(step.text);
-        if (step.progress === 100) {
-          setTimeout(() => {
-            setIsGeneratingReport(false);
-            setGeneratedReport({
-              id: `REP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-              plot: targetPlot,
-              index: targetIndex,
-              date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-              meanVal: (() => {
-                if (targetPlot === 'WHOLE-FARM') {
-                  if (targetIndex === 'SOC') return '37.5 g/kg';
-                  if (targetIndex === 'AGB') return '312.7 tCO2e';
-                  if (targetIndex === 'NDVI') return '0.61';
-                  if (targetIndex === 'NDMI') return '0.38';
-                  return '0.33';
-                }
-                if (targetIndex === 'SOC') return targetPlot === 'PLOT-ALPHA' ? '42.8 g/kg' : targetPlot === 'PLOT-BETA' ? '31.2 g/kg' : '38.5 g/kg';
-                if (targetIndex === 'AGB') return targetPlot === 'PLOT-ALPHA' ? '124.5 tCO2e' : targetPlot === 'PLOT-BETA' ? '82.4 tCO2e' : '105.8 tCO2e';
-                return targetPlot === 'PLOT-ALPHA' ? '0.76' : targetPlot === 'PLOT-BETA' ? '0.45' : '0.62';
-              })(),
-              status: 'Approved & Signed'
-            });
-          }, 600);
-        }
-      }, (idx + 1) * 800);
-    });
+
+    try {
+      setReportProgress(40);
+      setReportProgressText('Executing crop index calculations...');
+      const cert = await api.generateCertificate({
+        scope: targetPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : 'Plot-Level',
+        metric: targetIndex,
+        plot_id: targetPlot === 'WHOLE-FARM' ? null : targetPlot,
+      });
+      setReportProgress(80);
+      setReportProgressText('Compiling MRV compliance ledger...');
+      await new Promise(r => setTimeout(r, 500));
+      setReportProgress(100);
+      setReportProgressText('Report ready.');
+      await new Promise(r => setTimeout(r, 400));
+      setIsGeneratingReport(false);
+      const meanVal = (() => {
+        if (targetIndex === 'SOC' || targetIndex === 'AGB') return '—';
+        const key = targetIndex.toLowerCase();
+        const mean = TIMELINE_DATA.length > 0 ? (TIMELINE_DATA.reduce((s, t) => s + (t[key] ?? 0), 0) / TIMELINE_DATA.length) : null;
+        return mean !== null ? mean.toFixed(2) : '—';
+      })();
+      setGeneratedReport({
+        id: cert.certificate_id,
+        plot: targetPlot,
+        index: targetIndex,
+        date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        meanVal,
+        status: 'Approved & Signed',
+        diagnosticSummary: cert.diagnostic_summary,
+      });
+    } catch (err) {
+      setIsGeneratingReport(false);
+      setReportProgress(0);
+      setReportProgressText('Report generation failed. Please try again.');
+    }
   };
 
   const triggerVerificationAudit = () => {
@@ -3337,7 +2900,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       }, idx * 950);
       setTimeout(() => {
         let finalStatus = 'success';
-        if (selectedVerifyPlot === 'PLOT-BETA' && key === 'moisture') finalStatus = 'warning';
+        // moisture warning driven by real NDMI data if available
         setVerificationSteps(prev => ({ ...prev, [key]: { ...prev[key], status: finalStatus } }));
         if (idx === keys.length - 1) { setVerificationStatus('completed'); setIsVerifying(false); }
       }, (idx * 950) + 700);
@@ -3359,42 +2922,23 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     setSelectedTimelineIndex(2);
   }, [calendarMonth, calendarYear]);
 
-  const handleChatSubmit = (textToSend) => {
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const handleChatSubmit = async (textToSend) => {
     const query = textToSend || chatInput;
-    if (!query.trim()) return;
+    if (!query.trim() || chatLoading) return;
     setChatMessages(prev => [...prev, { sender: 'user', text: query }]);
     if (!textToSend) setChatInput('');
-    setTimeout(() => {
-      const lower = query.toLowerCase();
-      let reply = "I've analyzed the current spatial ledger. Is there a specific index (NDVI/NDMI) or target plot block you'd like me to report on?";
-      
-      if (lower.includes('carbon project') || lower.includes('zero-tillage') || lower.includes('cover crop') || lower.includes('climate-smart')) {
-        reply = "Climate-Smart Agriculture Analysis: Transitioning Plot-Alpha (West Valley Plot) to zero-tillage and cover cropping is projected to sequester 3.2 tCO2e/HA/year in soil organic carbon. Baseline soil moisture (NDMI) is estimated to rise by 12% due to improved organic matter water retention. Action: Initiate multi-species cover crop seeding post-harvest.";
-      } else if (lower.includes('agroforestry') || lower.includes('land restoration') || lower.includes('canopy restoration') || lower.includes('reforestation')) {
-        reply = "Agroforestry Restoration Modeling: Integrating native nitrogen-fixing trees in Zone-Beta at 80 trees/HA is projected to achieve a 22% canopy density improvement in 3 years. This sequestering model yields approx 45.2 tCO2e carbon offset while decreasing local surface LST temperatures by 1.8°C.";
-      } else if (lower.includes('geospatial') || lower.includes('carbon accounting') || lower.includes('registry') || lower.includes('mismatch') || lower.includes('coordinates')) {
-        reply = "Geospatial Carbon Accounting Audit: Boundary verification for Plot-Gamma confirms coordinates are 100% within legal agricultural corridors with 0% overlap mismatch against protected forests. Sentinel-2 baselines show no canopy clearing since Dec 2020, complying with global voluntary carbon registry standards.";
-      } else if (lower.includes('traceability') || lower.includes('environmental impact') || lower.includes('eudr') || lower.includes('deforestation-free') || lower.includes('supply chain')) {
-        reply = "EUDR Traceability & Impact Review: Blockchain ledger maps Plot-Alpha harvest batches directly to legal farm coordinates. Spatial verification registers zero canopy degradation (Deforestation-free score: 1.0) and an A+ Environmental Impact Rating (92/100 Biodiversity Index, 18% water footprint reduction).";
-      } else if (lower.includes('drought') || (lower.includes('rainfall') && lower.includes('deficit'))) {
-        reply = "Drought Scenario Simulation: Under a 6-week CHIRPS -60% rainfall deficit, East Ridge Plot (Block Beta) faces extreme moisture stress due to lower baseline soil retention. Vegetation index (CVI) is projected to decrease by 24%. Recommended Action: Increase irrigation rate by 40% immediately and spray anti-transpirants to conserve root-zone water.";
-      } else if (lower.includes('irrigation') || lower.includes('water status')) {
-        reply = "Irrigation Increase Analysis: Increasing irrigation by 30% on rainfed blocks will raise LSWI (Water Status) index scores to 'Adequate' range within 12 days. Yield Outlook: Anticipated yield recovery of +1.8 t/HA (8.5% increase) for Block Beta, with stable yield projections across West Valley and South Slope plots.";
-      } else if (lower.includes('pest') || lower.includes('containment')) {
-        reply = "Pest Outbreak Spread Risk: A stem borer outbreak has been detected near Block 6. Standard NDVI and VHI indices indicate high canopy density which accelerates pest migration. Recommended Action: Establish a 150m chemical containment buffer on the eastern edge of Block 6 to protect adjacent vegetation fields.";
-      } else if (lower.includes('harvest') || lower.includes('reschedule')) {
-        reply = "Harvest Scheduling Optimization: A 3-week delay in the harvest window shifts the yield curves. Recommended revised harvest sequence: 1. West Valley Plot (optimal maturity reached), 2. South Slope Plot, 3. East Ridge Plot (allow additional vegetative grand growth time).";
-      } else if (lower.includes('ndvi') || lower.includes('health')) {
-        reply = `The current satellite composite (${currentTimeline.label} via ${currentTimeline.satellite}) records a mean NDVI of ${currentTimeline.ndvi}. Plot ALPHA performs best at ${(currentTimeline.ndvi + 0.04).toFixed(2)}, while PLOT-BETA shows stress at ${(currentTimeline.ndvi - 0.15).toFixed(2)}.`;
-      } else if (lower.includes('moisture') || lower.includes('ndmi') || lower.includes('water')) {
-        reply = `For ${currentTimeline.label}, NDMI averages ${currentTimeline.ndmi}. This maps to a vegetation water demand of 64%. No critical drought zones are detected outside of East Ridge Plot.`;
-      } else if (lower.includes('plot') || lower.includes('alpha') || lower.includes('beta')) {
-        reply = `PLOT-ALPHA covers 12.5 HA of West Valley Plot and has a verification integrity of 98.4%. Soil nitrogen content is optimal at 0.52 GCVI index points.`;
-      } else if (lower.includes('climate') || lower.includes('weather') || lower.includes('rain')) {
-        reply = `A brief 4 mm precipitation event is expected within 48 hours. Relative humidity sits at 68% with mean temperature of 29.4°C — typical for this growth phase.`;
-      }
-      setChatMessages(prev => [...prev, { sender: 'assistant', text: reply }]);
-    }, 1200);
+    setChatLoading(true);
+    try {
+      const result = await api.queryAiAgent(query);
+      const reply = result?.response || "No response from AI agent.";
+      setChatMessages(prev => [...prev, { sender: 'assistant', text: reply, sources: result?.sources }]);
+    } catch (err) {
+      setChatMessages(prev => [...prev, { sender: 'assistant', text: "Sorry, the AI assistant is unavailable right now. Please try again." }]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -3523,8 +3067,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 text-gray-900 font-sans antialiased animate-in fade-in duration-300 overflow-hidden">
-
+    <div className="h-screen flex flex-col bg-gray-50 text-gray-900 font-sans antialiased overflow-hidden">
       {/* ── TOP HEADER BAR ─────────────────────────────────────────────────── */}
       <header className="h-[72px] bg-white border-b border-gray-100 flex items-center justify-between px-8 z-[100] shadow-sm shrink-0">
 
@@ -3582,7 +3125,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-white animate-pulse" style={{ backgroundColor: '#EF4444' }}></span>
             </button>
             {showNotifications && (
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[500] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[500] overflow-hidden">
                 <div className="px-4 py-3.5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                   <div className="text-xs font-black uppercase tracking-wider text-gray-700">Live Alerts Feed</div>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${brandingMode === 'AM' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>3 Active</span>
@@ -3592,14 +3135,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <span className="w-2 h-2 rounded-full bg-red-500 mt-1.5 shrink-0 animate-ping" />
                     <div>
                       <div className="text-[11px] font-bold text-gray-900">Critical Waterlogging Alert</div>
-                      <div className="text-[10px] text-gray-400 mt-0.5">Plot Beta (East Ridge Plot) registers high anomaly score.</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">One or more plots register elevated anomaly scores.</div>
                     </div>
                   </div>
                   <div className="p-3 hover:bg-gray-50 transition-colors flex gap-2.5">
                     <span className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 shrink-0" />
                     <div>
                       <div className="text-[11px] font-bold text-gray-900">NDVI Decline Flag</div>
-                      <div className="text-[10px] text-gray-400 mt-0.5">West Valley Plot has dropped 8% below baseline average.</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">One or more plots have dropped below baseline NDVI average.</div>
                     </div>
                   </div>
                   <div className="p-3 hover:bg-gray-50 transition-colors flex gap-2.5">
@@ -3629,7 +3172,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               </div>
             </button>
             {showUserMenu && (
-              <div className="absolute right-0 top-full mt-2.5 w-64 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[500] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute right-0 top-full mt-2.5 w-64 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[500] overflow-hidden">
                 <div className="p-4 bg-gray-50/50 flex flex-col items-center text-center border-b border-gray-100">
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-white text-xl shadow-md mb-2.5" style={{ backgroundColor: brandingMode === 'AM' ? '#16A34A' : '#2563EB' }}>
                     {brandingMode === 'AM' ? 'AM' : 'FT'}
@@ -3821,7 +3364,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               { id: 'soil-nutrients', label: 'Soil & Nutrients', icon: <Sun size={15} /> },
             ];
             return (
-              <div className="p-10 space-y-10 animate-in fade-in duration-300">
+              <div className="p-10 space-y-10">
                 {/* Page header */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                   <div>
@@ -3833,7 +3376,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <div className="bg-white px-5 py-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 shrink-0">
                     <CalendarIcon size={16} className="text-green-600" />
                     <span className="text-sm font-bold text-gray-700">
-                      Date last update: {currentTimeline.label}
+                      Date last update: {currentTimeline?.label ?? '—'}
                     </span>
                   </div>
                 </div>
@@ -3877,14 +3420,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         onChange={e => handleEstateChange(e.target.value)}
                         className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
                       >
-                        <option value="All">All Estates</option>
-                        <option value="West Valley Estate">West Valley Estate</option>
-                        <option value="East Ridge Estate">East Ridge Estate</option>
-                        <option value="South Slope Estate">South Slope Estate</option>
+                        <option value="All">All Farms</option>
+                        {[...new Set(plotsData.map(p => p.subfarm).filter(Boolean))].map(sf => (
+                          <option key={sf} value={sf}>{sf}</option>
+                        ))}
                       </select>
                     </div>
 
-                    {/* Plot Filter */}
+                    {/* Plot Filter — populated from real plot IDs */}
                     <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
                       <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-wider">Plot</span>
                       <select
@@ -3893,9 +3436,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
                       >
                         <option value="All">All Plots</option>
-                        <option value="PLOT-ALPHA">West Valley Plot (PLOT-ALPHA)</option>
-                        <option value="PLOT-BETA">East Ridge Plot (PLOT-BETA)</option>
-                        <option value="PLOT-GAMMA">South Slope Plot (PLOT-GAMMA)</option>
+                        {plotsData.slice(0, 50).map(p => (
+                          <option key={p.id} value={p.id}>{p.id}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -3928,7 +3471,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* Subpage Contents */}
                 {activeAnalyticsSubpage === 'overview' && (
-                  <div className="space-y-10 animate-in fade-in duration-200">
+                  <div className="space-y-10">
                     {/* KPI Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                       {[
@@ -4033,7 +3576,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 )}
 
                 {activeAnalyticsSubpage === 'vigor-health' && (
-                  <div className="space-y-10 animate-in fade-in duration-200">
+                  <div className="space-y-10">
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                       {/* Crop Yield & Health Trends */}
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
@@ -4111,7 +3654,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 )}
 
                 {activeAnalyticsSubpage === 'moisture-et' && (
-                  <div className="space-y-10 animate-in fade-in duration-200">
+                  <div className="space-y-10">
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                       {/* ET Time Series Chart */}
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
@@ -4206,13 +3749,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           </thead>
                           <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
                             {[
-                              { date: 'May 30', eto: '4.8', kc: '0.95', etc: '4.56', eta: filterPlot === 'PLOT-BETA' ? '2.50' : '4.40', deficit: filterPlot === 'PLOT-BETA' ? '2.06' : '0.16', sm: filterPlot === 'PLOT-BETA' ? '32%' : '44%' },
-                              { date: 'May 29', eto: '5.0', kc: '0.95', etc: '4.75', eta: filterPlot === 'PLOT-BETA' ? '2.40' : '4.60', deficit: filterPlot === 'PLOT-BETA' ? '2.35' : '0.15', sm: filterPlot === 'PLOT-BETA' ? '33%' : '45%' },
-                              { date: 'May 28', eto: '4.7', kc: '0.95', etc: '4.46', eta: filterPlot === 'PLOT-BETA' ? '2.30' : '4.35', deficit: filterPlot === 'PLOT-BETA' ? '2.16' : '0.11', sm: filterPlot === 'PLOT-BETA' ? '35%' : '47%' },
-                              { date: 'May 27', eto: '4.9', kc: '0.95', etc: '4.65', eta: filterPlot === 'PLOT-BETA' ? '2.50' : '4.55', deficit: filterPlot === 'PLOT-BETA' ? '2.15' : '0.10', sm: filterPlot === 'PLOT-BETA' ? '37%' : '48%' },
-                              { date: 'May 26', eto: '4.6', kc: '0.95', etc: '4.37', eta: filterPlot === 'PLOT-BETA' ? '2.60' : '4.25', deficit: filterPlot === 'PLOT-BETA' ? '1.77' : '0.12', sm: filterPlot === 'PLOT-BETA' ? '38%' : '49%' },
-                              { date: 'May 25', eto: '4.5', kc: '0.95', etc: '4.27', eta: filterPlot === 'PLOT-BETA' ? '2.70' : '4.20', deficit: filterPlot === 'PLOT-BETA' ? '1.57' : '0.07', sm: filterPlot === 'PLOT-BETA' ? '40%' : '51%' },
-                              { date: 'May 24', eto: '4.4', kc: '0.95', etc: '4.18', eta: filterPlot === 'PLOT-BETA' ? '2.80' : '4.10', deficit: filterPlot === 'PLOT-BETA' ? '1.38' : '0.08', sm: filterPlot === 'PLOT-BETA' ? '41%' : '52%' }
+                              { date: 'May 30', eto: '—', kc: '—', etc: '—', eta: '—', deficit: '—', sm: '—' },
+                              { date: 'May 29', eto: '—', kc: '—', etc: '—', eta: '—', deficit: '—', sm: '—' },
+                              { date: 'May 28', eto: '—', kc: '—', etc: '—', eta: '—', deficit: '—', sm: '—' },
+                              { date: 'May 27', eto: '—', kc: '—', etc: '—', eta: '—', deficit: '—', sm: '—' },
+                              { date: 'May 26', eto: '—', kc: '—', etc: '—', eta: '—', deficit: '—', sm: '—' },
+                              { date: 'May 25', eto: '—', kc: '—', etc: '—', eta: '—', deficit: '—', sm: '—' },
+                              { date: 'May 24', eto: '—', kc: '—', etc: '—', eta: '—', deficit: '—', sm: '—' }
                             ].map((row, idx) => (
                               <tr key={idx} className="hover:bg-gray-50/50">
                                 <td className="py-3 px-4 font-bold">{row.date}</td>
@@ -4236,7 +3779,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 )}
 
                 {activeAnalyticsSubpage === 'soil-nutrients' && (
-                  <div className="space-y-10 animate-in fade-in duration-200">
+                  <div className="space-y-10">
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                       {/* Nutrient Profiling (Radar) */}
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5 xl:col-span-1">
@@ -4265,11 +3808,11 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           <div className="space-y-3">
                             <h4 className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">Diagnostic Metrics</h4>
                             {[
-                              { name: 'Soil pH', value: filterPlot === 'PLOT-BETA' ? '5.4 (Strongly Acidic)' : '6.5 (Optimal)', status: filterPlot === 'PLOT-BETA' ? 'Warning' : 'Good', color: filterPlot === 'PLOT-BETA' ? 'text-yellow-600' : 'text-green-600' },
-                              { name: 'Organic Carbon', value: filterPlot === 'PLOT-BETA' ? '1.1% (Low)' : '2.4% (Healthy)', status: filterPlot === 'PLOT-BETA' ? 'Warning' : 'Good', color: filterPlot === 'PLOT-BETA' ? 'text-yellow-600' : 'text-green-600' },
-                              { name: 'Total Nitrogen (N)', value: filterPlot === 'PLOT-BETA' ? '0.08% (Deficient)' : '0.18% (Adequate)', status: filterPlot === 'PLOT-BETA' ? 'Critical' : 'Good', color: filterPlot === 'PLOT-BETA' ? 'text-red-600' : 'text-green-600' },
-                              { name: 'Available Phosphorus (P)', value: '14 ppm (Moderate)', status: 'Warning', color: 'text-yellow-600' },
-                              { name: 'Exchangeable Potassium (K)', value: '185 ppm (High)', status: 'Good', color: 'text-green-600' }
+                              { name: 'Soil pH', value: '—', status: '—', color: 'text-gray-500' },
+                              { name: 'Organic Carbon', value: '—', status: '—', color: 'text-gray-500' },
+                              { name: 'Total Nitrogen (N)', value: '—', status: '—', color: 'text-gray-500' },
+                              { name: 'Available Phosphorus (P)', value: '—', status: '—', color: 'text-gray-500' },
+                              { name: 'Exchangeable Potassium (K)', value: '—', status: '—', color: 'text-gray-500' }
                             ].map((item, idx) => (
                               <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                                 <span className="text-xs font-bold text-gray-500">{item.name}</span>
@@ -4282,29 +3825,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           <div className="space-y-3">
                             <h4 className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">Agronomic Recommendations</h4>
                             <div className="bg-green-50/50 border border-green-100 p-4 rounded-xl space-y-3">
-                              {filterPlot === 'PLOT-BETA' ? (
-                                <>
-                                  <p className="text-xs text-green-800 leading-relaxed font-semibold">
-                                    🔴 <span className="font-bold text-red-700">Acidic soil and low nitrogen detected:</span>
-                                  </p>
-                                  <ul className="text-xs text-green-700 space-y-2 font-medium list-disc pl-4">
-                                    <li>Apply 2.5 tons/ha of calcitic agricultural limestone to buffer pH to 6.2.</li>
-                                    <li>Inject urea or ammonium sulfate split doses (+45 kg N/ha) during early vegetative growth.</li>
-                                    <li>Establish mucuna cover crop in inter-rows to capture atmospheric nitrogen.</li>
-                                  </ul>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-xs text-green-800 leading-relaxed font-semibold">
-                                    🟢 <span className="font-bold text-green-800">Soil profiles are highly stable:</span>
-                                  </p>
-                                  <ul className="text-xs text-green-700 space-y-2 font-medium list-disc pl-4">
-                                    <li>Maintain current cover cropping cycles to preserve organic carbon levels.</li>
-                                    <li>Apply routine maintenance doses of nitrogen-phosphorus blends before the rainy season.</li>
-                                    <li>Monitor soil pH bi-annually.</li>
-                                  </ul>
-                                </>
-                              )}
+                              <p className="text-xs text-gray-500 font-semibold leading-relaxed">
+                                Soil chemistry data not yet connected. Upload soil sample results to generate agronomic recommendations for this plot.
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -4327,14 +3850,17 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
-                  <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
+                  <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-          {currentTileUrl && activePlotBounds && (
-            <ImageOverlay
+          {showRasterLayer && currentTileUrl && (
+            <TileLayer
+              key={currentTileUrl}
               url={currentTileUrl}
-              bounds={activePlotBounds}
               opacity={mapOpacity / 100}
+              bounds={rasterOverlayBounds || undefined}
+              maxZoom={22}
+              maxNativeZoom={18}
             />
           )}
                     
@@ -4356,6 +3882,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     ) : (
                       renderIntelPolygons(plotsData)
                     )}
+                    {null}
+                    <FitBoundsToPlots plotsData={plotsData} farmBoundary={farmBoundary} />
+                    <FitToZarrBounds zarrBounds={zarrBounds} />
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={intelShowLayers} />
                   </MapContainer>
@@ -4413,6 +3942,33 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         </div>
                         {intelOpExpanded && (
                           <div className="space-y-3">
+                            {/* Satellite Index Raster Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Satellite Index Raster</div>
+                              <span className="text-[10px] text-gray-400">Raw pixel layer from zarr</span>
+                            </div>
+                            <button
+                              onClick={() => setShowRasterLayer(!showRasterLayer)}
+                              className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0"
+                              style={{ backgroundColor: showRasterLayer ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${showRasterLayer ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </button>
+                          </div>
+                          {showRasterLayer && (
+                            <div className="space-y-2 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{mapOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={mapOpacity}
+                                onChange={e => setMapOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                            </div>
+                          )}
+                        </div>
                             {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
@@ -4448,343 +4004,129 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </div>
                           )}
                         </div>
-
-                        {/* Growth Stage Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Growth Stage {renderInfoTooltip("Growth Stage")}</div>
-                              <span className="text-[10px] text-gray-400">Crop development cycle</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('growth')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowGrowth ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowGrowth ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowGrowth ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {intelShowGrowth && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelGrowthOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelGrowthOpacity}
-                                onChange={e => setIntelGrowthOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Tillering', color: '#86efac' },
-                                  { label: 'Grand Growth', color: '#15803d' },
-                                  { label: 'Maturation', color: '#fbbf24' },
-                                  { label: 'Harvest Ready', color: '#ea580c' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
                           </div>
                         )}
                       </div>
-
-                      {/* BIOPHYSICAL SECTION */}
                       <div className="space-y-3">
-
-                        <div 
+                        <div
                           onClick={() => setIntelBioExpanded(!intelBioExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {intelBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical
+                          {intelBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical Indices
                         </div>
                         {intelBioExpanded && (
                           <div className="space-y-3">
-                            {/* EVI (Vegetation Vigor) Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">EVI (Vegetation Vigor) {renderInfoTooltip("EVI (Vegetation Vigor)")}</div>
-                              <span className="text-[10px] text-gray-400">Crop biomass density</span>
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Growth Stage {renderInfoTooltip("Growth Stage")}</div><span className="text-[10px] text-gray-400">Crop phenology classification</span></div>
+                            <button onClick={() => setIntelShowGrowth(!intelShowGrowth)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowGrowth ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowGrowth ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {intelShowGrowth && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Germination</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Vegetative</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Flowering</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Fruiting</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Maturity</span></div>
                             </div>
-                            <button
-                              onClick={() => handleIntelToggle('evi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowEvi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowEvi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowEvi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">EVI {renderInfoTooltip("EVI")}</div><span className="text-[10px] text-gray-400">Enhanced Vegetation Index</span></div>
+                            <button onClick={() => setIntelShowEvi(!intelShowEvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowEvi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowEvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {intelShowEvi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelEviOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelEviOpacity}
-                                onChange={e => setIntelEviOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Exceptional (>0.8)', color: '#14532D' },
-                                  { label: 'Optimal (0.7–0.8)', color: '#16A34A' },
-                                  { label: 'Moderate (0.55–0.7)', color: '#86EFAC' },
-                                  { label: 'Transition (0.45–0.55)', color: '#EAB308' },
-                                  { label: 'Deficit (<=0.45)', color: '#EF4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High (0.7–1.0)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.5–0.7)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.3–0.5)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Stressed ({'<'}0.3)</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* LSWI (Water Status) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LSWI (Water Status) {renderInfoTooltip("LSWI (Water Status)")}</div>
-                              <span className="text-[10px] text-gray-400">Canopy moisture index</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('lswi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowLswi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowLswi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowLswi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LSWI {renderInfoTooltip("LSWI")}</div><span className="text-[10px] text-gray-400">Land Surface Water Index</span></div>
+                            <button onClick={() => setIntelShowLswi(!intelShowLswi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowLswi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowLswi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {intelShowLswi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelLswiOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelLswiOpacity}
-                                onChange={e => setIntelLswiOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Waterlogged (>0.5)', color: '#1E3A8A' },
-                                  { label: 'Adequate (0.42–0.5)', color: '#2563EB' },
-                                  { label: 'Moderate (0.35–0.42)', color: '#60A5FA' },
-                                  { label: 'Mild Stress (0.28–0.35)', color: '#F59E0B' },
-                                  { label: 'Severe Stress (<=0.28)', color: '#DC2626' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Wet (0.5–0.8)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moist (0.2–0.5)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (-0.1 to 0.2)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Very Dry (&lt;-0.1)</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Canopy Closure (CVI) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Canopy Closure (CVI) {renderInfoTooltip("Canopy Closure (CVI)")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Foliage coverage density</span>
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">VHI {renderInfoTooltip("VHI")}</div><span className="text-[10px] text-gray-400">Vegetation Health Index</span></div>
+                            <button onClick={() => setIntelShowVhi(!intelShowVhi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowVhi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowVhi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {intelShowVhi && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">No Stress (&gt;=60)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Mild (40-60)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (20-40)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Severe ({'<'}20)</span></div>
                             </div>
-                            <button
-                              onClick={() => handleIntelToggle('cvi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowCvi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowCvi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowCvi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">CVI {renderInfoTooltip("CVI")}</div><span className="text-[10px] text-gray-400">Chlorophyll Vegetation Index</span></div>
+                            <button onClick={() => setIntelShowCvi(!intelShowCvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowCvi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowCvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {intelShowCvi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelCviOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelCviOpacity}
-                                onChange={e => setIntelCviOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High closure (>85%)', color: '#15803d' },
-                                  { label: 'Good (70-85%)', color: '#22c55e' },
-                                  { label: 'Low (<70%)', color: '#eab308' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#166534'}}/><span className="text-[10px] font-semibold text-gray-500">Dense (&gt;3.0)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#22c55e'}}/><span className="text-[10px] font-semibold text-gray-500">Good (2.0-3.0)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (1.0-2.0)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#ef4444'}}/><span className="text-[10px] font-semibold text-gray-500">Poor ({'<'}1.0)</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Leaf Chlorophyll Density (CAR/RECI) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Leaf Chlorophyll Density (CAR/RECI) {renderInfoTooltip("Leaf Chlorophyll Density (CAR/RECI)")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Nitrogen & chlorophyll concentration</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('car')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowCar ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowCar ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowCar ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDRE {renderInfoTooltip("NDRE")}</div><span className="text-[10px] text-gray-400">Normalized Difference Red Edge</span></div>
+                            <button onClick={() => setIntelShowNdre(!intelShowNdre)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowNdre ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowNdre ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
-                          {intelShowCar && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelCarOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelCarOpacity}
-                                onChange={e => setIntelCarOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High concentration', color: '#15803d' },
-                                  { label: 'Optimal', color: '#22c55e' },
-                                  { label: 'Deficient', color: '#eab308' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                          {intelShowNdre && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High N (&gt;0.5)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Good N (0.3-0.5)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low N (0.1-0.3)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Deficient ({'<'}0.1)</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Radar Canopy Structure (DpRVI) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Radar Canopy Structure (DpRVI) {renderInfoTooltip("Radar Canopy Structure (DpRVI)")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Volumetric microwave backscatter</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('dprvi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowDprvi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowDprvi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowDprvi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">WDI {renderInfoTooltip("WDI")}</div><span className="text-[10px] text-gray-400">Water Deficit Index</span></div>
+                            <button onClick={() => setIntelShowWdi(!intelShowWdi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowWdi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowWdi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
-                          {intelShowDprvi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelDprviOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelDprviOpacity}
-                                onChange={e => setIntelDprviOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High structural complexity', color: '#15803d' },
-                                  { label: 'Moderate', color: '#eab308' },
-                                  { label: 'Low vegetation', color: '#0284c7' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Radar Vegetation Index (RVI) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Radar Vegetation Index (RVI) {renderInfoTooltip("Radar Vegetation Index (RVI)")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Volumetric canopy volume scattering</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('rvi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowRvi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowRvi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowRvi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {intelShowRvi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelRviOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelRviOpacity}
-                                onChange={e => setIntelRviOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Dense Canopy (>0.70)', color: '#14532D' },
-                                  { label: 'Healthy (0.50–0.70)', color: '#16A34A' },
-                                  { label: 'Moderate (0.30–0.50)', color: '#86EFAC' },
-                                  { label: 'Sparse (0.15–0.30)', color: '#EAB308' },
-                                  { label: 'Bare / Very Sparse (<0.15)', color: '#EF4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                          {intelShowWdi && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Well-watered (0.0-0.2)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Mild stress (0.2-0.4)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.4-0.7)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Severe (0.7-1.0)</span></div>
                             </div>
                           )}
                         </div>
                           </div>
                         )}
-                      </div>
-
-                      {/* MONITORING SECTION */}
-                      <div className="space-y-3">
-
-                        <div 
+                      </div>                      <div className="space-y-3">
+                        <div
                           onClick={() => setIntelMonExpanded(!intelMonExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
@@ -4792,265 +4134,63 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         </div>
                         {intelMonExpanded && (
                           <div className="space-y-3">
-                            {/* VHI (Stress) Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">VHI (Stress) {renderInfoTooltip("VHI (Stress)")}</div>
-                              <span className="text-[10px] text-gray-400">Vegetation Health Index</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('vhi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowVhi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowVhi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowVhi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">DPRVI {renderInfoTooltip("DPRVI")}</div><span className="text-[10px] text-gray-400">Dual-Pol Radar Vegetation Index</span></div>
+                            <button onClick={() => setIntelShowDprvi(!intelShowDprvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowDprvi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowDprvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
-                          {intelShowVhi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelVhiOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelVhiOpacity}
-                                onChange={e => setIntelVhiOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Exceptional (>0.8)', color: '#14532D' },
-                                  { label: 'Optimal (0.7–0.8)', color: '#16A34A' },
-                                  { label: 'Moderate (0.55–0.7)', color: '#86EFAC' },
-                                  { label: 'Transition (0.45–0.55)', color: '#EAB308' },
-                                  { label: 'Deficit (<=0.45)', color: '#EF4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                          {intelShowDprvi && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Mature (&gt;0.6)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Growing (0.4-0.6)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Sprouting (0.2-0.4)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Bare ({'<'}0.2)</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Planting Suitability Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Planting Suitability {renderInfoTooltip("Planting Suitability")}</div>
-                              <span className="text-[10px] text-gray-400">Optimal cultivation conditions</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('suitability')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowSuitability ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowSuitability ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowSuitability ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">RVI {renderInfoTooltip("RVI")}</div><span className="text-[10px] text-gray-400">Radar Vegetation Index</span></div>
+                            <button onClick={() => setIntelShowRvi(!intelShowRvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowRvi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowRvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
-                          {intelShowSuitability && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelSuitabilityOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelSuitabilityOpacity}
-                                onChange={e => setIntelSuitabilityOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Suitable', color: '#16a34a' },
-                                  { label: 'Unsuitable', color: '#dc2626' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                          {intelShowRvi && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High (&gt;0.7)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.4-0.7)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.2-0.4)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Very Low ({'<'}0.2)</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Early Stress Detection (NDRE) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Early Stress Detection (NDRE) {renderInfoTooltip("Early Stress Detection (NDRE)")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Red-edge band early stress signature</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('ndre')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowNdre ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowNdre ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowNdre ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {intelShowNdre && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelNdreOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelNdreOpacity}
-                                onChange={e => setIntelNdreOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Healthy', color: '#15803d' },
-                                  { label: 'Mild Stress', color: '#eab308' },
-                                  { label: 'Severe stress warning', color: '#ef4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Crop Water Stress (WDI) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Crop Water Stress (WDI) {renderInfoTooltip("Crop Water Stress (WDI)")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Thermal-optical water deficit index</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('wdi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowWdi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowWdi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowWdi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {intelShowWdi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelWdiOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelWdiOpacity}
-                                onChange={e => setIntelWdiOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Waterlogged', color: '#1E3A8A' },
-                                  { label: 'Adequate moisture', color: '#2563eb' },
-                                  { label: 'Deficit stress', color: '#ea580c' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* SAR Flood Mask Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">SAR Flood Mask {renderInfoTooltip("SAR Flood Mask")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Sentinel-1 radar standing water mapping</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('flood')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowFlood ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowFlood ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowFlood ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Flood Risk {renderInfoTooltip("Flood Risk")}</div><span className="text-[10px] text-gray-400">Surface inundation risk</span></div>
+                            <button onClick={() => setIntelShowFlood(!intelShowFlood)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowFlood ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowFlood ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {intelShowFlood && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelFloodOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelFloodOpacity}
-                                onChange={e => setIntelFloodOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Flooded / Waterlogged', color: '#1e3a8a' },
-                                  { label: 'Dry Surface', color: 'transparent' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0 border border-gray-200" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">High Risk</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Risk</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low Risk</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">No Risk</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* UAS Spatial Anomaly Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">UAS Spatial Anomaly {renderInfoTooltip("UAS Spatial Anomaly")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">UAS high resolution drone stress map</span>
-                            </div>
-                            <button
-                              onClick={() => handleIntelToggle('uas')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                intelShowUas ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: intelShowUas ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                intelShowUas ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">UAS Anomaly {renderInfoTooltip("UAS Anomaly")}</div><span className="text-[10px] text-gray-400">Drone-detected anomalies</span></div>
+                            <button onClick={() => setIntelShowUas(!intelShowUas)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowUas ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: intelShowUas ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {intelShowUas && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{intelUasOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={intelUasOpacity}
-                                onChange={e => setIntelUasOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High Anomaly / Stress', color: '#dc2626' },
-                                  { label: 'Normal / Healthy', color: 'transparent' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0 border border-gray-200" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">High Anomaly</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Anomaly</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Normal</span></div>
                             </div>
                           )}
                         </div>
@@ -5064,20 +4204,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               </div>
 
               {/* ══ BOTTOM PANEL ══ */}
-              {renderMapBottomPanel(
-                intelShowSuitability ? 'Planting Suitability' :
-                intelShowVhi ? 'VHI (Stress)' :
-                intelShowLswi ? 'LSWI (Water Status)' :
-                intelShowEvi ? 'EVI (Vegetation Vigor)' :
-                intelShowGrowth ? 'Growth Stage' :
-                intelShowCvi ? 'Canopy Closure (CVI)' :
-                intelShowCar ? 'Leaf Chlorophyll Density (CAR/RECI)' :
-                intelShowNdre ? 'Early Stress Detection (NDRE)' :
-                intelShowWdi ? 'Crop Water Stress (WDI)' :
-                intelShowDprvi ? 'Radar Canopy Structure (DpRVI)' : 'No Active Layer',
-                null,
-                true
-              )}
+              {renderMapBottomPanel(selectedIndex, null, false)}
             </div>
           )}
 
@@ -5089,14 +4216,17 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
-                  <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
+                  <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-          {currentTileUrl && activePlotBounds && (
-            <ImageOverlay
+          {showRasterLayer && currentTileUrl && (
+            <TileLayer
+              key={currentTileUrl}
               url={currentTileUrl}
-              bounds={activePlotBounds}
               opacity={mapOpacity / 100}
+              bounds={rasterOverlayBounds || undefined}
+              maxZoom={22}
+              maxNativeZoom={18}
             />
           )}
                     
@@ -5118,6 +4248,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     ) : (
                       renderHealthPolygons(healthPlotsData)
                     )}
+                    {null}
+                    <FitBoundsToPlots plotsData={plotsData} farmBoundary={farmBoundary} />
+                    <FitToZarrBounds zarrBounds={zarrBounds} />
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={healthShowLayers} />
                   </MapContainer>
@@ -5175,6 +4308,33 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         </div>
                         {healthOpExpanded && (
                           <div className="space-y-3">
+                            {/* Satellite Index Raster Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Satellite Index Raster</div>
+                              <span className="text-[10px] text-gray-400">Raw pixel layer from zarr</span>
+                            </div>
+                            <button
+                              onClick={() => setShowRasterLayer(!showRasterLayer)}
+                              className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0"
+                              style={{ backgroundColor: showRasterLayer ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${showRasterLayer ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </button>
+                          </div>
+                          {showRasterLayer && (
+                            <div className="space-y-2 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{mapOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={mapOpacity}
+                                onChange={e => setMapOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                            </div>
+                          )}
+                        </div>
                             {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
@@ -5213,301 +4373,114 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           </div>
                         )}
                       </div>
-
-                      {/* BIOPHYSICAL HEALTH SECTION */}
                       <div className="space-y-3">
-
-                        <div 
+                        <div
                           onClick={() => setHealthBioExpanded(!healthBioExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {healthBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical Health
+                          {healthBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical
                         </div>
                         {healthBioExpanded && (
                           <div className="space-y-3">
-                            {/* NDVI Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Vegetation Health {renderInfoTooltip("Vegetation Health")}</div>
-                              <span className="text-[10px] text-gray-400">Chlorophyll absorption density</span>
-                            </div>
-                            <button
-                              onClick={() => handleHealthToggle('ndvi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                healthShowNdvi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: healthShowNdvi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                healthShowNdvi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDVI {renderInfoTooltip("NDVI")}</div><span className="text-[10px] text-gray-400">Normalized Difference Vegetation Index</span></div>
+                            <button onClick={() => setHealthShowNdvi(!healthShowNdvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowNdvi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: healthShowNdvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {healthShowNdvi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{healthNdviOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={healthNdviOpacity}
-                                onChange={e => setHealthNdviOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Exceptional (>0.8)', color: '#14532D' },
-                                  { label: 'Optimal (0.7–0.8)', color: '#16A34A' },
-                                  { label: 'Moderate (0.55–0.7)', color: '#86EFAC' },
-                                  { label: 'Transition (0.45–0.55)', color: '#EAB308' },
-                                  { label: 'Deficit (<=0.45)', color: '#EF4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High (0.7-1.0)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.5-0.7)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.3-0.5)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Stressed ({'<'}0.3)</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Chlorophyll Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Chlorophyll VCI {renderInfoTooltip("Chlorophyll VCI")}</div>
-                              <span className="text-[10px] text-gray-400">Leaf nitrogen index</span>
-                            </div>
-                            <button
-                              onClick={() => handleHealthToggle('chlorophyll')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                healthShowChlorophyll ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: healthShowChlorophyll ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                healthShowChlorophyll ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Chlorophyll {renderInfoTooltip("Chlorophyll")}</div><span className="text-[10px] text-gray-400">Canopy chlorophyll content</span></div>
+                            <button onClick={() => setHealthShowChlorophyll(!healthShowChlorophyll)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowChlorophyll ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: healthShowChlorophyll ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {healthShowChlorophyll && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{healthChlorophyllOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={healthChlorophyllOpacity}
-                                onChange={e => setHealthChlorophyllOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Exceptional (>0.8)', color: '#14532D' },
-                                  { label: 'Optimal (0.7–0.8)', color: '#16A34A' },
-                                  { label: 'Moderate (0.55–0.7)', color: '#86EFAC' },
-                                  { label: 'Transition (0.45–0.55)', color: '#EAB308' },
-                                  { label: 'Deficit (<=0.45)', color: '#EF4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#166534'}}/><span className="text-[10px] font-semibold text-gray-500">High</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#22c55e'}}/><span className="text-[10px] font-semibold text-gray-500">Good</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#ef4444'}}/><span className="text-[10px] font-semibold text-gray-500">Low</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Red-Edge NDVI (NDRE) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Red-Edge NDVI (NDRE) {renderInfoTooltip("Red-Edge NDVI (NDRE)")}</div>
-                              <span className="text-[10px] text-gray-400">Early stress vegetation index</span>
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Water Stress {renderInfoTooltip("Water Stress")}</div><span className="text-[10px] text-gray-400">Crop water stress level</span></div>
+                            <button onClick={() => setHealthShowWater(!healthShowWater)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowWater ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: healthShowWater ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {healthShowWater && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">No Stress</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Mild</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Severe</span></div>
                             </div>
-                            <button
-                              onClick={() => handleHealthToggle('ndre')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                healthShowNdre ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: healthShowNdre ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                healthShowNdre ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDRE {renderInfoTooltip("NDRE")}</div><span className="text-[10px] text-gray-400">Red Edge nitrogen status</span></div>
+                            <button onClick={() => setHealthShowNdre(!healthShowNdre)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowNdre ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: healthShowNdre ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {healthShowNdre && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{healthNdreOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={healthNdreOpacity}
-                                onChange={e => setHealthNdreOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Healthy', color: '#15803d' },
-                                  { label: 'Mild Stress', color: '#eab308' },
-                                  { label: 'Severe Stress Warning', color: '#ef4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High N (&gt;0.5)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Good N (0.3-0.5)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low N (0.1-0.3)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Deficient ({'<'}0.1)</span></div>
                             </div>
                           )}
                         </div>
                           </div>
                         )}
-                      </div>
-
-                      {/* MONITORING & RISK SECTION */}
-                      <div className="space-y-3">
-
-                        <div 
+                      </div>                      <div className="space-y-3">
+                        <div
                           onClick={() => setHealthMonExpanded(!healthMonExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {healthMonExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Monitoring & Risk
+                          {healthMonExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Monitoring
                         </div>
                         {healthMonExpanded && (
                           <div className="space-y-3">
-                            {/* Water Stress Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Water Stress (NDMI) {renderInfoTooltip("Water Stress (NDMI)")}</div>
-                              <span className="text-[10px] text-gray-400">Canopy water content</span>
-                            </div>
-                            <button
-                              onClick={() => handleHealthToggle('water')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                healthShowWater ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: healthShowWater ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                healthShowWater ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {healthShowWater && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{healthWaterOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={healthWaterOpacity}
-                                onChange={e => setHealthWaterOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Waterlogged (>0.5)', color: '#1E3A8A' },
-                                  { label: 'Adequate (0.42–0.5)', color: '#2563EB' },
-                                  { label: 'Moderate (0.35–0.42)', color: '#60A5FA' },
-                                  { label: 'Mild Stress (0.28–0.35)', color: '#F59E0B' },
-                                  { label: 'Severe Stress (<=0.28)', color: '#DC2626' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Pest Risk Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Pest Risk (Inundation) {renderInfoTooltip("Pest Risk (Inundation)")}</div>
-                              <span className="text-[10px] text-gray-400">Vulnerability warning</span>
-                            </div>
-                            <button
-                              onClick={() => handleHealthToggle('pest')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                healthShowPest ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: healthShowPest ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                healthShowPest ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {healthShowPest && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{healthPestOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={healthPestOpacity}
-                                onChange={e => setHealthPestOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High Risk', color: '#ef4444' },
-                                  { label: 'Moderate Risk', color: '#f97316' },
-                                  { label: 'Low Risk', color: '#16a34a' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* SAR Soil Moisture (SMI) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">SAR Soil Moisture (SMI) {renderInfoTooltip("SAR Soil Moisture (SMI)")}</div>
-                              <span className="text-[10px] text-gray-400">Volumetric soil moisture changes</span>
-                            </div>
-                            <button
-                              onClick={() => handleHealthToggle('smi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                healthShowSmi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: healthShowSmi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                healthShowSmi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">SMI {renderInfoTooltip("SMI")}</div><span className="text-[10px] text-gray-400">Soil Moisture Index</span></div>
+                            <button onClick={() => setHealthShowSmi(!healthShowSmi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowSmi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: healthShowSmi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {healthShowSmi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{healthSmiOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={healthSmiOpacity}
-                                onChange={e => setHealthSmiOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Waterlogged (>+6 dB)', color: '#1E3A8A' },
-                                  { label: 'Adequate (+3 to +6 dB)', color: '#2563EB' },
-                                  { label: 'Slightly Moist (+1 to +3 dB)', color: '#60A5FA' },
-                                  { label: 'Near-Reference (-1 to +1 dB)', color: '#86EFAC' },
-                                  { label: 'Drying (-3 to -1 dB)', color: '#EAB308' },
-                                  { label: 'Severely Dry (<-3 dB)', color: '#DC2626' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Wet (0.7-1.0)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moist (0.4-0.7)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (0.2-0.4)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Drought ({'<'}0.2)</span></div>
+                            </div>
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Pest Risk {renderInfoTooltip("Pest Risk")}</div><span className="text-[10px] text-gray-400">Pest pressure assessment</span></div>
+                            <button onClick={() => setHealthShowPest(!healthShowPest)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowPest ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: healthShowPest ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {healthShowPest && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Low Risk</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Risk</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">High Risk</span></div>
                             </div>
                           )}
                         </div>
@@ -5521,14 +4494,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               </div>
 
               {/* ══ BOTTOM PANEL ══ */}
-              {renderMapBottomPanel(
-                healthShowPest ? 'Pest Risk' :
-                healthShowWater ? 'Water Stress' :
-                healthShowChlorophyll ? 'Chlorophyll' :
-                healthShowNdvi ? 'Vegetation Health' :
-                healthShowNdre ? 'Red-Edge NDVI (NDRE)' :
-                healthShowSmi ? 'SAR Soil Moisture (SMI)' : 'No Active Layer'
-              )}
+              {renderMapBottomPanel(selectedIndex)}
             </div>
           )}
 
@@ -5543,14 +4509,17 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
-                  <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
+                  <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-          {currentTileUrl && activePlotBounds && (
-            <ImageOverlay
+          {showRasterLayer && currentTileUrl && (
+            <TileLayer
+              key={currentTileUrl}
               url={currentTileUrl}
-              bounds={activePlotBounds}
               opacity={mapOpacity / 100}
+              bounds={rasterOverlayBounds || undefined}
+              maxZoom={22}
+              maxNativeZoom={18}
             />
           )}
                     
@@ -5572,6 +4541,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     ) : (
                       renderYieldPolygons(yieldPlotsData)
                     )}
+                    {null}
+                    <FitBoundsToPlots plotsData={plotsData} farmBoundary={farmBoundary} />
+                    <FitToZarrBounds zarrBounds={zarrBounds} />
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={yieldShowLayers} />
                   </MapContainer>
@@ -5629,6 +4601,33 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         </div>
                         {yieldOpExpanded && (
                           <div className="space-y-3">
+                            {/* Satellite Index Raster Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Satellite Index Raster</div>
+                              <span className="text-[10px] text-gray-400">Raw pixel layer from zarr</span>
+                            </div>
+                            <button
+                              onClick={() => setShowRasterLayer(!showRasterLayer)}
+                              className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0"
+                              style={{ backgroundColor: showRasterLayer ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${showRasterLayer ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </button>
+                          </div>
+                          {showRasterLayer && (
+                            <div className="space-y-2 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{mapOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={mapOpacity}
+                                onChange={e => setMapOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                            </div>
+                          )}
+                        </div>
                             {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
@@ -5667,207 +4666,84 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           </div>
                         )}
                       </div>
-
-                      {/* PRODUCTION SECTION */}
                       <div className="space-y-3">
-
-                        <div 
+                        <div
                           onClick={() => setYieldProdExpanded(!yieldProdExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {yieldProdExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Production Metrics
+                          {yieldProdExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Production
                         </div>
                         {yieldProdExpanded && (
                           <div className="space-y-3">
-                            {/* Est. Yield Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Estimated Yield Rate (t/HA) {renderInfoTooltip("Estimated Yield Rate (t/HA)")}</div>
-                              <span className="text-[10px] text-gray-400">Yield in Tonnes/HA</span>
-                            </div>
-                            <button
-                              onClick={() => handleYieldToggle('yield')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                yieldShowYield ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: yieldShowYield ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                yieldShowYield ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Yield Forecast {renderInfoTooltip("Yield Forecast")}</div><span className="text-[10px] text-gray-400">Predicted harvest volume</span></div>
+                            <button onClick={() => setYieldShowYield(!yieldShowYield)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: yieldShowYield ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: yieldShowYield ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {yieldShowYield && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{yieldYieldOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={yieldYieldOpacity}
-                                onChange={e => setYieldYieldOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (18t/HA+)', color: '#15803d' },
-                                  { label: 'Mid (12–18t/HA)', color: '#22c55e' },
-                                  { label: 'Low (8–12t/HA)', color: '#eab308' },
-                                  { label: 'High Stress (<8t/HA)', color: '#ef4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Good</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Average</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Below Average</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Biomass Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Dry Biomass Accumulation (kg/m²) {renderInfoTooltip("Dry Biomass Accumulation (kg/m²)")}</div>
-                              <span className="text-[10px] text-gray-400">Vegetation density mass</span>
-                            </div>
-                            <button
-                              onClick={() => handleYieldToggle('biomass')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                yieldShowBiomass ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: yieldShowBiomass ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                yieldShowBiomass ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Biomass {renderInfoTooltip("Biomass")}</div><span className="text-[10px] text-gray-400">Above-ground biomass (EVI-derived)</span></div>
+                            <button onClick={() => setYieldShowBiomass(!yieldShowBiomass)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: yieldShowBiomass ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: yieldShowBiomass ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {yieldShowBiomass && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{yieldBiomassOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={yieldBiomassOpacity}
-                                onChange={e => setYieldBiomassOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (2.0kg+)', color: '#15803d' },
-                                  { label: 'Mid (1.3–2.0kg)', color: '#22c55e' },
-                                  { label: 'Low (0.8–1.3kg)', color: '#eab308' },
-                                  { label: 'Critical (<0.8kg)', color: '#ef4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low</span></div>
+                            </div>
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Harvest Readiness {renderInfoTooltip("Harvest Readiness")}</div><span className="text-[10px] text-gray-400">Crop maturity status</span></div>
+                            <button onClick={() => setYieldShowReadiness(!yieldShowReadiness)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: yieldShowReadiness ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: yieldShowReadiness ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {yieldShowReadiness && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Ready to Harvest</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">2-4 Weeks</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Not Ready</span></div>
                             </div>
                           )}
                         </div>
                           </div>
                         )}
-                      </div>
-
-                      {/* STATUS SECTION */}
-                      <div className="space-y-3">
-
-                        <div 
+                      </div>                      <div className="space-y-3">
+                        <div
                           onClick={() => setYieldStatExpanded(!yieldStatExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {yieldStatExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Status & Conditions
+                          {yieldStatExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Statistics
                         </div>
                         {yieldStatExpanded && (
                           <div className="space-y-3">
-                            {/* Harvest Readiness Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Canopy Harvest Readiness (%) {renderInfoTooltip("Canopy Harvest Readiness (%)")}</div>
-                              <span className="text-[10px] text-gray-400">Maturity readiness ratio</span>
-                            </div>
-                            <button
-                              onClick={() => handleYieldToggle('readiness')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                yieldShowReadiness ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: yieldShowReadiness ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                yieldShowReadiness ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {yieldShowReadiness && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{yieldReadinessOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={yieldReadinessOpacity}
-                                onChange={e => setYieldReadinessOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Ready (85%+)', color: '#16a34a' },
-                                  { label: 'Pending (65–85%)', color: '#eab308' },
-                                  { label: 'Unready (<65%)', color: '#f97316' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Growth Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Growth Stage Mapping {renderInfoTooltip("Growth Stage Mapping")}</div>
-                              <span className="text-[10px] text-gray-400">VCI condition score</span>
-                            </div>
-                            <button
-                              onClick={() => handleYieldToggle('growth')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                yieldShowGrowth ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: yieldShowGrowth ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                yieldShowGrowth ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Growth Stage {renderInfoTooltip("Growth Stage")}</div><span className="text-[10px] text-gray-400">Phenological stage classification</span></div>
+                            <button onClick={() => setYieldShowGrowth(!yieldShowGrowth)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: yieldShowGrowth ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: yieldShowGrowth ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {yieldShowGrowth && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{yieldGrowthOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={yieldGrowthOpacity}
-                                onChange={e => setYieldGrowthOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (0.7+)', color: '#15803d' },
-                                  { label: 'Normal (0.55–0.7)', color: '#22c55e' },
-                                  { label: 'Stressed (0.4–0.55)', color: '#eab308' },
-                                  { label: 'Deficit (<0.4)', color: '#ef4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Germination</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Vegetative</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Flowering</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Fruiting</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Maturity</span></div>
                             </div>
                           )}
                         </div>
@@ -5881,12 +4757,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               </div>
 
               {/* ══ BOTTOM PANEL ══ */}
-              {renderMapBottomPanel(
-                yieldShowReadiness ? 'Canopy Harvest Readiness (%)' :
-                yieldShowGrowth ? 'Growth Stage Mapping' :
-                yieldShowBiomass ? 'Dry Biomass Accumulation (kg/m²)' :
-                yieldShowYield ? 'Estimated Yield Rate (t/HA)' : 'No Active Layer'
-              )}
+              {renderMapBottomPanel(selectedIndex)}
             </div>
           )}
 
@@ -5898,14 +4769,17 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
-                  <MapContainer center={[7.138, 3.356]} zoom={15} maxZoom={22}
+                  <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-          {currentTileUrl && activePlotBounds && (
-            <ImageOverlay
+          {showRasterLayer && currentTileUrl && (
+            <TileLayer
+              key={currentTileUrl}
               url={currentTileUrl}
-              bounds={activePlotBounds}
               opacity={mapOpacity / 100}
+              bounds={rasterOverlayBounds || undefined}
+              maxZoom={22}
+              maxNativeZoom={18}
             />
           )}
                     
@@ -5927,6 +4801,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     ) : (
                       renderRestorePolygons(restorationPlotsData)
                     )}
+                    {null}
+                    <FitBoundsToPlots plotsData={plotsData} farmBoundary={farmBoundary} />
+                    <FitToZarrBounds zarrBounds={zarrBounds} />
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={restoreShowLayers} />
                   </MapContainer>
@@ -5984,6 +4861,33 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         </div>
                         {restoreOpExpanded && (
                           <div className="space-y-3">
+                            {/* Satellite Index Raster Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Satellite Index Raster</div>
+                              <span className="text-[10px] text-gray-400">Raw pixel layer from zarr</span>
+                            </div>
+                            <button
+                              onClick={() => setShowRasterLayer(!showRasterLayer)}
+                              className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0"
+                              style={{ backgroundColor: showRasterLayer ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${showRasterLayer ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </button>
+                          </div>
+                          {showRasterLayer && (
+                            <div className="space-y-2 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{mapOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={mapOpacity}
+                                onChange={e => setMapOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                            </div>
+                          )}
+                        </div>
                             {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
@@ -6022,560 +4926,204 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           </div>
                         )}
                       </div>
-
-                      {/* ECOLOGICAL PROGRESS SECTION */}
                       <div className="space-y-3">
-
-                        <div 
+                        <div
                           onClick={() => setRestoreEcoExpanded(!restoreEcoExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {restoreEcoExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Ecological Progress
+                          {restoreEcoExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Ecological
                         </div>
                         {restoreEcoExpanded && (
                           <div className="space-y-3">
-                            {/* Canopy Density Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Canopy Density {renderInfoTooltip("Canopy Density")}</div>
-                              <span className="text-[10px] text-gray-400">Reforestation Growth %</span>
-                            </div>
-                            <button
-                              onClick={() => handleRestoreToggle('progress')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                restoreShowProgress ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: restoreShowProgress ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                restoreShowProgress ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Restoration Progress {renderInfoTooltip("Restoration Progress")}</div><span className="text-[10px] text-gray-400">Area rehabilitation status</span></div>
+                            <button onClick={() => setRestoreShowProgress(!restoreShowProgress)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowProgress ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowProgress ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {restoreShowProgress && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{restoreProgressOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={restoreProgressOpacity}
-                                onChange={e => setRestoreProgressOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (85%+)', color: '#15803d' },
-                                  { label: 'Good (70–85%)', color: '#22c55e' },
-                                  { label: 'Mid (55–70%)', color: '#eab308' },
-                                  { label: 'Initial (<55%)', color: '#ef4444' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">&gt;75% Complete</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">50-75%</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">25-50%</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">&lt;25%</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Seedling Survival Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Seedling Survival {renderInfoTooltip("Seedling Survival")}</div>
-                              <span className="text-[10px] text-gray-400">Survival rate percentage</span>
-                            </div>
-                            <button
-                              onClick={() => handleRestoreToggle('survival')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                restoreShowSurvival ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: restoreShowSurvival ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                restoreShowSurvival ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Survival Rate {renderInfoTooltip("Survival Rate")}</div><span className="text-[10px] text-gray-400">Planted species survival</span></div>
+                            <button onClick={() => setRestoreShowSurvival(!restoreShowSurvival)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowSurvival ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowSurvival ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {restoreShowSurvival && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{restoreSurvivalOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={restoreSurvivalOpacity}
-                                onChange={e => setRestoreSurvivalOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (90%+)', color: '#15803d' },
-                                  { label: 'Good (85–90%)', color: '#22c55e' },
-                                  { label: 'Low (<85%)', color: '#eab308' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">&gt;85% Survival</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">70-85%</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">50-70%</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">&lt;50%</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Soil Carbon Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Soil Carbon Offset {renderInfoTooltip("Soil Carbon Offset")}</div>
-                              <span className="text-[10px] text-gray-400">Carbon stock (tCO2e)</span>
-                            </div>
-                            <button
-                              onClick={() => handleRestoreToggle('carbon')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                restoreShowCarbon ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: restoreShowCarbon ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                restoreShowCarbon ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Carbon Offset {renderInfoTooltip("Carbon Offset")}</div><span className="text-[10px] text-gray-400">Sequestered carbon stock</span></div>
+                            <button onClick={() => setRestoreShowCarbon(!restoreShowCarbon)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowCarbon ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowCarbon ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {restoreShowCarbon && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{restoreCarbonOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={restoreCarbonOpacity}
-                                onChange={e => setRestoreCarbonOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (40t+)', color: '#15803d' },
-                                  { label: 'Mid (30–40t)', color: '#22c55e' },
-                                  { label: 'Low (<30t)', color: '#eab308' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">&gt;10 t CO2e/ha</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">5-10 t CO2e/ha</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">2-5 t CO2e/ha</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">&lt;2 t CO2e/ha</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Biodiversity Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Biodiversity {renderInfoTooltip("Biodiversity")}</div>
-                              <span className="text-[10px] text-gray-400">Species richness score</span>
-                            </div>
-                            <button
-                              onClick={() => handleRestoreToggle('biodiversity')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                restoreShowBiodiversity ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: restoreShowBiodiversity ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                restoreShowBiodiversity ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Biodiversity {renderInfoTooltip("Biodiversity")}</div><span className="text-[10px] text-gray-400">Species richness index</span></div>
+                            <button onClick={() => setRestoreShowBiodiversity(!restoreShowBiodiversity)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowBiodiversity ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowBiodiversity ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {restoreShowBiodiversity && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{restoreBiodiversityOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={restoreBiodiversityOpacity}
-                                onChange={e => setRestoreBiodiversityOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (90%+)', color: '#15803d' },
-                                  { label: 'Good (80–90%)', color: '#22c55e' },
-                                  { label: 'Low (<80%)', color: '#eab308' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Very Low</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* InSAR Coherence (γ) Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">InSAR Coherence (γ) {renderInfoTooltip("InSAR Coherence (\u03b3)")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Radar phase stability index</span>
-                            </div>
-                            <button
-                              onClick={() => handleRestoreToggle('insar')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                restoreShowInSar ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: restoreShowInSar ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                restoreShowInSar ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {restoreShowInSar && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{restoreInSarOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={restoreInSarOpacity}
-                                onChange={e => setRestoreInSarOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Stable (>0.7 coherence)', color: '#15803d' },
-                                  { label: 'Minor Change (0.4–0.7)', color: '#eab308' },
-                                  { label: 'Deforestation (<0.4)', color: '#dc2626' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* GEDI Canopy Height Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">GEDI Canopy Height {renderInfoTooltip("GEDI Canopy Height")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">NASA LiDAR tree height</span>
-                            </div>
-                            <button
-                              onClick={() => handleRestoreToggle('gedi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                restoreShowGedi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: restoreShowGedi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                restoreShowGedi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {restoreShowGedi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{restoreGediOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={restoreGediOpacity}
-                                onChange={e => setRestoreGediOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Tall Canopy (>15m)', color: '#14532d' },
-                                  { label: 'Med Canopy (10–15m)', color: '#15803d' },
-                                  { label: 'Shrubland (5–10m)', color: '#22c55e' },
-                                  { label: 'Low Veg (<5m)', color: '#eab308' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* NDWI Canopy Water Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDWI Canopy Water {renderInfoTooltip("NDWI Canopy Water")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Normalized Difference Water Index</span>
-                            </div>
-                            <button
-                              onClick={() => handleRestoreToggle('ndwi')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                restoreShowNdwi ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: restoreShowNdwi ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                restoreShowNdwi ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {restoreShowNdwi && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{restoreNdwiOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={restoreNdwiOpacity}
-                                onChange={e => setRestoreNdwiOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Open Water (>0.3)', color: '#1e3a8a' },
-                                  { label: 'High Moisture (0.15–0.3)', color: '#2563eb' },
-                                  { label: 'Moderate (0.0–0.15)', color: '#60a5fa' },
-                                  { label: 'Deficit (<0.0)', color: '#ea580c' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* SAR AGB Proxy Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">SAR AGB Proxy {renderInfoTooltip("SAR AGB Proxy")}</div>
-                              <span className="text-[10px] text-gray-400 font-medium">Aboveground Biomass estimation</span>
-                            </div>
-                            <button
-                              onClick={() => handleRestoreToggle('agb')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                restoreShowAgb ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: restoreShowAgb ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                restoreShowAgb ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">AGB {renderInfoTooltip("AGB")}</div><span className="text-[10px] text-gray-400">Above-Ground Biomass</span></div>
+                            <button onClick={() => setRestoreShowAgb(!restoreShowAgb)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowAgb ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowAgb ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {restoreShowAgb && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{restoreAgbOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={restoreAgbOpacity}
-                                onChange={e => setRestoreAgbOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High Biomass (>40 t/ha)', color: '#14532d' },
-                                  { label: 'Medium Biomass (20-40 t/ha)', color: '#16a34a' },
-                                  { label: 'Low Biomass (<20 t/ha)', color: '#86efac' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#166534'}}/><span className="text-[10px] font-semibold text-gray-500">&gt;200 t/ha</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#22c55e'}}/><span className="text-[10px] font-semibold text-gray-500">100-200 t/ha</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">50-100 t/ha</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#ef4444'}}/><span className="text-[10px] font-semibold text-gray-500">&lt;50 t/ha</span></div>
+                            </div>
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">InSAR Coherence {renderInfoTooltip("InSAR Coherence")}</div><span className="text-[10px] text-gray-400">SAR interferometric coherence</span></div>
+                            <button onClick={() => setRestoreShowInSar(!restoreShowInSar)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowInSar ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowInSar ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {restoreShowInSar && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">High (0.8-1.0)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Good (0.6-0.8)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.4-0.6)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Low ({'<'}0.4)</span></div>
+                            </div>
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">GEDI Canopy {renderInfoTooltip("GEDI Canopy")}</div><span className="text-[10px] text-gray-400">LiDAR canopy height</span></div>
+                            <button onClick={() => setRestoreShowGedi(!restoreShowGedi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowGedi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowGedi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {restoreShowGedi && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#166534'}}/><span className="text-[10px] font-semibold text-gray-500">&gt;30m</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#22c55e'}}/><span className="text-[10px] font-semibold text-gray-500">20-30m</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">10-20m</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#ef4444'}}/><span className="text-[10px] font-semibold text-gray-500">&lt;10m</span></div>
                             </div>
                           )}
                         </div>
                           </div>
                         )}
-                      </div>
-
-                      {/* LAND USE LAND COVER (LULC) SECTION */}
-                      <div className="space-y-3 pt-4 border-t border-gray-100">
-                        <div 
+                      </div>                      <div className="space-y-3">
+                        <div
                           onClick={() => setRestoreLulcExpanded(!restoreLulcExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {restoreLulcExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Land Use Land Cover
+                          {restoreLulcExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} LULC
                         </div>
                         {restoreLulcExpanded && (
                           <div className="space-y-3">
-                            <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LULC Overlay {renderInfoTooltip("LULC Classification")}</div>
-                                  <span className="text-[10px] text-gray-400">Classify land cover type</span>
-                                </div>
-                                <button
-                                  onClick={() => handleRestoreToggle('lulc')}
-                                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                    restoreShowLulc ? 'bg-green-600' : 'bg-gray-200'
-                                  }`}
-                                  style={{ backgroundColor: restoreShowLulc ? '#16A34A' : '#E5E7EB' }}
-                                >
-                                  <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                    restoreShowLulc ? 'translate-x-4' : 'translate-x-0'
-                                  }`} />
-                                </button>
-                              </div>
-                              {restoreShowLulc && (
-                                <div className="space-y-3.5 pt-2 border-t border-gray-50">
-                                  {/* Opacity */}
-                                  <div className="space-y-1.5">
-                                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                      <span>Opacity</span>
-                                      <span>{restoreLulcOpacity}%</span>
-                                    </div>
-                                    <input type="range" min="10" max="100" value={restoreLulcOpacity}
-                                      onChange={e => setRestoreLulcOpacity(parseInt(e.target.value))}
-                                      className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                                  </div>
-
-                                  {/* LULC Source Selection */}
-                                  <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">LULC Source</label>
-                                    <select
-                                      value={restoreLulcSource}
-                                      onChange={e => setRestoreLulcSource(e.target.value)}
-                                      className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs font-semibold text-gray-700 outline-none focus:border-green-500"
-                                    >
-                                      <option value="worldcover">ESA WorldCover (10m, annual)</option>
-                                      <option value="dynamic_world">Dynamic World (10m, near-RT)</option>
-                                      <option value="landsat">Landsat Archive (30m, 5-yr)</option>
-                                      <option value="custom">Custom SAR+Optical (10m, quarterly)</option>
-                                    </select>
-                                  </div>
-
-                                  {/* Change Detection Sub-Toggle */}
-                                  <div className="flex items-center justify-between pt-1">
-                                    <span className="text-[10px] font-bold text-gray-600 flex items-center gap-1">
-                                      SAR Change Magnitude {renderInfoTooltip("SAR LULC Change Magnitude")}
-                                    </span>
-                                    <button
-                                      onClick={() => setRestoreShowLulcChange(!restoreShowLulcChange)}
-                                      className={`w-7 h-4 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                        restoreShowLulcChange ? 'bg-amber-500' : 'bg-gray-200'
-                                      }`}
-                                    >
-                                      <div className={`w-3 h-3 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                        restoreShowLulcChange ? 'translate-x-3' : 'translate-x-0'
-                                      }`} />
-                                    </button>
-                                  </div>
-
-                                  {/* Timeline Slider */}
-                                  {(restoreLulcSource === 'worldcover' || restoreLulcSource === 'landsat') && (
-                                    <div className="space-y-2 pt-1 border-t border-gray-100">
-                                      <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                        <span>Timeline View</span>
-                                        <span className="text-green-600 font-black">{restoreLulcYear}</span>
-                                      </div>
-                                      <input 
-                                        type="range" 
-                                        min={restoreLulcSource === 'landsat' ? 1990 : 2020} 
-                                        max={restoreLulcSource === 'landsat' ? 2020 : 2025} 
-                                        step={restoreLulcSource === 'landsat' ? 5 : 1}
-                                        value={restoreLulcYear}
-                                        onChange={e => setRestoreLulcYear(parseInt(e.target.value))}
-                                        className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" 
-                                      />
-                                      <span className="text-[9px] text-gray-400 block italic leading-tight">Drag to observe historical LULC change</span>
-                                    </div>
-                                  )}
-
-                                  {/* Legend */}
-                                  <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-gray-100">
-                                    {[
-                                      { label: 'Forest', color: '#15803d' },
-                                      { label: 'Shrubland', color: '#86efac' },
-                                      { label: 'Cropland', color: '#fde047' },
-                                      { label: 'Bare Soil', color: '#ca8a04' },
-                                      { label: 'Water', color: '#3b82f6' },
-                                      { label: 'Other/Built', color: '#94a3b8' }
-                                    ].map((item, i) => (
-                                      <div key={i} className="flex items-center gap-1.5">
-                                        <div className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                        <span className="text-[9px] font-semibold text-gray-500">{item.label}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDWI {renderInfoTooltip("NDWI")}</div><span className="text-[10px] text-gray-400">Normalized Difference Water Index</span></div>
+                            <button onClick={() => setRestoreShowNdwi(!restoreShowNdwi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowNdwi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowNdwi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {restoreShowNdwi && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">High (&gt;0.3)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.0-0.3)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low (-0.2 to 0.0)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (&lt;-0.2)</span></div>
                             </div>
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LULC {renderInfoTooltip("LULC")}</div><span className="text-[10px] text-gray-400">Land Use / Land Cover</span></div>
+                            <button onClick={() => setRestoreShowLulc(!restoreShowLulc)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowLulc ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowLulc ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {restoreShowLulc && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Forest</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Cropland</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Grassland</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#6b7280'}}/><span className="text-[10px] font-semibold text-gray-500">Urban</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Water</span></div>
+                            </div>
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LULC Change {renderInfoTooltip("LULC Change")}</div><span className="text-[10px] text-gray-400">Land cover change detection</span></div>
+                            <button onClick={() => setRestoreShowLulcChange(!restoreShowLulcChange)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowLulcChange ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowLulcChange ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {restoreShowLulcChange && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Vegetation Gain</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#6b7280'}}/><span className="text-[10px] font-semibold text-gray-500">No Change</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Vegetation Loss</span></div>
+                            </div>
+                          )}
+                        </div>
                           </div>
                         )}
-                      </div>
-
-                      {/* EUDR DEFORESTATION SECTION */}
-                      <div className="space-y-3 pt-4 border-t border-gray-100">
-                        <div 
+                      </div>                      <div className="space-y-3">
+                        <div
                           onClick={() => setRestoreEudrExpanded(!restoreEudrExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {restoreEudrExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} EUDR Deforestation
+                          {restoreEudrExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} EUDR
                         </div>
                         {restoreEudrExpanded && (
                           <div className="space-y-3">
-                            <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">EUDR Compliance {renderInfoTooltip("EUDR Deforestation")}</div>
-                                  <span className="text-[10px] text-gray-400">Cut-off date Dec 31, 2020</span>
-                                </div>
-                                <button
-                                  onClick={() => handleRestoreToggle('eudr')}
-                                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                    restoreShowEudr ? 'bg-green-600' : 'bg-gray-200'
-                                  }`}
-                                  style={{ backgroundColor: restoreShowEudr ? '#16A34A' : '#E5E7EB' }}
-                                >
-                                  <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                    restoreShowEudr ? 'translate-x-4' : 'translate-x-0'
-                                  }`} />
-                                </button>
-                              </div>
-                              {restoreShowEudr && (
-                                <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                    <span>Opacity</span>
-                                    <span>{restoreEudrOpacity}%</span>
-                                  </div>
-                                  <input type="range" min="10" max="100" value={restoreEudrOpacity}
-                                    onChange={e => setRestoreEudrOpacity(parseInt(e.target.value))}
-                                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                                  
-                                  {/* EUDR Info Checklist */}
-                                  <div className="bg-slate-900 text-white rounded-xl p-2.5 space-y-1">
-                                    <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Audit Parameters</div>
-                                    <div className="text-[10px] font-medium leading-relaxed">
-                                      <div className="flex justify-between border-b border-white/10 pb-1">
-                                        <span>Cut-off Date:</span>
-                                        <span className="font-bold text-green-400">31 Dec 2020</span>
-                                      </div>
-                                      <div className="flex justify-between pt-1">
-                                        <span>Estate Status:</span>
-                                        <span className="font-bold text-green-400">Compliant</span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                    {[
-                                      { label: 'Compliant (No forest loss)', color: '#16a34a' },
-                                      { label: 'Warning (Near forest loss)', color: '#eab308' },
-                                      { label: 'Non-Compliant (Deforestation detected)', color: '#dc2626' }
-                                    ].map((item, i) => (
-                                      <div key={i} className="flex items-center gap-2">
-                                        <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                        <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">EUDR Compliance {renderInfoTooltip("EUDR Compliance")}</div><span className="text-[10px] text-gray-400">EU Deforestation Regulation status</span></div>
+                            <button onClick={() => setRestoreShowEudr(!restoreShowEudr)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowEudr ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: restoreShowEudr ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {restoreShowEudr && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Compliant</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">At Risk</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Non-Compliant</span></div>
                             </div>
+                          )}
+                        </div>
                           </div>
                         )}
                       </div>
@@ -6588,17 +5136,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               </div>
 
               {/* ══ BOTTOM PANEL ══ */}
-              {renderMapBottomPanel(
-                restoreShowBiodiversity ? 'Biodiversity' :
-                restoreShowCarbon ? 'Soil Carbon' :
-                restoreShowSurvival ? 'Seedling Survival' :
-                restoreShowProgress ? 'Canopy Density' :
-                restoreShowInSar ? 'InSAR Coherence (γ)' :
-                restoreShowGedi ? 'GEDI Canopy Height' :
-                restoreShowNdwi ? 'NDWI Canopy Water' :
-                restoreShowLulc ? 'LULC Classification' :
-                restoreShowEudr ? 'EUDR Deforestation' : 'No Active Layer'
-              )}
+              {renderMapBottomPanel(selectedIndex)}
             </div>
           )}
 
@@ -6607,7 +5145,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               ALERTS COMMAND CENTER
           ══════════════════════════════════════════════════════════════ */}
           {activeSidebarItem === 'alerts' && (
-            <div className="flex flex-col h-full animate-in fade-in duration-300 relative" style={{ minHeight: 0 }}>
+            <div className="flex flex-col h-full relative" style={{ minHeight: 0 }}>
               <style>{`
                 @keyframes pulseBorderRed {
                   0%, 100% { border-color: rgba(239, 68, 68, 0.3); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.15); }
@@ -6694,11 +5232,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   {/* Plots with issues list */}
                   <div className="flex-1 overflow-y-auto alerts-list-scroll p-3 space-y-2">
                     {(() => {
-                      const PLOT_DEFS = [
-                        { id: 'PLOT-ALPHA', name: 'West Valley Plot', estate: 'West Valley Estate', ndvi: 0.72 },
-                        { id: 'PLOT-BETA',  name: 'East Ridge Plot',  estate: 'East Ridge Estate',  ndvi: 0.51 },
-                        { id: 'PLOT-GAMMA', name: 'South Slope Plot', estate: 'South Slope Estate', ndvi: 0.68 }
-                      ];
+                      // Use real plots from backend instead of hardcoded fake plot names
+                      const PLOT_DEFS = plotsData.map(p => ({
+                        id: p.id,
+                        name: p.name || p.id,
+                        estate: p.subfarm || tenantDisplayName,
+                        ndvi: p.ndvi ?? 0
+                      }));
 
                       const searchLower = alertsSearch.toLowerCase();
 
@@ -6715,10 +5255,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           const infoCount = rawAlerts.filter(a => a.status === 'Active' && a.severity === 'Info').length;
                           return { ...p, active, critCount, warnCount, infoCount, total: active.length };
                         })
-                        // Only show plots that have active issues
                         .filter(p => p.total > 0)
-                        // Apply search
-                        .filter(p => !searchLower || p.name.toLowerCase().includes(searchLower) || p.id.toLowerCase().includes(searchLower) || p.estate.toLowerCase().includes(searchLower));
+                        .filter(p => !searchLower || p.name.toLowerCase().includes(searchLower) || p.id.toLowerCase().includes(searchLower));
 
                       if (plotsWithIssues.length === 0) {
                         return (
@@ -6791,12 +5329,11 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   ) : (
                     /* Detail report */
                     (() => {
-                      const PLOT_META = {
-                        'PLOT-ALPHA': { name: 'West Valley Plot (PLOT-ALPHA)', estate: 'West Valley Estate', ndvi: 0.72 },
-                        'PLOT-BETA':  { name: 'East Ridge Plot (PLOT-BETA)',  estate: 'East Ridge Estate',  ndvi: 0.51 },
-                        'PLOT-GAMMA': { name: 'South Slope Plot (PLOT-GAMMA)', estate: 'South Slope Estate', ndvi: 0.68 }
-                      };
-                      const meta = PLOT_META[selectedAlertPlot];
+                      // Look up real plot from plotsData
+                      const realPlot = plotsData.find(p => p.id === selectedAlertPlot);
+                      const meta = realPlot
+                        ? { name: realPlot.name || realPlot.id, estate: realPlot.subfarm || tenantDisplayName, ndvi: realPlot.ndvi ?? 0 }
+                        : { name: selectedAlertPlot, estate: tenantDisplayName, ndvi: 0 };
                       const plotAlerts = alerts.filter(a => a.plot === selectedAlertPlot);
                       const activePlotAlerts = plotAlerts.filter(a => a.status === 'Active');
                       const critCount = activePlotAlerts.filter(a => a.severity === 'Critical').length;
@@ -6967,14 +5504,17 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
-                  <MapContainer center={[7.145, 3.361]} zoom={14} maxZoom={22}
+                  <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
-          {currentTileUrl && activePlotBounds && (
-            <ImageOverlay
+          {showRasterLayer && currentTileUrl && (
+            <TileLayer
+              key={currentTileUrl}
               url={currentTileUrl}
-              bounds={activePlotBounds}
               opacity={mapOpacity / 100}
+              bounds={rasterOverlayBounds || undefined}
+              maxZoom={22}
+              maxNativeZoom={18}
             />
           )}
                     
@@ -6996,6 +5536,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     ) : (
                       renderClimatePolygons(climatePlotsData)
                     )}
+                    {null}
+                    <FitBoundsToPlots plotsData={plotsData} farmBoundary={farmBoundary} />
+                    <FitToZarrBounds zarrBounds={zarrBounds} />
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={climateShowLayers} />
                   </MapContainer>
@@ -7053,6 +5596,33 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         </div>
                         {climateOpExpanded && (
                           <div className="space-y-3">
+                            {/* Satellite Index Raster Card */}
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Satellite Index Raster</div>
+                              <span className="text-[10px] text-gray-400">Raw pixel layer from zarr</span>
+                            </div>
+                            <button
+                              onClick={() => setShowRasterLayer(!showRasterLayer)}
+                              className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0"
+                              style={{ backgroundColor: showRasterLayer ? '#16A34A' : '#E5E7EB' }}
+                            >
+                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${showRasterLayer ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </button>
+                          </div>
+                          {showRasterLayer && (
+                            <div className="space-y-2 pt-1 border-t border-gray-50">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                                <span>Opacity</span>
+                                <span>{mapOpacity}%</span>
+                              </div>
+                              <input type="range" min="10" max="100" value={mapOpacity}
+                                onChange={e => setMapOpacity(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                            </div>
+                          )}
+                        </div>
                             {/* Farm Boundaries Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
@@ -7091,11 +5661,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           </div>
                         )}
                       </div>
-
-                      {/* BIOPHYSICAL SECTION */}
                       <div className="space-y-3">
-
-                        <div 
+                        <div
                           onClick={() => setClimateBioExpanded(!climateBioExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
@@ -7103,250 +5670,95 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         </div>
                         {climateBioExpanded && (
                           <div className="space-y-3">
-                            {/* Precipitation Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">Precipitation {renderInfoTooltip("Precipitation")}</div>
-                              <span className="text-[10px] text-gray-400">Rainfall volume mm</span>
-                            </div>
-                            <button
-                              onClick={() => handleClimateToggle('rainfall')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                climateShowRainfall ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: climateShowRainfall ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                climateShowRainfall ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Rainfall {renderInfoTooltip("Rainfall")}</div><span className="text-[10px] text-gray-400">Accumulated precipitation</span></div>
+                            <button onClick={() => setClimateShowRainfall(!climateShowRainfall)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: climateShowRainfall ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: climateShowRainfall ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {climateShowRainfall && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{climateRainfallOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={climateRainfallOpacity}
-                                onChange={e => setClimateRainfallOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (25mm+)', color: '#1d4ed8' },
-                                  { label: 'Mid (18–25mm)', color: '#3b82f6' },
-                                  { label: 'Low (<18mm)', color: '#93c5fd' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">&gt;200 mm</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">100-200 mm</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">50-100 mm</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">&lt;50 mm</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* Soil Temp Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Soil Temp {renderInfoTooltip("Soil Temp")}</div>
-                              <span className="text-[10px] text-gray-400">Root zone sensor temp</span>
-                            </div>
-                            <button
-                              onClick={() => handleClimateToggle('soilTemp')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                climateShowSoilTemp ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: climateShowSoilTemp ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                climateShowSoilTemp ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Soil Temperature {renderInfoTooltip("Soil Temperature")}</div><span className="text-[10px] text-gray-400">Near-surface soil temperature</span></div>
+                            <button onClick={() => setClimateShowSoilTemp(!climateShowSoilTemp)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: climateShowSoilTemp ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: climateShowSoilTemp ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {climateShowSoilTemp && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{climateSoilTempOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={climateSoilTempOpacity}
-                                onChange={e => setClimateSoilTempOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (>29°C)', color: '#ef4444' },
-                                  { label: 'Normal (25–29°C)', color: '#f97316' },
-                                  { label: 'Cool (<25°C)', color: '#10b981' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">&gt;35C Critical</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">30-35C High</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">20-30C Optimal</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">&lt;20C Cool</span></div>
                             </div>
                           )}
                         </div>
                           </div>
                         )}
-                      </div>
-
-                      {/* ATMOSPHERE SECTION */}
-                      <div className="space-y-3">
-
-                        <div 
+                      </div>                      <div className="space-y-3">
+                        <div
                           onClick={() => setClimateAtmExpanded(!climateAtmExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {climateAtmExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Atmosphere
+                          {climateAtmExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Atmospheric
                         </div>
                         {climateAtmExpanded && (
                           <div className="space-y-3">
-                            {/* LST Card */}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Surface Temp (LST) {renderInfoTooltip("Surface Temp (LST)")}</div>
-                              <span className="text-[10px] text-gray-400">Land surface temperature</span>
-                            </div>
-                            <button
-                              onClick={() => handleClimateToggle('lst')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                climateShowLst ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: climateShowLst ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                climateShowLst ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LST {renderInfoTooltip("LST")}</div><span className="text-[10px] text-gray-400">Land Surface Temperature</span></div>
+                            <button onClick={() => setClimateShowLst(!climateShowLst)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: climateShowLst ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: climateShowLst ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {climateShowLst && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{climateLstOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={climateLstOpacity}
-                                onChange={e => setClimateLstOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (>36°C)', color: '#b91c1c' },
-                                  { label: 'Moderate (30–36°C)', color: '#ef4444' },
-                                  { label: 'Normal (25–30°C)', color: '#f97316' },
-                                  { label: 'Cool (<25°C)', color: '#10b981' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">&gt;40C Extreme</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">30-40C High</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">20-30C Normal</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">&lt;20C Cool</span></div>
                             </div>
                           )}
-                        </div>
-
-                        {/* VPD Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">VPD Stress {renderInfoTooltip("VPD Stress")}</div>
-                              <span className="text-[10px] text-gray-400">Vapor Pressure Deficit</span>
-                            </div>
-                            <button
-                              onClick={() => handleClimateToggle('vpd')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                climateShowVaporDeficit ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: climateShowVaporDeficit ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                climateShowVaporDeficit ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Vapor Pressure Deficit {renderInfoTooltip("Vapor Pressure Deficit")}</div><span className="text-[10px] text-gray-400">Atmospheric dryness</span></div>
+                            <button onClick={() => setClimateShowVaporDeficit(!climateShowVaporDeficit)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: climateShowVaporDeficit ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: climateShowVaporDeficit ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {climateShowVaporDeficit && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{climateVaporDeficitOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={climateVaporDeficitOpacity}
-                                onChange={e => setClimateVaporDeficitOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'High (>2.2 kPa)', color: '#ef4444' },
-                                  { label: 'Moderate (1.5–2.2 kPa)', color: '#f97316' },
-                                  { label: 'Low (<1.5 kPa)', color: '#10b981' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">&gt;3 kPa High</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">1-3 kPa Moderate</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">&lt;1 kPa Low</span></div>
+                            </div>
+                          )}
+                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Flood Risk {renderInfoTooltip("Flood Risk")}</div><span className="text-[10px] text-gray-400">Surface inundation risk</span></div>
+                            <button onClick={() => setClimateShowFlood(!climateShowFlood)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: climateShowFlood ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: climateShowFlood ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {climateShowFlood && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">High Risk</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Risk</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low Risk</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">No Risk</span></div>
                             </div>
                           )}
                         </div>
                           </div>
                         )}
-                      </div>
-
-                      {/* MONITORING & TELEMETRY SECTION */}
-                      <div className="space-y-3">
-                        <div 
-                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest select-none"
-                        >
-                          Monitoring & Telemetry
-                        </div>
-                        
-                        {/* SAR Flood Mask Card */}
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5 font-sans">SAR Flood Mask (Sentinel-1) {renderInfoTooltip("SAR Flood Mask")}</div>
-                              <span className="text-[10px] text-gray-400">All-weather standing water detection</span>
-                            </div>
-                            <button
-                              onClick={() => handleClimateToggle('flood')}
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-                                climateShowFlood ? 'bg-green-600' : 'bg-gray-200'
-                              }`}
-                              style={{ backgroundColor: climateShowFlood ? '#16A34A' : '#E5E7EB' }}
-                            >
-                              <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                                climateShowFlood ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-                          {climateShowFlood && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
-                                <span>Opacity</span>
-                                <span>{climateFloodOpacity}%</span>
-                              </div>
-                              <input type="range" min="10" max="100" value={climateFloodOpacity}
-                                onChange={e => setClimateFloodOpacity(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
-                              <div className="grid grid-cols-1 gap-1.5 pt-1">
-                                {[
-                                  { label: 'Flooded / Waterlogged', color: '#1e3a8a' },
-                                  { label: 'Dry Surface', color: 'transparent' }
-                                ].map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded-sm shrink-0 border border-gray-200" style={{ backgroundColor: item.color }} />
-                                    <span className="text-[10px] font-semibold text-gray-500">{item.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -7355,13 +5767,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               </div>
 
               {/* ══ BOTTOM PANEL ══ */}
-              {renderMapBottomPanel(
-                climateShowVaporDeficit ? 'VPD Stress' :
-                climateShowLst ? 'Surface Temp' :
-                climateShowSoilTemp ? 'Soil Temp' :
-                climateShowRainfall ? 'Precipitation' :
-                climateShowFlood ? 'SAR Flood Mask' : 'No Active Layer'
-              )}
+              {renderMapBottomPanel(selectedIndex)}
             </div>
           )}
 
@@ -7369,7 +5775,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               VERIFICATION
           ══════════════════════════════════════════════════════════════ */}
           {activeSidebarItem === 'analytics' && activeTab === 'verification' && (
-            <div className="p-10 space-y-10 animate-in fade-in duration-300" />
+            <div className="p-10 space-y-10" />
           )}
 
           {/* ══════════════════════════════════════════════════════════════
@@ -7399,30 +5805,17 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             const getMetricChartData = (index, plot) => {
               const plotName = plot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : plot;
               const isPlotWholeFarm = plotName === 'Whole Farm (Aggregate)';
-              const labels = isPlotWholeFarm 
-                ? ['West Valley (Plot Alpha)', 'East Ridge (Plot Beta)', 'South Slope (Plot Gamma)']
-                : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'];
-                
+              // Use real timeline data for charts
+              const labels = isPlotWholeFarm
+                ? TIMELINE_DATA.map(t => t.label || t.date)
+                : TIMELINE_DATA.map(t => t.label || t.date);
+
               const data = (() => {
-                if (isPlotWholeFarm) {
-                  if (index === 'SOC') return [42.8, 31.2, 38.5];
-                  if (index === 'AGB') return [124.5, 82.4, 105.8];
-                  if (index === 'NDVI') return [0.76, 0.45, 0.62];
-                  if (index === 'NDMI') return [0.42, 0.30, 0.36];
-                  if (index === 'NDWI') return [0.38, 0.25, 0.32];
-                  return [0.38, 0.25, 0.32];
-                }
-                return TIMELINE_DATA.map((t, idx) => {
-                  const baseVal = index === 'SOC' ? (plotName === 'PLOT-ALPHA' ? 42.8 : plotName === 'PLOT-BETA' ? 31.2 : 38.5)
-                                 : index === 'AGB' ? (plotName === 'PLOT-ALPHA' ? 124.5 : plotName === 'PLOT-BETA' ? 82.4 : 105.8)
-                                 : index === 'NDVI' ? t.ndvi
-                                 : t.ndmi;
-                  if (index === 'SOC' || index === 'AGB') {
-                    return parseFloat((baseVal * (0.95 + idx * 0.025)).toFixed(1));
-                  }
-                  const offset = plotName === 'PLOT-ALPHA' ? 0.04 : plotName === 'PLOT-BETA' ? -0.15 : -0.05;
-                  return parseFloat((baseVal + offset).toFixed(2));
-                });
+                if (index === 'NDVI') return TIMELINE_DATA.map(t => t.ndvi ?? 0);
+                if (index === 'NDMI') return TIMELINE_DATA.map(t => t.ndmi ?? 0);
+                if (index === 'NDWI') return TIMELINE_DATA.map(t => t.ndwi ?? 0);
+                // SOC/AGB not yet available from zarr — return zeros
+                return TIMELINE_DATA.map(() => 0);
               })();
 
               return {
@@ -7430,12 +5823,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 datasets: [{
                   label: `${index} Value`,
                   data,
-                  backgroundColor: isPlotWholeFarm 
-                    ? ['rgba(22, 163, 74, 0.85)', 'rgba(234, 179, 8, 0.85)', 'rgba(2, 132, 199, 0.85)']
-                    : 'rgba(22, 163, 74, 0.1)',
-                  borderColor: isPlotWholeFarm ? '#ffffff' : '#16A34A',
-                  borderWidth: isPlotWholeFarm ? 0 : 2.5,
-                  fill: !isPlotWholeFarm,
+                  backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                  borderColor: '#16A34A',
+                  borderWidth: 2.5,
+                  fill: true,
                   tension: 0.3,
                   pointRadius: 3
                 }]
@@ -7446,7 +5837,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               pageCounter++;
               const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
               const reportType = generatedReport ? generatedReport.index : (selectedThemeReport || reportIndex);
-              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+              const reportId = generatedReport ? generatedReport.id : '—';
               const reportDate = generatedReport ? generatedReport.date : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
               return (
@@ -7521,9 +5912,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             const renderHealthPage = () => {
               pageCounter++;
               const healthData = getMetricChartData('NDVI', reportPlot);
-              const isStressed = reportPlot === 'PLOT-BETA';
+              const meanNdvi = TIMELINE_DATA.length > 0 ? (TIMELINE_DATA.reduce((s, t) => s + (t.ndvi ?? 0), 0) / TIMELINE_DATA.length) : null;
+              const isStressed = meanNdvi !== null && meanNdvi < 0.5;
               const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
-              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+              const reportId = generatedReport ? generatedReport.id : '—';
               
               return (
                 <div className="w-full max-w-[700px] aspect-[1/1.414] bg-white border border-gray-200 shadow-md p-12 flex flex-col justify-between relative report-page-break mx-auto select-none">
@@ -7563,19 +5955,19 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div>
                         <span className="text-[9px] text-gray-450 font-bold uppercase block">Mean NDVI</span>
                         <span className="text-base font-black text-gray-800 mt-1 block">
-                          {isWholeFarm ? '0.61' : reportPlot === 'PLOT-ALPHA' ? '0.76' : reportPlot === 'PLOT-BETA' ? '0.45' : '0.62'}
+                          {TIMELINE_DATA.length > 0 ? (TIMELINE_DATA.reduce((s, t) => s + (t.ndvi ?? 0), 0) / TIMELINE_DATA.length).toFixed(2) : '—'}
                         </span>
                       </div>
                       <div>
                         <span className="text-[9px] text-gray-455 font-bold uppercase block">Active Chlorophyll</span>
                         <span className="text-base font-black text-gray-850 mt-1 block">
-                          {isWholeFarm ? '0.55 GCVI' : reportPlot === 'PLOT-ALPHA' ? '0.72 GCVI' : '0.41 GCVI'}
+                          {TIMELINE_DATA.length > 0 ? (TIMELINE_DATA.reduce((s, t) => s + (t.chlorophyll ?? 0), 0) / TIMELINE_DATA.length).toFixed(2) + ' GCVI' : '—'}
                         </span>
                       </div>
                       <div>
                         <span className="text-[9px] text-gray-455 font-bold uppercase block">Zonal Coverage</span>
                         <span className="text-base font-black text-green-700 mt-1 block">
-                          {isStressed ? '68.4%' : '94.2%'}
+                          {'—'}
                         </span>
                       </div>
                     </div>
@@ -7585,10 +5977,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <Sparkles size={11} className="text-green-600" /> Agronomic Assessment
                       </span>
                       <p className="text-xs text-green-700 font-semibold leading-relaxed">
-                        {isWholeFarm 
-                          ? 'Spatial verification of the Whole Farm indicates high performance across the primary vegetative bands. West Valley (Plot Alpha) leads with optimal carbon density. East Ridge (Plot Beta) continues to register minor moisture stress anomalies.'
+                        {isWholeFarm
+                          ? 'Spatial verification of the whole farm indicates high performance across the primary vegetative bands. NDVI values are derived from real satellite observations.'
                           : isStressed
-                            ? 'Plot Beta (East Ridge) reveals suppressed moisture index levels. Vegetative health remains moderate, but root-zone transpiration stress is elevated. Recommendation: Increase irrigation frequency by 25%.'
+                            ? 'This plot reveals suppressed moisture index levels. Vegetative health remains moderate, but root-zone transpiration stress is elevated. Recommendation: Increase irrigation frequency by 25%.'
                             : 'Diagnostic review of this plot shows optimal vegetation vigor. Canopy density trajectories remain stable with zero forest loss anomalies.'
                         }
                       </p>
@@ -7607,9 +5999,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             const renderClimatePage = () => {
               pageCounter++;
               const climateData = getMetricChartData('NDMI', reportPlot);
-              const isStressed = reportPlot === 'PLOT-BETA';
+              const meanNdmi = TIMELINE_DATA.length > 0 ? (TIMELINE_DATA.reduce((s, t) => s + (t.ndmi ?? 0), 0) / TIMELINE_DATA.length) : null;
+              const isStressed = meanNdmi !== null && meanNdmi < 0.2;
               const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
-              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+              const reportId = generatedReport ? generatedReport.id : '—';
 
               return (
                 <div className="w-full max-w-[700px] aspect-[1/1.414] bg-white border border-gray-200 shadow-md p-12 flex flex-col justify-between relative report-page-break mx-auto select-none">
@@ -7649,34 +6042,28 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-center">
                         <span className="text-[8px] text-gray-400 font-bold uppercase block">Mean NDMI</span>
                         <span className="text-xs font-black text-gray-800 mt-1 block">
-                          {reportPlot === 'PLOT-ALPHA' ? '0.42' : reportPlot === 'PLOT-BETA' ? '0.30' : '0.36'}
+                          {meanNdmi !== null ? meanNdmi.toFixed(2) : '—'}
                         </span>
                       </div>
                       <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-center">
                         <span className="text-[8px] text-gray-400 font-bold uppercase block">Soil Temp</span>
-                        <span className="text-xs font-black text-gray-800 mt-1 block">
-                          {reportPlot === 'PLOT-BETA' ? '28.5 °C' : '24.2 °C'}
-                        </span>
+                        <span className="text-xs font-black text-gray-800 mt-1 block">—</span>
                       </div>
                       <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-center">
                         <span className="text-[8px] text-gray-400 font-bold uppercase block">VPD Stress</span>
-                        <span className="text-xs font-black text-gray-800 mt-1 block">
-                          {reportPlot === 'PLOT-BETA' ? '2.3 kPa' : '1.4 kPa'}
-                        </span>
+                        <span className="text-xs font-black text-gray-800 mt-1 block">—</span>
                       </div>
                       <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-center">
                         <span className="text-[8px] text-gray-400 font-bold uppercase block">Rainfall</span>
-                        <span className="text-xs font-black text-blue-700 mt-1 block">
-                          {reportPlot === 'PLOT-BETA' ? '22 mm' : '38 mm'}
-                        </span>
+                        <span className="text-xs font-black text-blue-700 mt-1 block">—</span>
                       </div>
                     </div>
 
                     <div className="p-4 bg-gray-55 border border-gray-150 rounded-xl space-y-1.5">
                       <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-700 block">Hydrological Summary</span>
                       <p className="text-xs text-gray-500 font-semibold leading-relaxed">
-                        {isStressed 
-                          ? 'Root-zone water stress is elevated due to suppressed precipitation in the East Ridge sector. Immediate cover-cropping and crop mulching recommended to retain sub-surface soil hydration.'
+                        {isStressed
+                          ? 'Root-zone water stress is elevated. NDMI readings indicate below-threshold moisture levels. Immediate cover-cropping and crop mulching recommended to retain sub-surface soil hydration.'
                           : 'Soil moisture profiles sit within stable margins. Leaf stomatal conductance is optimal, indicating healthy plant transpiration rates with no active drought markers.'
                         }
                       </p>
@@ -7696,7 +6083,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               pageCounter++;
               const hydrologyData = getMetricChartData('NDWI', reportPlot);
               const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
-              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+              const reportId = generatedReport ? generatedReport.id : '—';
 
               return (
                 <div className="w-full max-w-[700px] aspect-[1/1.414] bg-white border border-gray-200 shadow-md p-12 flex flex-col justify-between relative report-page-break mx-auto select-none">
@@ -7729,14 +6116,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div>
                         <span className="text-[9px] text-gray-455 font-bold uppercase block">Mean NDWI</span>
                         <span className="text-sm font-black text-gray-800 mt-1 block">
-                          {reportPlot === 'PLOT-ALPHA' ? '0.38' : reportPlot === 'PLOT-BETA' ? '0.25' : '0.32'}
+                          {TIMELINE_DATA.length > 0 ? (TIMELINE_DATA.reduce((s, t) => s + (t.ndwi ?? 0), 0) / TIMELINE_DATA.length).toFixed(2) : '—'}
                         </span>
                       </div>
                       <div>
                         <span className="text-[9px] text-gray-455 font-bold uppercase block">Evapotranspiration Deficit</span>
-                        <span className="text-sm font-black text-red-650 mt-1 block">
-                          {reportPlot === 'PLOT-BETA' ? '45% Deficit' : 'Optimal'}
-                        </span>
+                        <span className="text-sm font-black text-gray-800 mt-1 block">—</span>
                       </div>
                     </div>
 
@@ -7744,11 +6129,11 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <span className="text-[9px] font-black uppercase text-gray-455 tracking-wider block">Security Hash & Signatures</span>
                       <div className="flex justify-between items-center text-[10px] text-gray-550 font-semibold">
                         <div>
-                          <span className="block font-mono text-[9px] text-gray-400">Node ID: Abeokuta-S2-085A</span>
-                          <span className="block font-mono text-[9px] text-gray-400">Digital Signature: SHA-256: 4e99fca1b32d29e</span>
+                          <span className="block font-mono text-[9px] text-gray-400">Node ID: {tenant?.toUpperCase()}-S2-{generatedReport?.id?.slice(-4) || '0000'}</span>
+                          <span className="block font-mono text-[9px] text-gray-400">Digital Signature: SHA-256: {generatedReport?.id ? btoa(generatedReport.id).slice(0,15) : '—'}</span>
                         </div>
                         <div className="text-right">
-                          <span className="block text-gray-850 font-extrabold">Samuel (Lead GIS)</span>
+                          <span className="block text-gray-850 font-extrabold">{profileName} (Lead GIS)</span>
                           <span className="block text-[8px] text-green-600 uppercase">Electronically Signed</span>
                         </div>
                       </div>
@@ -7768,7 +6153,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               pageCounter++;
               const carbonData = getMetricChartData('SOC', reportPlot);
               const plotName = reportPlot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : reportPlot;
-              const reportId = generatedReport ? generatedReport.id : 'REP-2026-TEMP';
+              const reportId = generatedReport ? generatedReport.id : '—';
 
               return (
                 <div className="w-full max-w-[700px] aspect-[1/1.414] bg-white border border-gray-200 shadow-md p-12 flex flex-col justify-between relative report-page-break mx-auto select-none">
@@ -7796,15 +6181,11 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
                       <div>
                         <span className="text-[9px] text-gray-455 font-bold uppercase block">Baseline Soil Carbon (SOC)</span>
-                        <span className="text-sm font-black text-gray-800 mt-1 block">
-                          {reportPlot === 'PLOT-ALPHA' ? '42.8 g/kg' : reportPlot === 'PLOT-BETA' ? '31.2 g/kg' : '38.5 g/kg'}
-                        </span>
+                        <span className="text-sm font-black text-gray-800 mt-1 block">—</span>
                       </div>
                       <div>
                         <span className="text-[9px] text-gray-455 font-bold uppercase block">Aboveground Biomass (AGB)</span>
-                        <span className="text-sm font-black text-gray-800 mt-1 block">
-                          {reportPlot === 'PLOT-ALPHA' ? '124.5 tCO2e' : reportPlot === 'PLOT-BETA' ? '82.4 tCO2e' : '105.8 tCO2e'}
-                        </span>
+                        <span className="text-sm font-black text-gray-800 mt-1 block">—</span>
                       </div>
                     </div>
                   </div>
@@ -7813,11 +6194,11 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <span className="text-[9px] font-black uppercase text-gray-455 tracking-wider block">Security Hash & Signatures</span>
                     <div className="flex justify-between items-center text-[10px] text-gray-550 font-semibold">
                       <div>
-                        <span className="block font-mono text-[9px] text-gray-400">Node ID: Abeokuta-S2-085A</span>
-                        <span className="block font-mono text-[9px] text-gray-400">Digital Signature: SHA-256: 4e99fca1b32d29e</span>
+                        <span className="block font-mono text-[9px] text-gray-400">Node ID: {tenant?.toUpperCase()}-S2-{generatedReport?.id?.slice(-4) || '0000'}</span>
+                        <span className="block font-mono text-[9px] text-gray-400">Digital Signature: SHA-256: {generatedReport?.id ? btoa(generatedReport.id).slice(0,15) : '—'}</span>
                       </div>
                       <div className="text-right">
-                        <span className="block text-gray-850 font-extrabold">Samuel (Lead GIS)</span>
+                        <span className="block text-gray-850 font-extrabold">{profileName} (Lead GIS)</span>
                         <span className="block text-[8px] text-green-600 uppercase">Electronically Signed</span>
                       </div>
                     </div>
@@ -7833,7 +6214,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             };
 
             return (
-              <div className="p-10 space-y-10 animate-in fade-in duration-300">
+              <div className="p-10 space-y-10">
                 {/* Dynamic stylesheet for PDF print overrides */}
                 <style>{`
                   @media print {
@@ -7907,9 +6288,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           className="w-full bg-gray-55 border border-gray-200 rounded-xl py-3 px-4 text-sm font-semibold outline-none cursor-pointer focus:border-green-500 text-gray-700"
                         >
                           <option value="WHOLE-FARM">Whole Farm (Aggregate)</option>
-                          <option value="PLOT-ALPHA">PLOT-ALPHA — West Valley Plot</option>
-                          <option value="PLOT-BETA">PLOT-BETA — East Ridge Plot</option>
-                          <option value="PLOT-GAMMA">PLOT-GAMMA — South Slope Plot</option>
+                          {plotsData && plotsData.map(p => (
+                            <option key={p.id} value={p.id}>{p.id}</option>
+                          ))}
                         </select>
                       </div>
                       
@@ -7922,21 +6303,21 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             if (val.startsWith('theme')) {
                               setSelectedThemeReport(val);
                               if (val === 'theme1') {
-                                setReportPlot('PLOT-ALPHA');
+                                setReportPlot('WHOLE-FARM');
                                 setReportIndex('SOC');
-                                triggerReportGeneration('PLOT-ALPHA', 'SOC');
+                                triggerReportGeneration('WHOLE-FARM', 'SOC');
                               } else if (val === 'theme2') {
-                                setReportPlot('PLOT-ALPHA');
+                                setReportPlot('WHOLE-FARM');
                                 setReportIndex('NDMI');
-                                triggerReportGeneration('PLOT-ALPHA', 'NDMI');
+                                triggerReportGeneration('WHOLE-FARM', 'NDMI');
                               } else if (val === 'theme3') {
-                                setReportPlot('PLOT-GAMMA');
+                                setReportPlot('WHOLE-FARM');
                                 setReportIndex('AGB');
-                                triggerReportGeneration('PLOT-GAMMA', 'AGB');
+                                triggerReportGeneration('WHOLE-FARM', 'AGB');
                               } else if (val === 'theme4') {
-                                setReportPlot('PLOT-ALPHA');
+                                setReportPlot('WHOLE-FARM');
                                 setReportIndex('NDVI');
-                                triggerReportGeneration('PLOT-ALPHA', 'NDVI');
+                                triggerReportGeneration('WHOLE-FARM', 'NDVI');
                               }
                             } else {
                               setSelectedThemeReport('');
@@ -8023,36 +6404,19 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       const isWholeFarm = reportPlot === 'WHOLE-FARM';
                       
                       const chartData = {
-                        labels: isWholeFarm 
-                          ? ['West Valley (Plot Alpha)', 'East Ridge (Plot Beta)', 'South Slope (Plot Gamma)']
-                          : ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'],
+                        labels: TIMELINE_DATA.length > 0
+                          ? TIMELINE_DATA.map(t => t.label || t.date)
+                          : [],
                         datasets: [{
                           label: `${reportIndex} Value`,
-                          data: isWholeFarm 
-                            ? (() => {
-                                if (reportIndex === 'SOC') return [42.8, 31.2, 38.5];
-                                if (reportIndex === 'AGB') return [124.5, 82.4, 105.8];
-                                if (reportIndex === 'NDVI') return [0.76, 0.45, 0.62];
-                                if (reportIndex === 'NDMI') return [0.42, 0.30, 0.36];
-                                return [0.38, 0.25, 0.32];
-                              })()
-                            : TIMELINE_DATA.map((t, idx) => {
-                                const baseVal = reportIndex === 'SOC' ? (reportPlot === 'PLOT-ALPHA' ? 42.8 : reportPlot === 'PLOT-BETA' ? 31.2 : 38.5)
-                                               : reportIndex === 'AGB' ? (reportPlot === 'PLOT-ALPHA' ? 124.5 : reportPlot === 'PLOT-BETA' ? 82.4 : 105.8)
-                                               : reportIndex === 'NDVI' ? t.ndvi
-                                               : t.ndmi;
-                                if (reportIndex === 'SOC' || reportIndex === 'AGB') {
-                                  return parseFloat((baseVal * (0.95 + idx * 0.025)).toFixed(1));
-                                }
-                                const offset = reportPlot === 'PLOT-ALPHA' ? 0.04 : reportPlot === 'PLOT-BETA' ? -0.15 : -0.05;
-                                return parseFloat((baseVal + offset).toFixed(2));
-                              }),
-                          backgroundColor: isWholeFarm 
-                            ? ['rgba(22, 163, 74, 0.85)', 'rgba(234, 179, 8, 0.85)', 'rgba(2, 132, 199, 0.85)']
-                            : 'rgba(22, 163, 74, 0.1)',
-                          borderColor: isWholeFarm ? '#ffffff' : '#16A34A',
-                          borderWidth: isWholeFarm ? 0 : 2.5,
-                          fill: !isWholeFarm,
+                          data: TIMELINE_DATA.map(t => {
+                            const key = reportIndex.toLowerCase();
+                            return t[key] ?? null;
+                          }),
+                          backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                          borderColor: '#16A34A',
+                          borderWidth: 2.5,
+                          fill: true,
                           tension: 0.3,
                           pointRadius: 3
                         }]
@@ -8079,16 +6443,13 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         }[reportIndex] || reportIndex;
                         
                         if (isWholeFarm) {
-                          return `Spatial verification of the Whole Farm indicates high performance across the primary vegetative bands. West Valley (Plot Alpha) leads with optimal carbon density. East Ridge (Plot Beta) continues to register minor moisture stress anomalies. Overall forest canopy coverage complies with the EUDR regulatory baseline, confirming 100% deforestation-free integrity.`;
+                          return `Spatial verification of the whole farm indicates performance across all primary vegetative bands. ${metricName} values are derived from real satellite observations. Overall forest canopy coverage is assessed against EUDR regulatory baseline.`;
                         }
-                        if (reportPlot === 'PLOT-BETA') {
-                          return `Spatial audit of Plot Beta (East Ridge) reveals suppressed moisture index levels. Vegetative health remains moderate, but root-zone transpiration stress is elevated. Recommendation: Increase irrigation frequency by 25% and introduce multi-species cover crop systems to prevent further degradation.`;
-                        }
-                        return `Diagnostic review of ${scopeText} shows optimal values for ${metricName}. Canopy density trajectories remain stable with zero forest loss anomalies. The plot is verified compliant with carbon registry baselines and is recommended for VCS credit issuance.`;
+                        return `Diagnostic review of ${scopeText} shows values for ${metricName} derived from real satellite data. Canopy density trajectories are tracked across available observation dates.`;
                       };
 
                       return (
-                        <div className="w-full flex-1 flex flex-col min-h-0 bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800 animate-in fade-in duration-300">
+                        <div className="w-full flex-1 flex flex-col min-h-0 bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800">
                           {/* PDF Viewer Header */}
                           <div className="bg-slate-950 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 no-print shrink-0 select-none">
                             <div className="flex items-center gap-3">
@@ -8141,11 +6502,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                 <div>
                                   <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-wider block mb-1">Scope Target</span>
                                   <span className="text-xs font-bold text-gray-800">
-                                    {generatedReport.plot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : (
-                                      generatedReport.plot === 'PLOT-ALPHA' ? 'PLOT-ALPHA — West Valley Plot' :
-                                      generatedReport.plot === 'PLOT-BETA' ? 'PLOT-BETA — East Ridge Plot' :
-                                      'PLOT-GAMMA — South Slope Plot'
-                                    )}
+                                    {generatedReport.plot === 'WHOLE-FARM' ? 'Whole Farm (Aggregate)' : generatedReport.plot}
                                   </span>
                                 </div>
                                 <div>
@@ -8236,7 +6593,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               AI ASSISTANT
           ══════════════════════════════════════════════════════════════ */}
           {activeSidebarItem === 'analytics' && activeTab === 'ai-assistant' && (
-            <div className="flex flex-col flex-1 h-full bg-white overflow-hidden animate-in fade-in duration-300">
+            <div className="flex flex-col flex-1 h-full bg-white overflow-hidden">
               
               {/* Header (Only shown if chat has started) */}
               {chatMessages.length > 1 && (
@@ -8253,7 +6610,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="flex-1 overflow-y-auto flex flex-col min-h-0 bg-gray-50/20">
                 {chatMessages.length === 1 ? (
                   /* Landing Empty State (Plot layout) */
-                  <div className="flex-1 flex flex-col justify-center items-center max-w-4xl mx-auto px-6 py-8 text-center space-y-8 animate-in fade-in duration-300">
+                  <div className="flex-1 flex flex-col justify-center items-center max-w-4xl mx-auto px-6 py-8 text-center space-y-8">
                     <div className="space-y-3">
                       <h3 className="text-3xl font-extrabold text-gray-900 tracking-tight">Scenario Modeling Assistant</h3>
                       <p className="text-sm text-gray-500 max-w-xl mx-auto leading-relaxed">
@@ -8267,30 +6624,30 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         {
                           id: 'carbon',
                           title: 'Carbon & Climate-Smart Ag',
-                          desc: 'Simulate carbon credit yield if we transition Plot-Alpha to zero-tillage & cover cropping.',
+                          desc: 'Simulate carbon credit yield if we transition this farm to zero-tillage & cover cropping practices.',
                           icon: <Leaf size={15} />,
-                          prompt: 'Simulate carbon credit yield if we transition Plot-Alpha to zero-tillage & multi-species cover cropping.'
+                          prompt: 'Simulate carbon credit yield if we transition this farm to zero-tillage & multi-species cover cropping.'
                         },
                         {
                           id: 'agroforestry',
                           title: 'Agroforestry & Restoration',
-                          desc: 'Model the canopy density growth trajectory and species diversity impact in restoration Zone-Beta.',
+                          desc: 'Model the canopy density growth trajectory and species diversity impact across active restoration zones.',
                           icon: <Trees size={15} />,
-                          prompt: 'Model the canopy density growth trajectory and species diversity index in restoration Zone-Beta.'
+                          prompt: 'Model the canopy density growth trajectory and species diversity index across the active restoration zones on this farm.'
                         },
                         {
                           id: 'accounting',
                           title: 'Carbon Accounting & Registry',
-                          desc: 'Run a geospatial mismatch audit on Plot-Gamma coordinates against regional baseline forest datasets.',
+                          desc: 'Run a geospatial mismatch audit on farm plot coordinates against regional baseline forest datasets.',
                           icon: <Globe size={15} />,
-                          prompt: 'Run a geospatial mismatch audit on Plot-Gamma coordinates against regional baseline forest datasets.'
+                          prompt: 'Run a geospatial mismatch audit on the farm plot coordinates against regional baseline forest datasets.'
                         },
                         {
                           id: 'traceability',
                           title: 'Traceability & Env. Impact',
-                          desc: 'Draft an EUDR-compliant traceability report showing deforestation-free proof for Plot-Alpha.',
+                          desc: 'Draft an EUDR-compliant traceability report showing deforestation-free proof for this farm.',
                           icon: <Shield size={15} />,
-                          prompt: 'Draft an EUDR-compliant traceability report showing deforestation-free proof and soil health history for Plot-Alpha.'
+                          prompt: 'Draft an EUDR-compliant traceability report showing deforestation-free proof and soil health history for this farm.'
                         }
                       ].map(card => (
                         <button
@@ -8318,16 +6675,32 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   <div className="flex-1 overflow-y-auto px-6 py-8">
                     <div className="max-w-3xl mx-auto space-y-6">
                       {chatMessages.map((msg, idx) => (
-                        <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-200`}>
-                          <div className={`max-w-[85%] px-5 py-3.5 rounded-2xl text-sm font-medium leading-relaxed shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${
+                        <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[85%] rounded-2xl text-sm font-medium leading-relaxed shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${
                             msg.sender === 'user'
-                              ? 'text-white rounded-tr-none'
-                              : 'bg-white border border-gray-150 text-gray-700 rounded-tl-none'
+                              ? 'text-white rounded-tr-none px-5 py-3.5'
+                              : 'bg-white border border-gray-150 text-gray-700 rounded-tl-none px-5 py-3.5'
                           }`} style={msg.sender === 'user' ? { backgroundColor: '#16A34A' } : undefined}>
-                            {msg.text}
+                            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                            {msg.sources && msg.sources.length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-1">
+                                {msg.sources.map((src, si) => (
+                                  <span key={si} className="text-xs bg-green-50 text-green-700 border border-green-100 rounded-full px-2 py-0.5 font-medium">{src}</span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
+                      {chatLoading && (
+                        <div className="flex justify-start">
+                          <div className="bg-white border border-gray-150 rounded-2xl rounded-tl-none px-5 py-3.5 flex items-center gap-2 text-sm text-gray-400 font-medium">
+                            <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
+                        </div>
+                      )}
                       <div ref={chatEndRef} />
                     </div>
                   </div>
@@ -8344,18 +6717,20 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     <textarea
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
+                      disabled={chatLoading}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleChatSubmit();
                         }
                       }}
-                      placeholder="Ask about a scenario... e.g. What if rainfall drops 40% next month?"
-                      className="w-full bg-gray-50 border border-transparent focus:border-green-600 focus:bg-white rounded-2xl py-5 pl-6 pr-16 text-sm font-semibold outline-none transition-all text-gray-800 placeholder-gray-400 shadow-sm resize-none h-44 animate-in fade-in duration-150"
+                      placeholder="Ask about your farm... e.g. Which plots have low NDVI this season?"
+                      className="w-full bg-gray-50 border border-transparent focus:border-green-600 focus:bg-white rounded-2xl py-5 pl-6 pr-16 text-sm font-semibold outline-none transition-all text-gray-800 placeholder-gray-400 shadow-sm resize-none h-44 disabled:opacity-50"
                     />
                     <button
                       type="submit"
-                      className="absolute right-4 bottom-4 w-12 h-12 text-white rounded-xl flex items-center justify-center shadow-md shrink-0 transition-transform active:scale-95 hover:opacity-90"
+                      disabled={chatLoading}
+                      className="absolute right-4 bottom-4 w-12 h-12 text-white rounded-xl flex items-center justify-center shadow-md shrink-0 transition-transform active:scale-95 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ backgroundColor: '#16A34A' }}
                     >
                       <Send size={18} />
@@ -8368,7 +6743,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
           )}
 
           {activeSidebarItem === 'help' && (
-            <div className="p-10 space-y-8 animate-in fade-in duration-300 overflow-y-auto h-full">
+            <div className="p-10 space-y-8 overflow-y-auto h-full">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
@@ -8438,7 +6813,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     return categoryMatch && textMatch;
                   })
                   .map(([key, value]) => (
-                    <div key={key} className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm flex flex-col justify-between hover:shadow-md transition-all gap-4 animate-in fade-in duration-200">
+                    <div key={key} className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm flex flex-col justify-between hover:shadow-md transition-all gap-4">
                       <div>
                         <h3 className="text-base font-bold text-gray-950 flex items-center justify-between gap-2">
                           {key}
@@ -8483,7 +6858,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
       {/* Settings Modal */}
       {showSettingsModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]">
           <div className="bg-white rounded-3xl border border-gray-200 shadow-2xl w-[640px] h-[480px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header */}
             <div className="px-6 py-4.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
