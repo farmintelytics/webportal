@@ -203,24 +203,33 @@ export function MapView() {
           const isSelected = selected?.id === b.id;
           const positions = hasRealData ? realBlockToLeaflet(b) : b.polygon;
           if (!positions || positions.length < 3) return null;
-          const fill = hasRealData ? realBlockColor(b) : blockColor(b, primaryLayer);
+          
+          const hasRaster = active[primaryLayer] && currentTileUrl;
+          const fill = hasRaster ? "transparent" : (hasRealData ? realBlockColor(b) : blockColor(b, primaryLayer));
           const layerOpacity = opacity[primaryLayer] ?? 70;
+          const fOpacity = hasRaster ? 0 : (layerOpacity / 100);
+          
           const tooltipLabel = hasRealData
             ? `Plot ${b.plot_nb || b.id} · ${b.estate}`
             : `${b.id} · ${b.estate}`;
           const tooltipSub = hasRealData
             ? `NDVI: ${(b.current_indices?.ndvi ?? 0).toFixed(3)} · ${b.health_class}`
             : ageClassLabel[b.ageClass];
+            
+          // If boundaries toggle is off, and no raster is active, we might want to hide entirely, 
+          // but we still want them clickable. For now, respect the boundaries toggle for outlines:
+          const showOutline = active["boundaries"] || isSelected;
+          
           return (
             <Polygon
               key={b.id}
               positions={positions}
               pathOptions={{
                 fillColor: fill,
-                fillOpacity: layerOpacity / 100,
-                color: isSelected ? "#ffffff" : "#000000",
-                weight: isSelected ? 3 : 1,
-                opacity: 0.5
+                fillOpacity: fOpacity,
+                color: showOutline ? (isSelected ? "#ffffff" : "#ffffff") : "transparent",
+                weight: showOutline ? (isSelected ? 3 : 1) : 0,
+                opacity: showOutline ? (hasRaster ? 0.6 : 0.4) : 0
               }}
               eventHandlers={{ click: () => setSelected(b) }}
             >
