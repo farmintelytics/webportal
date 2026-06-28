@@ -6,6 +6,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Layers, X, Calendar, AlertTriangle, FileText, MapPin, Search } from "lucide-react";
 import { cn } from "@monitoring-shared/lib/utils";
 import L from "leaflet";
+import { fetchTimeseriesSlider } from "../../../../services/agromonitorApi";
 
 type LayerKey =
   | "ndvi" | "evi" | "cire" | "lai" | "lswi" | "bsi"
@@ -80,12 +81,18 @@ function blockColor(b: Block, activeLayer: LayerKey): string {
   return ageColors[b.ageClass] || "#16a34a";
 }
 
-function FitBounds() {
+function FitBounds({ blocks }: { blocks: any[] }) {
   const map = useMap();
   useEffect(() => {
-    const all = blocks.flatMap((b) => b.polygon) as [number, number][];
+    const all = blocks.flatMap((b) => {
+      const coords = b.geometry?.coordinates?.[0] || b.polygon;
+      if (b.geometry?.coordinates?.[0]) {
+        return coords.map(([lng, lat]: [number, number]) => [lat, lng]);
+      }
+      return coords;
+    }) as [number, number][];
     if (all.length) map.fitBounds(all, { padding: [40, 40] });
-  }, [map]);
+  }, [map, blocks]);
   return null;
 }
 
@@ -121,6 +128,39 @@ export function MapView() {
 
   const primaryLayer: LayerKey = (active.bsr ? "bsr" : active.yield ? "yield" : active.cire ? "cire" : "ndvi");
 
+  const [sliderData, setSliderData] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [zarrBounds, setZarrBounds] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadSlider() {
+      try {
+        const data = await fetchTimeseriesSlider({
+          farm: "farm_1",
+          index: primaryLayer,
+          start: "2024-01-01",
+          end: "2027-12-31"
+        });
+        setSliderData(data);
+        if (data?.timeline) {
+          setTimeline(data.timeline);
+          setTime(Math.max(0, data.timeline.length - 1));
+        }
+        if (data?.zarr_bounds) setZarrBounds(data.zarr_bounds);
+      } catch (err) {
+        console.error("Failed to load timeseries slider:", err);
+      }
+    }
+    loadSlider();
+  }, [primaryLayer]);
+
+  const currentTileUrl = useMemo(() => {
+    if (!timeline || timeline.length === 0) return null;
+    const currentEntry = timeline[Math.min(time, timeline.length - 1)];
+    if (!currentEntry) return null;
+    return sliderData?.tiles?.[currentEntry.date] || null;
+  }, [sliderData, timeline, time]);
+
   const stats = useMemo(() => {
     if (hasRealData) {
       return {
@@ -148,7 +188,17 @@ export function MapView() {
           url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
           opacity={0.6}
         />
-        <FitBounds />
+        <FitBounds blocks={blocks} />
+        {active[primaryLayer] && currentTileUrl && (
+          <TileLayer
+            key={currentTileUrl}
+            url={currentTileUrl}
+            opacity={(opacity[primaryLayer] ?? 70) / 100}
+            bounds={zarrBounds || undefined}
+            maxZoom={22}
+            maxNativeZoom={18}
+          />
+        )}
         {blocks.map((b: any) => {
           const isSelected = selected?.id === b.id;
           const positions = hasRealData ? realBlockToLeaflet(b) : b.polygon;
@@ -194,7 +244,7 @@ export function MapView() {
               <div className="flex items-center gap-2">
                 <Calendar className="h-3.5 w-3.5 text-primary"/>
                 <span className="text-[11px] font-bold uppercase tracking-wider">Imagery Explorer</span>
-                <span className="text-xs text-primary font-mono font-bold">{SEASONS[time]}</span>
+                <span className="text-xs text-primary font-mono font-bold">{timeline[time]?.label || "Loading..."}</span>
               </div>
               <div className="flex bg-muted p-0.5 rounded-lg">
                 <button 
@@ -208,7 +258,7 @@ export function MapView() {
               </div>
             </div>
             <input
-              type="range" min={0} max={23} value={time} onChange={e => setTime(+e.target.value)}
+              type="range" min={0} max={Math.max(0, timeline.length - 1)} value={time} onChange={e => setTime(+e.target.value)}
               className="w-full h-1.5 accent-primary appearance-none bg-muted rounded-full cursor-pointer"
             />
           </div>
