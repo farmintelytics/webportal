@@ -105,10 +105,38 @@ const Inventory = () => {
 
   // Group MinIO files statistics
   const totalSize = minioFiles.reduce((acc, f) => acc + f.size_bytes, 0);
-  const typeCounts = minioFiles.reduce((acc, f) => {
-    acc[f.file_type] = (acc[f.file_type] || 0) + 1;
+  
+  const typeStats = minioFiles.reduce((acc, f) => {
+    const t = f.file_type;
+    if (!acc[t]) {
+      acc[t] = { count: 0, size: 0, file_type: t };
+    }
+    acc[t].count += 1;
+    acc[t].size += f.size_bytes;
     return acc;
   }, {});
+
+  const typeStatsList = Object.values(typeStats).sort((a, b) => b.size - a.size);
+
+  const typeColors = {
+    'Zarr Dataset': '#3b82f6',
+    'Boundary (GeoJSON)': '#10b981',
+    'Plots Health Data': '#8b5cf6',
+    'GeoJSON Data': '#06b6d4',
+    'Run Metadata': '#f59e0b',
+    'JSON Data': '#64748b',
+    'ZIP Archive': '#ec4899',
+    'Parquet Data': '#f43f5e',
+    'Image': '#eab308',
+    'GeoTIFF Image': '#14b8a6',
+    'YAML Config': '#374151',
+    'Other': '#94a3b8'
+  };
+
+  const getPercentage = (size) => {
+    if (totalSize === 0) return 0;
+    return ((size / totalSize) * 100).toFixed(1);
+  };
 
   const formatSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
@@ -248,6 +276,62 @@ const Inventory = () => {
           </div>
         </div>
       </div>
+
+      {/* Storage Distribution by Data Type Card */}
+      {minioFiles.length > 0 && (
+        <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <h3 style={{ color: '#0f172a', fontSize: '14px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Layers size={15} color="#16a34a" />
+              MinIO Storage Distribution by Data Type
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '11px', fontWeight: 600, margin: '4px 0 0' }}>Breakdown of the {formatSize(totalSize)} total storage footprint in MinIO</p>
+          </div>
+
+          {/* Progress Bar composite layout */}
+          <div style={{ height: '20px', width: '100%', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden', display: 'flex' }}>
+            {typeStatsList.map(type => {
+              const pct = parseFloat(getPercentage(type.size));
+              if (pct <= 0) return null;
+              return (
+                <div 
+                  key={type.file_type}
+                  style={{
+                    width: `${pct}%`,
+                    background: typeColors[type.file_type] || '#94a3b8',
+                    height: '100%',
+                    transition: 'all 0.3s ease',
+                  }}
+                  title={`${type.file_type}: ${pct}% (${formatSize(type.size)})`}
+                />
+              );
+            })}
+          </div>
+
+          {/* Grid of legend items */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px 24px' }}>
+            {typeStatsList.map(type => {
+              const pct = getPercentage(type.size);
+              const color = typeColors[type.file_type] || '#94a3b8';
+              return (
+                <div key={type.file_type} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{type.file_type}</span>
+                      <span style={{ color: '#0f172a' }}>{pct}%</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                      <span>{type.count} {type.count === 1 ? 'file' : 'files'}</span>
+                      <span style={{ fontFamily: 'monospace' }}>{formatSize(type.size)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filters & Search bar */}
       <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
