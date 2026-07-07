@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { MapContainer, TileLayer, Polygon, Tooltip, useMap } from "react-leaflet";
 import { blocks as mockBlocks, ageClassColor, ageClassLabel, type Block, mapCenter } from "../lib/mock-data";
 import { useMonitoring } from "../../shared/MonitoringContext";
@@ -6,7 +6,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Layers, X, Calendar, AlertTriangle, FileText, MapPin, Search } from "lucide-react";
 import { cn } from "@monitoring-shared/lib/utils";
 import L from "leaflet";
-import { fetchTimeseriesSlider } from "../../../../services/agromonitorApi";
+import { fetchTimeseriesSlider } from "../../../../services/organizationMonitorApi";
 
 type LayerKey =
   | "ndvi" | "evi" | "cire" | "lai" | "lswi" | "bsi"

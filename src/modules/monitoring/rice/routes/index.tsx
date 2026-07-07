@@ -10,7 +10,7 @@ import {
 
 import { Dashboard } from "./dashboard";
 import { cn } from "@monitoring-shared/lib/utils";
-import { fetchPlotsIntelligence, fetchTimeseriesSlider } from "../../../../services/agromonitorApi";
+import { fetchPlotsIntelligence, fetchTimeseriesSlider } from "../../../../services/organizationMonitorApi";
 
 export const Route = createFileRoute("/")({
   head: () => ({

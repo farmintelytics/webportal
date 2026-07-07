@@ -57,7 +57,7 @@ import GroupsDashboard from './modules/cooperative/Dashboard';
 // === Finance & Payments ===
 import FinanceDashboard from './modules/finance/Dashboard';
 
-import AgroMonitor from './modules/agro-monitor/AgroMonitor';
+import OrganizationMonitor from './modules/organization-monitor/OrganizationMonitor';
 
 // === Super Admin Portal ===
 import AdminLogin from './farmintelytics-admin/AdminLogin';
@@ -261,15 +261,15 @@ const PortalPage = () => {
 };
 
 
-// ─── Agro Monitor page (dedicated URL) ──────────────────────────────────────
-const AgroMonitorPage = () => {
+// ─── Organization Monitor page (dedicated URL) ──────────────────────────────
+const OrganizationMonitorPage = () => {
   const navigate = useNavigate();
 
   // In restricted mode there is no hub to go back to
   const handleSignOut   = () => navigate('/login');
   const handleBackToHub = RESTRICTED_MODULE ? null : () => navigate('/');
 
-  return <ErrorBoundary><AgroMonitor onSignOut={handleSignOut} onBack={handleBackToHub} /></ErrorBoundary>;
+  return <ErrorBoundary><OrganizationMonitor onSignOut={handleSignOut} onBack={handleBackToHub} /></ErrorBoundary>;
 };
 
 
@@ -280,7 +280,7 @@ const App = () => {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path={AGROMONITOR_PATH} element={<AgroMonitorPage />} />
+        <Route path={AGROMONITOR_PATH} element={<OrganizationMonitorPage />} />
         {/* Redirect everything else to /login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
@@ -292,7 +292,7 @@ const App = () => {
       <Route path="/"                       element={<HubPage />} />
       <Route path="/login"                  element={<LoginPage />} />
       <Route path="/portal"                 element={<PortalPage />} />
-      <Route path={AGROMONITOR_PATH}        element={<AgroMonitorPage />} />
+      <Route path={AGROMONITOR_PATH}        element={<OrganizationMonitorPage />} />
       <Route path="/admin/login"            element={<AdminLogin />} />
       <Route path="/admin/*"               element={<AdminPortal />} />
       {/* Catch-all: back to hub */}

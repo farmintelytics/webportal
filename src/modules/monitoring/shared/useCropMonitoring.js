@@ -8,7 +8,7 @@
  */
 import { useState, useEffect } from 'react';
 import { fetchCropSummary, fetchCropBlocks, fetchCropIndices } from '../../../services/cropMonitoringApi';
-import { fetchCropMonitoringConfig } from '../../../services/agromonitorApi';
+import { fetchCropMonitoringConfig } from '../../../services/organizationMonitorApi';
 
 export function useCropMonitoring(cropType = 'ffb') {
   const [summary, setSummary] = useState(null);

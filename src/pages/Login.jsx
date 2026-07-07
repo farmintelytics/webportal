@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, Lock, Mail, Eye, EyeOff, ShieldCheck, Globe, Zap, CreditCard, Landmark, Coins, Plane, Radar, Satellite, Users, Layers, UserCheck, Grid } from 'lucide-react';
-import { login } from '../services/agromonitorApi';
+import { login } from '../services/organizationMonitorApi';
 
 const Login = ({ onLogin, moduleName, onBack, defaultEmail = '', defaultCode = '' }) => {
   const [showPassword, setShowPassword] = useState(false);

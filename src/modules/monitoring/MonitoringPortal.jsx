@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import * as api from '../../services/agromonitorApi';
+import * as api from '../../services/organizationMonitorApi';
 import { 
   Globe, 
   Layers, 

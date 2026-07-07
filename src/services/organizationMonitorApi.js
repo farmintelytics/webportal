@@ -1,5 +1,5 @@
 /**
- * agromonitorApi.js
+ * organizationMonitorApi.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Frontend API client for the Farmintelytics Django Ninja backend.
  * Base path: /farmintelytics-engine/agromonitoring

@@ -19,7 +19,7 @@ import {
   ChevronDown,
   Trees
 } from 'lucide-react';
-import { fetchTenants, fetchCropMonitoringConfig } from '../services/agromonitorApi';
+import { fetchTenants, fetchCropMonitoringConfig } from '../services/organizationMonitorApi';
 
 
 const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (

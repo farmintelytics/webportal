@@ -9,7 +9,7 @@ import { Input } from "@monitoring-shared/ui/input";
 import { Button } from "@monitoring-shared/ui/button";
 import { cn } from "@monitoring-shared/lib/utils";
 import { useMonitoring } from "../../../shared/MonitoringContext";
-import { fetchTimeseriesSlider } from "../../../../../services/agromonitorApi";
+import { fetchTimeseriesSlider } from "../../../../../services/organizationMonitorApi";
 
 function FitBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
   const map = useMap();

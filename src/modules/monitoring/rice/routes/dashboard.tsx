@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 import { MapHome } from "./index";
-import { fetchDashboardTrends } from "../../../../services/agromonitorApi";
+import { fetchDashboardTrends } from "../../../../services/organizationMonitorApi";
 
 
 export const Route = createFileRoute("/dashboard")({

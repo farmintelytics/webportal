@@ -8,7 +8,7 @@ import { defaultLayers, type Block, type MapLayer } from "../data/fallbackData";
 import { AlertTriangle, Sprout, Map as MapIcon, Mountain, Globe, Layers as LayersIcon } from "lucide-react";
 import { cn } from "@monitoring-shared/lib/utils";
 import { useMonitoring } from "../../shared/MonitoringContext";
-import { fetchTimeseriesSlider } from "../../../../services/agromonitorApi";
+import { fetchTimeseriesSlider } from "../../../../services/organizationMonitorApi";
 
 const FarmMap = lazy(() => import("../components/FarmMap").then((m) => ({ default: m.FarmMap })));
 

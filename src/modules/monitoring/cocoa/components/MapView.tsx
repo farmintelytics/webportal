@@ -6,7 +6,7 @@ import { type HealthClass, type Block } from "../lib/cocoa-data";
 import { Layers, Search, X, Eye, EyeOff, ChevronDown, ChevronRight, Calendar } from "lucide-react";
 import { cn } from "@monitoring-shared/lib/utils";
 import { useMonitoring } from "../../shared/MonitoringContext";
-import { fetchTimeseriesSlider } from "../../../../services/agromonitorApi";
+import { fetchTimeseriesSlider } from "../../../../services/organizationMonitorApi";
 
 
 // Schematic farm geographic coords centered on Ashanti, Ghana cocoa region
