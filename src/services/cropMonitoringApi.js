@@ -75,7 +75,7 @@ export const CROP_META = {
     primaryIndex: 'ndvi',
     moistureIndex: 'lswi',
     color: '#16A34A',
-    indices: ['ndvi', 'evi', 'reci', 'lswi', 'wdi', 'ndre', 'cvi', 'ndmi'],
+    indices: ['ndvi', 'evi', 'reci', 'lswi', 'wdi', 'ndre', 'cvi', 'ndmi', 'msi'],
   },
   oil_palm: {
     label: 'Oil Palm',
@@ -83,7 +83,7 @@ export const CROP_META = {
     primaryIndex: 'ndvi',
     moistureIndex: 'lswi',
     color: '#16A34A',
-    indices: ['ndvi', 'evi', 'reci', 'lswi', 'wdi', 'ndre', 'cvi', 'ndmi'],
+    indices: ['ndvi', 'evi', 'reci', 'lswi', 'wdi', 'ndre', 'cvi', 'ndmi', 'msi'],
   },
   sugarcane: {
     label: 'Sugarcane',
@@ -91,7 +91,7 @@ export const CROP_META = {
     primaryIndex: 'ndvi',
     moistureIndex: 'ndmi', // MDWI / NDMI for cane moisture
     color: '#CA8A04',
-    indices: ['ndvi', 'evi', 'ndmi', 'lswi', 'wdi', 'reci', 'savi', 'lai'],
+    indices: ['ndvi', 'evi', 'ndmi', 'lswi', 'wdi', 'reci', 'savi', 'lai', 'msavi2'],
   },
   rice: {
     label: 'Rice',
@@ -99,7 +99,7 @@ export const CROP_META = {
     primaryIndex: 'ndvi',
     moistureIndex: 'ndwi', // NDWI for flooded paddy detection
     color: '#0891B2',
-    indices: ['ndvi', 'ndwi', 'evi', 'lai', 'ndmi'],
+    indices: ['ndvi', 'ndwi', 'evi', 'lai', 'ndmi', 'gndvi', 'msi'],
   },
   cocoa: {
     label: 'Cocoa',
@@ -107,7 +107,7 @@ export const CROP_META = {
     primaryIndex: 'ndvi',
     moistureIndex: 'ndmi',
     color: '#92400E',
-    indices: ['ndvi', 'lai', 'reci', 'cvi', 'evi', 'ndmi'],
+    indices: ['ndvi', 'lai', 'reci', 'cvi', 'evi', 'ndmi', 'msi'],
   },
   cassava: {
     label: 'Cassava',
@@ -115,7 +115,7 @@ export const CROP_META = {
     primaryIndex: 'ndvi',
     moistureIndex: 'ndmi',
     color: '#7C3AED',
-    indices: ['ndvi', 'evi', 'ndmi', 'lai'],
+    indices: ['ndvi', 'evi', 'ndmi', 'lai', 'msavi2', 'msi'],
   },
   maize: {
     label: 'Maize',
@@ -123,7 +123,7 @@ export const CROP_META = {
     primaryIndex: 'ndvi',
     moistureIndex: 'ndmi',
     color: '#D97706',
-    indices: ['ndvi', 'evi', 'lai', 'ndmi', 'reci'],
+    indices: ['ndvi', 'evi', 'lai', 'ndmi', 'reci', 'gndvi', 'msi'],
   },
   rubber: {
     label: 'Rubber',
@@ -131,7 +131,7 @@ export const CROP_META = {
     primaryIndex: 'ndvi',
     moistureIndex: 'lswi',
     color: '#64748B',
-    indices: ['ndvi', 'evi', 'reci', 'lswi', 'ndmi'],
+    indices: ['ndvi', 'evi', 'reci', 'lswi', 'ndmi', 'msi'],
   },
   cashew: {
     label: 'Cashew',
@@ -139,6 +139,6 @@ export const CROP_META = {
     primaryIndex: 'ndvi',
     moistureIndex: 'ndwi',
     color: '#B45309',
-    indices: ['ndvi', 'evi', 'ndwi', 'reci', 'ndmi'],
+    indices: ['ndvi', 'evi', 'ndwi', 'reci', 'ndmi', 'gndvi', 'msi'],
   },
 };

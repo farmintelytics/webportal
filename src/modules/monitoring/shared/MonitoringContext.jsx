@@ -9,10 +9,11 @@ const MonitoringContext = createContext({
   cropIndices: null,
   cropLoading: false,
   cropError: null,
+  mapCenter: null,
 });
 
-export const MonitoringProvider = ({ children, onBack, onSignOut, cropType, cropSummary, cropBlocks, cropIndices, cropLoading, cropError }) => (
-  <MonitoringContext.Provider value={{ onBack, onSignOut, cropType: cropType ?? 'ffb', cropSummary, cropBlocks: cropBlocks ?? [], cropIndices, cropLoading: cropLoading ?? false, cropError: cropError ?? null }}>
+export const MonitoringProvider = ({ children, onBack, onSignOut, cropType, cropSummary, cropBlocks, cropIndices, cropLoading, cropError, mapCenter }) => (
+  <MonitoringContext.Provider value={{ onBack, onSignOut, cropType: cropType ?? 'ffb', cropSummary, cropBlocks: cropBlocks ?? [], cropIndices, cropLoading: cropLoading ?? false, cropError: cropError ?? null, mapCenter }}>
     {children}
   </MonitoringContext.Provider>
 );

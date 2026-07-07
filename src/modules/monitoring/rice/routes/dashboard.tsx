@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { KpiCard } from "../components/KpiCard";
-import { plots, ndviTimeSeries, rainfallData, yieldByStage, stageColors } from "../lib/fallbackData";
+import { ndviTimeSeries, rainfallData, stageColors } from "../lib/fallbackData";
+import { useMonitoring } from "../../shared/MonitoringContext";
 import { Sprout, Droplets, AlertTriangle, Wheat } from "lucide-react";
 import {
   Line, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell,
@@ -11,7 +12,7 @@ import {
 } from "recharts";
 
 import { MapHome } from "./index";
-import { fetchPlotsIntelligence, fetchDashboardTrends } from "../../../../services/agromonitorApi";
+import { fetchDashboardTrends } from "../../../../services/agromonitorApi";
 
 
 export const Route = createFileRoute("/dashboard")({
@@ -31,43 +32,13 @@ const indices = [
 ] as const;
 
 export function Dashboard() {
+  const { cropSummary, cropBlocks, cropLoading } = useMonitoring();
   const [range, setRange] = useState<"4w" | "12w" | "season">("12w");
   const [enabled, setEnabled] = useState<Record<string, boolean>>({ ndvi: true, evi: true, ndre: true });
   const [compareLast, setCompareLast] = useState(true);
-
-  const [plotsData, setPlotsData] = useState<any[]>(plots);
   const [trendsData, setTrendsData] = useState<any>(null);
 
   useEffect(() => {
-    fetchPlotsIntelligence()
-      .then((res) => {
-        if (res && res.length > 0) {
-          const mapped = res.map((p: any) => {
-            const ndvi = p.indices?.ndvi ?? 0.65;
-            const ndmi = p.indices?.ndmi ?? 0.45;
-            const alert = p.indices?.uas_anomaly_score > 0.4 ? "critical" : p.indices?.uas_anomaly_score > 0.15 ? "stressed" : "healthy";
-            return {
-              id: p.plot_id,
-              name: p.name,
-              area: p.area_ha ?? 10.0,
-              ndvi,
-              ndre: +(ndvi * 0.7).toFixed(2),
-              lswi: ndmi,
-              vhi: Math.round(ndvi * 100),
-              stage: p.stage ?? "Vegetative",
-              predictedYield: +(ndvi * 5.2).toFixed(2),
-              lastSeasonYield: +(ndvi * 4.8).toFixed(2),
-              alert,
-              soilScore: 85,
-              waterScore: 80,
-              climateScore: 78,
-            };
-          });
-          setPlotsData(mapped);
-        }
-      })
-      .catch((err) => console.error("Error fetching plots intelligence:", err));
-
     fetchDashboardTrends()
       .then((res) => {
         if (res) {
@@ -76,6 +47,32 @@ export function Dashboard() {
       })
       .catch((err) => console.error("Error fetching dashboard trends:", err));
   }, []);
+
+  const plotsData = useMemo(() => {
+    if (!cropBlocks || cropBlocks.length === 0) return [];
+    return cropBlocks.map((p: any) => {
+      const ndvi = p.current_indices?.ndvi ?? 0.65;
+      const ndmi = p.current_indices?.ndmi ?? p.current_indices?.ndwi ?? 0.45;
+      const alert = p.health_class === "Critical" ? "critical" : p.health_class === "Stressed" ? "stressed" : "healthy";
+      return {
+        id: p.id,
+        name: p.plot_nb ? `Plot ${p.plot_nb}` : p.id,
+        area: p.area_ha ?? 10.0,
+        ndvi,
+        ndre: p.current_indices?.ndre ?? +(ndvi * 0.7).toFixed(2),
+        lswi: p.current_indices?.lswi ?? ndmi,
+        vhi: Math.round(ndvi * 100),
+        stage: p.stage ?? "Vegetative",
+        predictedYield: p.yield_t_ha ?? +(ndvi * 5.2).toFixed(2),
+        lastSeasonYield: p.yield_t_ha ? +(p.yield_t_ha * 0.95).toFixed(2) : +(ndvi * 4.8).toFixed(2),
+        alert,
+        soilScore: 85,
+        waterScore: 80,
+        climateScore: 78,
+        suitabilityScore: 82,
+      };
+    });
+  }, [cropBlocks]);
 
   const activeNdviTimeSeries = useMemo(() => {
     if (trendsData && trendsData.ndvi_vigor_trends) {
@@ -90,8 +87,10 @@ export function Dashboard() {
   }, [trendsData]);
 
   const activeRainfallData = useMemo(() => {
-    return rainfallData;
-  }, []);
+    return cropSummary?.rainfall_series?.length > 0
+      ? cropSummary.rainfall_series
+      : rainfallData;
+  }, [cropSummary]);
 
   const activeYieldByStage = useMemo(() => {
     return [
@@ -113,11 +112,11 @@ export function Dashboard() {
   const totalArea = plotsData.reduce((s, p) => s + p.area, 0);
   const totalYield = plotsData.reduce((s, p) => s + p.predictedYield * p.area, 0);
   const stressed = plotsData.filter(p => p.alert !== "healthy").length;
-  const avgNdvi = +(plotsData.reduce((s,p)=>s+p.ndvi,0)/plotsData.length).toFixed(2);
+  const avgNdvi = plotsData.length > 0 ? +(plotsData.reduce((s,p)=>s+p.ndvi,0)/plotsData.length).toFixed(2) : 0;
 
   const radarData = ["soilScore","waterScore","climateScore","suitabilityScore"].map(k => ({
     metric: k.replace("Score",""),
-    score: Math.round(plotsData.reduce((s,p)=>s+(p as any)[k],0)/plotsData.length),
+    score: plotsData.length > 0 ? Math.round(plotsData.reduce((s,p)=>s+(p as any)[k],0)/plotsData.length) : 0,
   }));
 
   return (

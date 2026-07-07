@@ -14,7 +14,7 @@ export default function Monitoring({ onBack, onSignOut }) {
   }, []);
 
   // sugarcane uses NDMI/LSWI/WDI for moisture (user mentioned MDWI ≈ NDMI)
-  const { summary, blocks, indices, loading, error } = useCropMonitoring('sugarcane');
+  const { summary, blocks, indices, mapCenter, loading, error } = useCropMonitoring('sugarcane');
 
   return (
     <SidebarProvider>
@@ -28,6 +28,7 @@ export default function Monitoring({ onBack, onSignOut }) {
           cropIndices={indices}
           cropLoading={loading}
           cropError={error}
+          mapCenter={mapCenter}
         >
           <RouterProvider router={router} />
         </MonitoringProvider>

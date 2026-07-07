@@ -8,11 +8,13 @@
  */
 import { useState, useEffect } from 'react';
 import { fetchCropSummary, fetchCropBlocks, fetchCropIndices } from '../../../services/cropMonitoringApi';
+import { fetchCropMonitoringConfig } from '../../../services/agromonitorApi';
 
 export function useCropMonitoring(cropType = 'ffb') {
   const [summary, setSummary] = useState(null);
   const [blocks, setBlocks] = useState([]);
   const [indices, setIndices] = useState(null);
+  const [mapCenter, setMapCenter] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -23,13 +25,17 @@ export function useCropMonitoring(cropType = 'ffb') {
 
     async function load() {
       try {
-        const [sumRes, indRes] = await Promise.all([
+        const [sumRes, indRes, confRes] = await Promise.all([
           fetchCropSummary(cropType),
           fetchCropIndices(cropType),
+          fetchCropMonitoringConfig().catch(() => null),
         ]);
         if (!active) return;
         setSummary(sumRes);
         setIndices(indRes);
+        if (confRes && confRes.map_center) {
+          setMapCenter(confRes.map_center);
+        }
 
         // Blocks can be large (623 items) — load separately
         try {
@@ -49,5 +55,5 @@ export function useCropMonitoring(cropType = 'ffb') {
     return () => { active = false; };
   }, [cropType]);
 
-  return { summary, blocks, indices, loading, error };
+  return { summary, blocks, indices, mapCenter, loading, error };
 }

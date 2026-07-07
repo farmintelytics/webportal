@@ -7,7 +7,7 @@ import 'leaflet/dist/leaflet.css';
 import './styles.css';
 
 export default function Monitoring({ onBack, onSignOut }) {
-  const { summary, blocks, indices, loading, error } = useCropMonitoring('cassava');
+  const { summary, blocks, indices, mapCenter, loading, error } = useCropMonitoring('cassava');
   const router = useMemo(() => {
     const memoryHistory = createMemoryHistory({
       initialEntries: ['/'],
@@ -21,7 +21,7 @@ export default function Monitoring({ onBack, onSignOut }) {
 
   return (
     <div className='monitoring-theme-cassava min-h-screen w-full'>
-      <MonitoringProvider onBack={onBack} onSignOut={onSignOut} cropType="cassava" cropSummary={summary} cropBlocks={blocks} cropIndices={indices} cropLoading={loading} cropError={error}>
+      <MonitoringProvider onBack={onBack} onSignOut={onSignOut} cropType="cassava" cropSummary={summary} cropBlocks={blocks} cropIndices={indices} cropLoading={loading} cropError={error} mapCenter={mapCenter}>
         <RouterProvider router={router} />
       </MonitoringProvider>
     </div>

@@ -2,18 +2,8 @@
  * agromonitorApi.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Frontend API client for the Farmintelytics Django Ninja backend.
- *
- * Usage: import { fetchDashboardStats, fetchPlotsIntelligence, … } from '../api/agromonitorApi';
- *
- * The backend runs at http://127.0.0.1:8000 (Django dev server).
  * Base path: /farmintelytics-engine/agromonitoring
  * Every function is async and returns the parsed JSON response.
- *
- * NOTE: The frontend currently uses hardcoded mock data. These functions are
- * ready to be wired in as drop-in replacements once the backend is deployed.
- *
- * VERIFICATION PAGE: The /api/verification/audit endpoint intentionally returns
- * empty checks and logs — the verification page is left blank for now.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -33,6 +23,7 @@ async function apiFetch(path, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   const res = await fetch(url, {
+    cache: 'no-store',
     ...options,
     headers,
   });
@@ -78,20 +69,22 @@ export async function verifyToken(token) {
  *   total_area_ha, active_imagery_source, average_carbon_density_tco2e_ha,
  *   active_alerts_count, audit_status
  */
-export async function fetchDashboardStats() {
-  return apiFetch('/dashboard/stats');
+export async function fetchDashboardStats(tenant) {
+  const params = tenant ? `?tenant=${tenant}` : '';
+  return apiFetch(`/dashboard/stats${params}`);
 }
 
 /**
- * GET /api/dashboard/trends
+ * GET /api/dashboard/trends?tenant={tenant}
  * Returns charting datasets:
  *   ndvi_vigor_trends[]   → for the 6-month NDVI line chart
  *   moisture_comparison[] → NDMI bar chart (matches plotsData field ndmi)
  *   nutrient_profile      → radar chart labels + values
  *   land_use_classification[] → doughnut chart segments
  */
-export async function fetchDashboardTrends() {
-  return apiFetch('/dashboard/trends');
+export async function fetchDashboardTrends(tenant) {
+  const params = tenant ? `?tenant=${tenant}` : '';
+  return apiFetch(`/dashboard/trends${params}`);
 }
 
 // ─── Intelligence Layers ────────────────────────────────────────────────────
@@ -110,8 +103,9 @@ export async function fetchDashboardTrends() {
  *   indices.uas_anomaly_score → uas_anomaly_score
  *   boundary.coordinates → coords (after lat/lng swap – see note below)
  */
-export async function fetchPlotsIntelligence() {
-  return apiFetch('/plots/intelligence');
+export async function fetchPlotsIntelligence(tenant) {
+  const params = tenant ? `?tenant=${tenant}` : '';
+  return apiFetch(`/plots/intelligence${params}`);
 }
 
 // ─── Crop Health Analytics ──────────────────────────────────────────────────
@@ -205,8 +199,9 @@ export async function fetchPlotsTelemetry({ date, plotId } = {}) {
  *   biodiversity_score   → biodiversity_score
  *   manager              → manager
  */
-export async function fetchRestorationZones() {
-  return apiFetch('/restoration/zones');
+export async function fetchRestorationZones(tenant) {
+  const params = tenant ? `?tenant=${tenant}` : '';
+  return apiFetch(`/restoration/zones${params}`);
 }
 
 // ─── Alerts Command Center ──────────────────────────────────────────────────
@@ -219,8 +214,9 @@ export async function fetchRestorationZones() {
  * AlertItem: { alert_id, plot_id, type, severity, message, timestamp,
  *              acknowledged, acknowledged_by, acknowledged_at }
  */
-export async function fetchAlerts() {
-  return apiFetch('/alerts');
+export async function fetchAlerts(tenant) {
+  const params = tenant ? `?tenant=${tenant}` : '';
+  return apiFetch(`/alerts${params}`);
 }
 
 /**
@@ -338,22 +334,47 @@ export async function fetchTenants() {
 }
 
 /**
- * GET /timeseries/slider/?farm={farm}&index={index}&start={start}&end={end}
- * Returns timeseries slider URLs and stats.
+ * GET /crop-monitoring/config
+ * Returns active tenant crop permissions and map settings.
+ * @returns {Promise<{tenant: string, display_name: string, allowed_crops: string[], map_center: [number, number], modules: string[]}>}
  */
-export async function fetchTimeseriesSlider({ farm, index, start, end } = {}) {
+export async function fetchCropMonitoringConfig() {
+  return apiFetch('/crop-monitoring/config');
+}
+
+/**
+ * GET /timeseries/slider/?farm={farm}&index={index}&start={start}&end={end}&sensor={sensor}&load_delay={delay}
+ * Returns timeseries slider URLs and stats.
+ * @param {Object} options
+ * @param {string} options.farm - Farm identifier
+ * @param {string} options.index - Index name (e.g., 'ndvi', 'ndmi')
+ * @param {string} [options.start] - Start date (ISO format)
+ * @param {string} [options.end] - End date (ISO format)
+ * @param {string} [options.sensor] - Data source (e.g., 'sentinel', 'landsat')
+ * @param {number} [options.loadDelay] - Delay in seconds before returning (allows data to load)
+ */
+export async function fetchTimeseriesSlider({ farm, index, start, end, sensor, loadDelay = 0 } = {}) {
   const params = new URLSearchParams({ farm, index });
   if (start) params.set('start', start);
   if (end) params.set('end', end);
+  if (sensor) params.set('sensor', sensor);
+  if (loadDelay > 0) params.set('load_delay', loadDelay.toString());
   return apiFetch(`/timeseries/slider?${params}`);
 }
 
 /**
- * GET /timeseries/pixel/?farm={farm}&index={index}&lat={lat}&lon={lon}
+ * GET /timeseries/pixel/?farm={farm}&index={index}&lat={lat}&lon={lon}&load_delay={delay}
  * Returns pixel-level Zarr time series data.
+ * @param {Object} options
+ * @param {string} options.farm - Farm identifier
+ * @param {string} options.index - Index name (e.g., 'ndvi', 'ndmi')
+ * @param {number} options.lat - Latitude coordinate
+ * @param {number} options.lon - Longitude coordinate
+ * @param {number} [options.loadDelay] - Delay in seconds before returning (allows data to load)
  */
-export async function fetchPixelTimeseries({ farm, index, lat, lon } = {}) {
+export async function fetchPixelTimeseries({ farm, index, lat, lon, loadDelay = 0 } = {}) {
   const params = new URLSearchParams({ farm, index, lat: lat.toString(), lon: lon.toString() });
+  if (loadDelay > 0) params.set('load_delay', loadDelay.toString());
   return apiFetch(`/timeseries/pixel?${params}`);
 }
 
@@ -386,6 +407,25 @@ export async function queryAiAgent(question) {
 export async function fetchRasterIndices(tenant) {
   const params = tenant ? `?tenant=${tenant}` : '';
   return apiFetch(`/raster/indices${params}`);
+}
+
+/**
+ * POST /cache/clear
+ * Clear all cached zarr stores. Call after pipeline ingestion completes to force refresh.
+ * @returns {{ status: string, message: string }}
+ */
+export async function clearCache() {
+  return apiFetch('/cache/clear', { method: 'POST' });
+}
+
+/**
+ * POST /cache/rebuild
+ * Rebuild cache by pre-loading indices for the current tenant.
+ * Clears cache first, then pre-loads frequently accessed indices.
+ * @returns {{ status: string, tenant: string, rebuilt_count: number, indices: string[] }}
+ */
+export async function rebuildCache() {
+  return apiFetch('/cache/rebuild', { method: 'POST' });
 }
 
 

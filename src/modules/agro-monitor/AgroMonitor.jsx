@@ -900,11 +900,11 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     let active = true;
     async function loadBackendData() {
       try {
-        const statsRes = await api.fetchDashboardStats();
-        const trendsRes = await api.fetchDashboardTrends();
-        const plotsRes = await api.fetchPlotsIntelligence();
-        const zonesRes = await api.fetchRestorationZones();
-        const alertsRes = await api.fetchAlerts();
+        const statsRes = await api.fetchDashboardStats(tenant);
+        const trendsRes = await api.fetchDashboardTrends(tenant);
+        const plotsRes = await api.fetchPlotsIntelligence(tenant);
+        const zonesRes = await api.fetchRestorationZones(tenant);
+        const alertsRes = await api.fetchAlerts(tenant);
 
         if (active) {
           setStats(statsRes);
@@ -940,7 +940,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     }
     loadBackendData();
     return () => { active = false; };
-  }, []);
+  }, [tenant]);
   const [selectedBasemap, setSelectedBasemap] = useState('sentinel-2');
   const [selectedIndex, setSelectedIndex] = useState('ndvi');
   const [mapOpacity, setMapOpacity] = useState(80);
@@ -961,26 +961,41 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     loadIndices();
   }, [tenant]);
 
+  const [refreshSlider, setRefreshSlider] = useState(0);
+  const [selectedSensor, setSelectedSensor] = useState('sentinel-2'); // 'sentinel-2' | 'landsat'
+
+  const SAR_INDICES = new Set(['rvi', 'dprvi', 'smi', 'flood_mask', 'sar_rvi', 'sar_dprvi', 'sar_smi']);
+  const isSarIndex = SAR_INDICES.has((selectedIndex || '').toLowerCase());
+  // SAR indices are always Sentinel-1; optical defaults to user-chosen sensor
+  const effectiveSensor = isSarIndex ? 'sentinel-1' : selectedSensor;
+
   // Fetch timeseries slider and pre-rendered raster overlays
   useEffect(() => {
     async function loadSliderData() {
+      setTimelineLoading(true);
+      setSliderData(null);        // clear stale tiles while fetching
+      setTIMELINE_DATA([]);       // clear stale labels immediately
       try {
         const indexName = (selectedIndex || 'ndvi').toLowerCase();
+        const sensorParam = isSarIndex ? 'sentinel-1' : selectedSensor;
         const data = await api.fetchTimeseriesSlider({
-          farm: 'farm_1',
+          farm: tenant || 'farm_1',
           index: indexName,
-          start: '2024-01-01',
-          end: '2027-12-31'
+          start: '2026-01-01',
+          end: '2026-03-31',
+          sensor: sensorParam,
         });
         setSliderData(data);
         // Keep zarr bounds in sync when index changes (SAR vs optical extents may differ)
         if (data?.zarr_bounds) setZarrBounds(data.zarr_bounds);
       } catch (err) {
         console.error("Failed to fetch timeseries slider data:", err);
+      } finally {
+        setTimelineLoading(false);
       }
     }
     loadSliderData();
-  }, [selectedPlot, selectedIndex]);
+  }, [selectedPlot, selectedIndex, tenant, refreshSlider, selectedSensor]);
 
   // Click handler to fetch Zarr pixel timeseries
   const handlePlotClick = async (plot, lat, lng) => {
@@ -1011,6 +1026,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
   // Real timeline loaded from backend zarr/TIF data — no mock values
   const [TIMELINE_DATA, setTIMELINE_DATA] = useState([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
+  const [tileRefreshing, setTileRefreshing] = useState(false);
   // Spatial bounds from zarr x/y arrays: [[min_lat, min_lng], [max_lat, max_lng]]
   const [zarrBounds, setZarrBounds] = useState(null);
 
@@ -1023,32 +1039,84 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
       setTIMELINE_DATA([]);
       return;
     }
-    const entries = sliderData.timeline.map((t) => ({
-      date: t.date,
-      label: t.label,
-      satellite: t.satellite || null,
-      quality: '—',
-      ndvi: t.ndvi ?? 0,
-      ndmi: t.ndmi ?? 0,
-      color: '#16A34A',
-      tileUrl: (sliderData.tiles || {})[t.date] || null,
-    }));
+    const entries = sliderData.timeline.map((t) => {
+      let sumNdvi = 0, countNdvi = 0;
+      let sumNdmi = 0, countNdmi = 0;
+      let sumEvi = 0, countEvi = 0;
+      let sumChl = 0, countChl = 0;
+      let sumNdwi = 0, countNdwi = 0;
+
+      if (plots && plots.length > 0) {
+        plots.forEach(p => {
+          if (p.indices) {
+            if (p.indices.ndvi && p.indices.ndvi[t.date] != null) { sumNdvi += p.indices.ndvi[t.date]; countNdvi++; }
+            if (p.indices.ndmi && p.indices.ndmi[t.date] != null) { sumNdmi += p.indices.ndmi[t.date]; countNdmi++; }
+            if (p.indices.evi && p.indices.evi[t.date] != null) { sumEvi += p.indices.evi[t.date]; countEvi++; }
+            if (p.indices.cvi && p.indices.cvi[t.date] != null) { sumChl += p.indices.cvi[t.date]; countChl++; }
+            if (p.indices.ndwi && p.indices.ndwi[t.date] != null) { sumNdwi += p.indices.ndwi[t.date]; countNdwi++; }
+          }
+        });
+      }
+
+      return {
+        date: t.date,
+        label: t.label,
+        satellite: t.satellite || null,
+        quality: '—',
+        ndvi: countNdvi > 0 ? sumNdvi / countNdvi : (t.ndvi ?? 0),
+        ndmi: countNdmi > 0 ? sumNdmi / countNdmi : (t.ndmi ?? 0),
+        evi: countEvi > 0 ? sumEvi / countEvi : 0,
+        chlorophyll: countChl > 0 ? sumChl / countChl : 0,
+        ndwi: countNdwi > 0 ? sumNdwi / countNdwi : 0,
+        color: '#16A34A',
+        tileUrl: (sliderData.tiles || {})[t.date] || null,
+      };
+    });
     setTIMELINE_DATA(entries);
     if (entries.length > 0) {
-      const last = entries[entries.length - 1].date;
+      // Auto-navigate calendar and slider to the most recent available acquisition date
+      const lastIdx = entries.length - 1;
+      const last = entries[lastIdx].date;
       const d = new Date(last);
       setCalendarMonth(d.getMonth());
       setCalendarYear(d.getFullYear());
+      setSelectedTimelineIndex(lastIdx);
     }
-  }, [sliderData]);
+  }, [sliderData, plots]);
 
   const [selectedTimelineIndex, setSelectedTimelineIndex] = useState(2);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [compareTimelineIndex, setCompareTimelineIndex] = useState(3);
 
-  const clampedTimelineIndex = Math.min(selectedTimelineIndex, TIMELINE_DATA.length - 1);
+  // activeTimelineIndex drives map tile rendering — debounced 10s after slider stops.
+  // selectedTimelineIndex updates instantly for slider position feedback.
+  const [activeTimelineIndex, setActiveTimelineIndex] = useState(2);
+  const [activeCompareTimelineIndex, setActiveCompareTimelineIndex] = useState(3);
+  const [sliderPending, setSliderPending] = useState(false);
+  const sliderTimerA = useRef(null);
+  const sliderTimerB = useRef(null);
+
+  useEffect(() => {
+    setSliderPending(true);
+    clearTimeout(sliderTimerA.current);
+    sliderTimerA.current = setTimeout(() => {
+      setActiveTimelineIndex(selectedTimelineIndex);
+      setSliderPending(false);
+    }, 10000);
+    return () => clearTimeout(sliderTimerA.current);
+  }, [selectedTimelineIndex]);
+
+  useEffect(() => {
+    clearTimeout(sliderTimerB.current);
+    sliderTimerB.current = setTimeout(() => {
+      setActiveCompareTimelineIndex(compareTimelineIndex);
+    }, 10000);
+    return () => clearTimeout(sliderTimerB.current);
+  }, [compareTimelineIndex]);
+
+  const clampedTimelineIndex = Math.min(activeTimelineIndex, TIMELINE_DATA.length - 1);
   const currentTimelineA = TIMELINE_DATA[clampedTimelineIndex >= 0 ? clampedTimelineIndex : 0];
-  const clampedCompareTimelineIndex = Math.min(compareTimelineIndex, TIMELINE_DATA.length - 1);
+  const clampedCompareTimelineIndex = Math.min(activeCompareTimelineIndex, TIMELINE_DATA.length - 1);
   const currentTimelineB = TIMELINE_DATA[clampedCompareTimelineIndex >= 0 ? clampedCompareTimelineIndex : 0];
   const currentTimeline = currentTimelineA;
 
@@ -1100,6 +1168,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
     if (currentTimeline.tileUrl) return currentTimeline.tileUrl;
     return null;
   }, [sliderData, currentTimeline]);
+
+  // Brief flash to signal tile refresh to user when tile URL changes
+  useEffect(() => {
+    if (!currentTileUrl) return;
+    setTileRefreshing(true);
+    const t = setTimeout(() => setTileRefreshing(false), 1800);
+    return () => clearTimeout(t);
+  }, [currentTileUrl]);
 
   const activePlotBounds = useMemo(() => {
     // For the raster overlay we want full-farm coverage, not a single plot.
@@ -2440,59 +2516,118 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               {isPlaying ? <Pause size={14} /> : <Play size={15} />}
             </button>
             <div className="flex-1 relative">
-              <input type="range" min="0" max={TIMELINE_DATA.length - 1}
-                value={isCompareMode ? (activeDateSlot === 'A' ? selectedTimelineIndex : compareTimelineIndex) : selectedTimelineIndex}
-                onChange={e => {
-                  const val = parseInt(e.target.value);
-                  if (isCompareMode) {
-                    if (activeDateSlot === 'A') setSelectedTimelineIndex(val);
-                    else setCompareTimelineIndex(val);
-                  } else {
-                    setSelectedTimelineIndex(val);
-                  }
-                }}
-                className={`w-full h-2 bg-gray-100 rounded-full appearance-none cursor-pointer ${
-                  isCompareMode && activeDateSlot === 'B' ? 'accent-blue-600' : 'accent-green-600'
-                }`} />
-              <div className="flex justify-between px-0.5 mt-1">
-                {TIMELINE_DATA.map((t, i) => {
-                  const isActive = isCompareMode 
-                    ? (activeDateSlot === 'A' ? i === selectedTimelineIndex : i === compareTimelineIndex)
-                    : i === selectedTimelineIndex;
-                  return (
-                    <span key={i} className={`text-[9px] font-semibold transition-colors ${
-                      isActive 
-                        ? (isCompareMode && activeDateSlot === 'B' ? 'text-blue-600 font-bold' : 'text-green-600 font-bold') 
-                        : 'text-gray-400'
-                    }`}>
-                      {t.label.split(',')[0]}
-                    </span>
-                  );
-                })}
-              </div>
+              {timelineLoading ? (
+                <div className="flex items-center gap-2 h-8 text-xs text-gray-400">
+                  <svg className="animate-spin h-4 w-4 text-green-500 shrink-0" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                  Loading satellite timeline…
+                </div>
+              ) : TIMELINE_DATA.length === 0 ? (
+                <div className="flex items-center gap-2 h-8 text-xs text-gray-400">
+                  <span>No imagery yet for {selectedIndex?.toUpperCase() || 'this index'} — pipeline may still be writing data.</span>
+                  <button
+                    onClick={() => setRefreshSlider(n => n + 1)}
+                    title="Retry loading"
+                    className="ml-1 p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-green-600 transition-colors"
+                  ><RefreshCw size={12} /></button>
+                </div>
+              ) : (
+                <>
+                  <input type="range" min="0" max={TIMELINE_DATA.length - 1}
+                    value={Math.min(
+                      isCompareMode ? (activeDateSlot === 'A' ? selectedTimelineIndex : compareTimelineIndex) : selectedTimelineIndex,
+                      TIMELINE_DATA.length - 1
+                    )}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      if (isCompareMode) {
+                        if (activeDateSlot === 'A') setSelectedTimelineIndex(val);
+                        else setCompareTimelineIndex(val);
+                      } else {
+                        setSelectedTimelineIndex(val);
+                      }
+                    }}
+                    className={`w-full h-2 bg-gray-100 rounded-full appearance-none cursor-pointer ${
+                      isCompareMode && activeDateSlot === 'B' ? 'accent-blue-600' : 'accent-green-600'
+                    }`} />
+                  <div className="flex justify-between px-0.5 mt-1">
+                    {TIMELINE_DATA.map((t, i) => {
+                      const isActive = isCompareMode
+                        ? (activeDateSlot === 'A' ? i === selectedTimelineIndex : i === compareTimelineIndex)
+                        : i === selectedTimelineIndex;
+                      return (
+                        <span key={i} className={`text-[9px] font-semibold transition-colors ${
+                          isActive
+                            ? (isCompareMode && activeDateSlot === 'B' ? 'text-green-600 font-bold' : 'text-green-600 font-bold')
+                            : 'text-gray-400'
+                        }`}>
+                          {t.label.split(',')[0]}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs font-semibold text-gray-500">
-                {isCompareMode 
-                  ? (activeDateSlot === 'A' ? currentTimelineA?.satellite : currentTimelineB?.satellite) 
-                  : currentTimeline?.satellite ?? '—'}
-              </span>
+              {/* Current acquisition date pill — shows pending state while waiting 10s */}
+              {!timelineLoading && TIMELINE_DATA.length > 0 && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap tabular-nums transition-colors ${
+                  sliderPending
+                    ? 'bg-green-100 text-green-600 border-green-200 animate-pulse'
+                    : 'bg-green-50 text-green-700 border-green-100'
+                }`}>
+                  {sliderPending
+                    ? (TIMELINE_DATA[Math.min(selectedTimelineIndex, TIMELINE_DATA.length - 1)]?.label ?? '…')
+                    : (currentTimeline?.label ?? '…')}
+                  {sliderPending && <span className="ml-1 opacity-70">↻</span>}
+                </span>
+              )}
+              {/* Satellite selector dropdown */}
+              <select
+                value={isSarIndex ? 'sentinel-1' : selectedSensor}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === 'sentinel-1') {
+                    setSelectedIndex('rvi');
+                  } else {
+                    if (isSarIndex) setSelectedIndex('ndvi');
+                    setSelectedSensor(val);
+                  }
+                }}
+                className="text-xs font-bold px-2 py-1 rounded-full border border-green-200 bg-white text-green-700 cursor-pointer focus:outline-none focus:border-green-500"
+              >
+                <option value="sentinel-2">Sentinel-2</option>
+                <option value="sentinel-1">Sentinel-1</option>
+                <option value="landsat">Landsat</option>
+              </select>
+              {/* Index selector — simple names only (NDVI, not OPTICAL_SENTINEL_2_NDVI) */}
               <select
                 value={selectedIndex}
                 onChange={e => setSelectedIndex(e.target.value)}
-                className={`text-xs font-bold px-2 py-1 rounded-full border cursor-pointer focus:outline-none ${
-                  isCompareMode && activeDateSlot === 'B'
-                    ? 'bg-blue-50 text-blue-700 border-blue-100'
-                    : 'bg-green-50 text-green-700 border-green-100'
-                }`}
+                className="text-xs font-bold px-2 py-1 rounded-full border border-green-200 bg-white text-green-700 cursor-pointer focus:outline-none focus:border-green-500"
               >
                 {availableIndices.length > 0
-                  ? availableIndices.map(idx => (
-                      <option key={idx.index} value={idx.index}>{idx.index.toUpperCase()}</option>
-                    ))
+                  ? availableIndices
+                      .filter(idx => isSarIndex
+                        ? SAR_INDICES.has(idx.index.toLowerCase())
+                        : !SAR_INDICES.has(idx.index.toLowerCase()))
+                      .map(idx => (
+                        <option key={idx.index} value={idx.index}>{idx.index.toUpperCase()}</option>
+                      ))
                   : <option value={selectedIndex}>{selectedIndex.toUpperCase()}</option>
                 }
               </select>
+              <button
+                onClick={() => setRefreshSlider(n => n + 1)}
+                disabled={timelineLoading}
+                title="Refresh timeline data"
+                className="p-1.5 rounded-full hover:bg-green-50 text-green-400 hover:text-green-600 transition-colors disabled:opacity-40"
+              >
+                <RefreshCw size={13} className={timelineLoading ? 'animate-spin' : ''} />
+              </button>
             </div>
           </div>
         )}
@@ -2579,25 +2714,25 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <span className="text-gray-700">{currentTimelineA?.label?.split(',')[0] ?? '—'}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[8px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded uppercase border border-green-150">
-                          {currentTimelineA?.satellite ?? '—'}
+                        <span className="text-[8px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded uppercase border border-green-200">
+                          {effectiveSensor === 'sentinel-1' ? 'S1 SAR' : effectiveSensor === 'landsat' ? 'L9' : 'S2'}
                         </span>
-                        <span className="text-gray-450 text-[9px]">{currentTimelineA?.quality ?? '—'}</span>
+                        <span className="text-gray-500 text-[9px]">{(selectedIndex || 'NDVI').toUpperCase()}</span>
                       </div>
                     </div>
                   )}
                   {currentTimelineB && (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-blue-600" />
-                        <span className="font-bold text-blue-700">Date B:</span>
+                        <span className="w-2 h-2 rounded-full bg-green-600" />
+                        <span className="font-bold text-green-700">Date B:</span>
                         <span className="text-gray-700">{currentTimelineB?.label?.split(',')[0] ?? '—'}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[8px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded uppercase border border-blue-150">
-                          {currentTimelineB?.satellite ?? '—'}
+                        <span className="text-[8px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded uppercase border border-green-200">
+                          {effectiveSensor === 'sentinel-1' ? 'S1 SAR' : effectiveSensor === 'landsat' ? 'L9' : 'S2'}
                         </span>
-                        <span className="text-gray-450 text-[9px]">{currentTimelineB?.quality ?? '—'}</span>
+                        <span className="text-gray-500 text-[9px]">{(selectedIndex || 'NDVI').toUpperCase()}</span>
                       </div>
                     </div>
                   )}
@@ -2606,11 +2741,18 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 currentTimeline && (
                   <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-gray-600">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 uppercase">
-                        {currentTimeline?.satellite ?? '—'}
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase ${
+                        effectiveSensor === 'sentinel-1'
+                          ? 'text-green-700 bg-green-50 border-green-200'
+                          : effectiveSensor === 'landsat'
+                            ? 'text-green-700 bg-green-50 border-green-200'
+                            : 'text-green-700 bg-green-50 border-green-200'
+                      }`}>
+                        {effectiveSensor === 'sentinel-1' ? 'Sentinel-1 SAR' : effectiveSensor === 'landsat' ? 'Landsat-9' : 'Sentinel-2'}
                       </span>
-                      <span className="text-gray-450 font-semibold text-[10px]">{currentTimeline?.quality ?? '—'}</span>
+                      <span className="text-gray-500 font-semibold text-[10px]">{(selectedIndex || 'NDVI').toUpperCase()}</span>
                     </div>
+                    <span className="text-gray-400 text-[10px]">{currentTimeline.label}</span>
                   </div>
                 )
               )}
@@ -3077,14 +3219,14 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             <ArrowLeft size={17} />
           </button>
           <div className="flex items-center gap-3.5">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md ring-4 transition-all ${brandingMode === 'AM' ? 'ring-green-50' : 'ring-blue-50'}`} style={{ backgroundColor: brandingMode === 'AM' ? '#16A34A' : '#2563EB' }}>
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md ring-4 transition-all ${brandingMode === 'AM' ? 'ring-green-50' : 'ring-green-50'}`} style={{ backgroundColor: brandingMode === 'AM' ? '#16A34A' : '#2563EB' }}>
               <Satellite className="text-white" size={21} />
             </div>
             <div>
               <h1 className="text-base font-bold tracking-tight text-gray-900 leading-none">
                 {tenantDisplayName} {brandingMode === 'AM' ? 'Agro Monitoring' : 'Farm Tools'}
               </h1>
-              <p className={`text-[11px] font-semibold uppercase tracking-widest mt-1 leading-none ${brandingMode === 'AM' ? 'text-green-600' : 'text-blue-600'}`}>
+              <p className={`text-[11px] font-semibold uppercase tracking-widest mt-1 leading-none ${brandingMode === 'AM' ? 'text-green-600' : 'text-green-600'}`}>
                 {brandingMode === 'AM' ? 'Enterprise Satellite Node' : 'Agricultural Operations Hub'}
               </p>
             </div>
@@ -3128,25 +3270,25 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[500] overflow-hidden">
                 <div className="px-4 py-3.5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                   <div className="text-xs font-black uppercase tracking-wider text-gray-700">Live Alerts Feed</div>
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${brandingMode === 'AM' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>3 Active</span>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${brandingMode === 'AM' ? 'bg-green-50 text-green-700' : 'bg-green-50 text-green-700'}`}>3 Active</span>
                 </div>
                 <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
                   <div className="p-3 hover:bg-gray-50 transition-colors flex gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-red-500 mt-1.5 shrink-0 animate-ping" />
+                    <span className="w-2 h-2 rounded-full bg-green-500 mt-1.5 shrink-0 animate-ping" />
                     <div>
                       <div className="text-[11px] font-bold text-gray-900">Critical Waterlogging Alert</div>
                       <div className="text-[10px] text-gray-400 mt-0.5">One or more plots register elevated anomaly scores.</div>
                     </div>
                   </div>
                   <div className="p-3 hover:bg-gray-50 transition-colors flex gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-green-500 mt-1.5 shrink-0" />
                     <div>
                       <div className="text-[11px] font-bold text-gray-900">NDVI Decline Flag</div>
                       <div className="text-[10px] text-gray-400 mt-0.5">One or more plots have dropped below baseline NDVI average.</div>
                     </div>
                   </div>
                   <div className="p-3 hover:bg-gray-50 transition-colors flex gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-green-500 mt-1.5 shrink-0" />
                     <div>
                       <div className="text-[11px] font-bold text-gray-900">New Sentinel Pass Ingested</div>
                       <div className="text-[10px] text-gray-400 mt-0.5">Weekly cloud-free composite uploaded successfully.</div>
@@ -3165,9 +3307,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             >
               <div className="text-right">
                 <div className="text-sm font-bold text-gray-900 leading-none">{profileName}</div>
-                <div className={`text-[11px] font-semibold tracking-wider mt-1 uppercase ${brandingMode === 'AM' ? 'text-green-600' : 'text-blue-600'}`}>{profileRole}</div>
+                <div className={`text-[11px] font-semibold tracking-wider mt-1 uppercase ${brandingMode === 'AM' ? 'text-green-600' : 'text-green-600'}`}>{profileRole}</div>
               </div>
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm border hover:ring-2 transition-all ${brandingMode === 'AM' ? 'text-green-700 border-green-200 hover:ring-green-200 bg-green-50' : 'text-blue-700 border-blue-200 hover:ring-blue-200 bg-blue-50'}`}>
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm border hover:ring-2 transition-all ${brandingMode === 'AM' ? 'text-green-700 border-green-200 hover:ring-green-200 bg-green-50' : 'text-green-700 border-green-200 hover:ring-green-200 bg-green-50'}`}>
                 {brandingMode === 'AM' ? 'AM' : 'FT'}
               </div>
             </button>
@@ -3179,7 +3321,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </div>
                   <div className="text-sm font-extrabold text-gray-950">{profileName}</div>
                   <div className="text-[11px] font-semibold text-gray-400 mt-0.5">{profileEmail}</div>
-                  <span className={`inline-block text-[9px] font-extrabold px-2 py-0.5 rounded-full mt-2 border ${brandingMode === 'AM' ? 'bg-green-50 text-green-700 border-green-150' : 'bg-blue-50 text-blue-700 border-blue-150'}`}>
+                  <span className={`inline-block text-[9px] font-extrabold px-2 py-0.5 rounded-full mt-2 border ${brandingMode === 'AM' ? 'bg-green-50 text-green-700 border-green-150' : 'bg-green-50 text-green-700 border-green-100'}`}>
                     {profileRole}
                   </span>
                 </div>
@@ -3193,7 +3335,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   </button>
                   <button
                     onClick={() => { setShowUserMenu(false); onSignOut(); }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm font-bold text-green-700 hover:bg-green-50 rounded-xl transition-all"
                   >
                     <LogOut size={15} />
                     Sign Out
@@ -3245,7 +3387,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     </span>
                     <span className="flex-1 text-left">{item.label}</span>
                     {item.badge > 0 && (
-                      <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${activeSidebarItem === item.id ? 'bg-white/25 text-white' : 'bg-red-100 text-red-700'}`}>
+                      <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${activeSidebarItem === item.id ? 'bg-white/25 text-white' : 'bg-green-100 text-green-700'}`}>
                         {item.badge}
                       </span>
                     )}
@@ -3294,8 +3436,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                 ))}
 
                 {isCompareMode && (
-                  <div className="px-3 py-2.5 bg-blue-50/40 rounded-xl mt-1.5 space-y-2 border border-blue-100/50">
-                    <div className="text-[10px] font-bold text-blue-700 uppercase tracking-widest px-1">Active Date Slot</div>
+                  <div className="px-3 py-2.5 bg-green-50/40 rounded-xl mt-1.5 space-y-2 border border-green-100/50">
+                    <div className="text-[10px] font-bold text-green-700 uppercase tracking-widest px-1">Active Date Slot</div>
                     <div className="grid grid-cols-2 gap-1.5">
                       <button
                         onClick={() => setActiveDateSlot('A')}
@@ -3311,7 +3453,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         onClick={() => setActiveDateSlot('B')}
                         className={`py-2 px-1.5 rounded-lg text-[10px] font-extrabold text-center border transition-all ${
                           activeDateSlot === 'B'
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            ? 'bg-green-600 text-white border-green-600 shadow-sm'
                             : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                         }`}
                       >
@@ -3461,7 +3603,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     {(filterEstate !== 'All' || filterPlot !== 'All' || filterDate !== 'All') && (
                       <button
                         onClick={() => { setFilterEstate('All'); setFilterPlot('All'); setFilterDate('All'); }}
-                        className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100/70 rounded-xl"
+                        className="text-xs font-bold text-green-700 hover:text-green-800 transition-colors flex items-center gap-1.5 px-3 py-2 bg-green-50 hover:bg-green-100/70 rounded-xl"
                       >
                         <X size={14} /> Clear Filters
                       </button>
@@ -3475,10 +3617,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     {/* KPI Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                       {[
-                        { label: 'Total Plots',   value: `${dashboardMetrics.plots}`,               subtext: 'Active Farm Plots',        icon: <Layers size={22} className="text-blue-600" />,  accent: '#EFF6FF', border: '#BFDBFE' },
+                        { label: 'Total Plots',   value: `${dashboardMetrics.plots}`,               subtext: 'Active Farm Plots',        icon: <Layers size={22} className="text-green-600" />,  accent: '#EFF6FF', border: '#BFDBFE' },
                         { label: 'Area Monitored', value: `${dashboardMetrics.area.toLocaleString()} ha`, subtext: 'Hectares Covered',    icon: <Globe size={22} className="text-green-600" />,    accent: '#F0FDF4', border: '#BBF7D0' },
-                        { label: 'Carbon Density', value: `${dashboardMetrics.carbon} t/ha`,             subtext: 'Average tCO2e/Hectare',    icon: <Leaf size={22} className="text-amber-500" />,   accent: '#FFFBEB', border: '#FDE68A' },
-                        { label: 'Alerts',         value: dashboardMetrics.alerts,                    subtext: 'Critical Moisture Stress', icon: <AlertTriangle size={22} className="text-red-500" />, accent: '#FFF1F2', border: '#FECDD3' }
+                        { label: 'Carbon Density', value: `${dashboardMetrics.carbon} t/ha`,             subtext: 'Average tCO2e/Hectare',    icon: <Leaf size={22} className="text-green-600" />,   accent: '#f0fdf4', border: '#bbf7d0' },
+                        { label: 'Alerts',         value: dashboardMetrics.alerts,                    subtext: 'Critical Moisture Stress', icon: <AlertTriangle size={22} className="text-green-600" />, accent: '#FFF1F2', border: '#FECDD3' }
                       ].map((kpi, i) => (
                         <div key={i}
                           className="bg-white p-7 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group cursor-default"
@@ -3528,10 +3670,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
                         <div className="flex justify-between items-center">
                           <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                            <Droplets size={18} className="text-blue-500" />
+                            <Droplets size={18} className="text-green-600" />
                             Canopy Moisture Retention (NDMI) Trends {renderInfoTooltip("Moisture Retention (NDMI)")}
                           </h3>
-                          <span className="text-xs bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             NDMI
                           </span>
                         </div>
@@ -3544,10 +3686,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
                         <div className="flex justify-between items-center">
                           <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                            <Thermometer size={18} className="text-orange-500" />
+                            <Thermometer size={18} className="text-green-600" />
                             Soil Temperature Trends {renderInfoTooltip("Soil Temperature Trends")}
                           </h3>
-                          <span className="text-xs bg-orange-50 text-orange-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             LST °C
                           </span>
                         </div>
@@ -3563,7 +3705,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             <Wind size={18} className="text-purple-500" />
                             Vapor Pressure Deficit (VPD) Stress Trends {renderInfoTooltip("Vapor Pressure Deficit (VPD)")}
                           </h3>
-                          <span className="text-xs bg-purple-50 text-purple-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             VPD kPa
                           </span>
                         </div>
@@ -3660,9 +3802,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
                         <div className="flex justify-between items-center">
                           <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                            <Droplets size={18} className="text-blue-600" />
+                            <Droplets size={18} className="text-green-600" />
                             FAO-56 Evapotranspiration Model {renderInfoTooltip("FAO-56 Evapotranspiration Model")}</h3>
-                          <span className="text-xs bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             ETc vs ETa
                           </span>
                         </div>
@@ -3678,9 +3820,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
                         <div className="flex justify-between items-center">
                           <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                            <Droplets size={18} className="text-blue-600" />
+                            <Droplets size={18} className="text-green-600" />
                             Canopy Moisture Retention (NDMI) Trends {renderInfoTooltip("Moisture Retention (NDMI)")}</h3>
-                          <span className="text-xs bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             NDMI
                           </span>
                         </div>
@@ -3696,9 +3838,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
                         <div className="flex justify-between items-center">
                           <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                            <Sun size={18} className="text-amber-500" />
+                            <Sun size={18} className="text-green-600" />
                             Soil Temperature Trends {renderInfoTooltip("Soil Temp")}</h3>
-                          <span className="text-xs bg-amber-50 text-amber-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             Soil Temp
                           </span>
                         </div>
@@ -3714,9 +3856,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
                         <div className="flex justify-between items-center">
                           <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                            <Activity size={18} className="text-purple-600" />
+                            <Activity size={18} className="text-green-600" />
                             Vapor Pressure Deficit (VPD) Stress Trends {renderInfoTooltip("VPD Stress")}</h3>
-                          <span className="text-xs bg-purple-50 text-purple-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                          <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             VPD Index
                           </span>
                         </div>
@@ -3763,11 +3905,11 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                                 <td className="py-3 px-4">{row.kc}</td>
                                 <td className="py-3 px-4">{row.etc}</td>
                                 <td className="py-3 px-4">
-                                  <span className={parseFloat(row.deficit) > 1.0 ? 'text-red-650 font-bold' : 'text-green-600'}>
+                                  <span className={parseFloat(row.deficit) > 1.0 ? 'text-green-700 font-bold' : 'text-green-600'}>
                                     {row.eta}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4 font-semibold text-red-500">{row.deficit}</td>
+                                <td className="py-3 px-4 font-semibold text-green-600">{row.deficit}</td>
                                 <td className="py-3 px-4">{row.sm}</td>
                               </tr>
                             ))}
@@ -3784,7 +3926,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       {/* Nutrient Profiling (Radar) */}
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5 xl:col-span-1">
                         <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
-                          <Sun size={18} className="text-amber-500" />
+                          <Sun size={18} className="text-green-600" />
                           Nutrient Profiling {renderInfoTooltip("Nutrient Profiling")}</h3>
                         <div className="h-[320px] flex items-center justify-center">
                           <Radar
@@ -3850,6 +3992,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
+                  {tileRefreshing && currentTileUrl && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-1.5 bg-black/60 text-white text-[10px] font-semibold px-3 py-1.5 rounded-full pointer-events-none">
+                      <svg className="animate-spin h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      Loading {(selectedIndex || 'NDVI').toUpperCase()} · {effectiveSensor === 'sentinel-1' ? 'S1 SAR' : effectiveSensor === 'landsat' ? 'L9' : 'S2'}…
+                    </div>
+                  )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
@@ -3863,7 +4011,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               maxNativeZoom={18}
             />
           )}
-                    
+
                     {isCompareMode ? (
                       <>
                         <MapPaneClipSetter
@@ -4216,6 +4364,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
+                  {tileRefreshing && currentTileUrl && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-1.5 bg-black/60 text-white text-[10px] font-semibold px-3 py-1.5 rounded-full pointer-events-none">
+                      <svg className="animate-spin h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      Loading {(selectedIndex || 'NDVI').toUpperCase()} · {effectiveSensor === 'sentinel-1' ? 'S1 SAR' : effectiveSensor === 'landsat' ? 'L9' : 'S2'}…
+                    </div>
+                  )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
@@ -4509,6 +4663,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
+                  {tileRefreshing && currentTileUrl && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-1.5 bg-black/60 text-white text-[10px] font-semibold px-3 py-1.5 rounded-full pointer-events-none">
+                      <svg className="animate-spin h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      Loading {(selectedIndex || 'NDVI').toUpperCase()} · {effectiveSensor === 'sentinel-1' ? 'S1 SAR' : effectiveSensor === 'landsat' ? 'L9' : 'S2'}…
+                    </div>
+                  )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
@@ -4769,6 +4929,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
+                  {tileRefreshing && currentTileUrl && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-1.5 bg-black/60 text-white text-[10px] font-semibold px-3 py-1.5 rounded-full pointer-events-none">
+                      <svg className="animate-spin h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      Loading {(selectedIndex || 'NDVI').toUpperCase()} · {effectiveSensor === 'sentinel-1' ? 'S1 SAR' : effectiveSensor === 'landsat' ? 'L9' : 'S2'}…
+                    </div>
+                  )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
@@ -5169,16 +5335,16 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
               <div className="px-8 pt-7 pb-5 border-b border-gray-100 flex items-center justify-between gap-4 shrink-0 bg-white">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm animate-pulse" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5' }}>
-                    <AlertTriangle size={18} className="text-red-600" />
+                    <AlertTriangle size={18} className="text-green-700" />
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 tracking-tight leading-none">Alerts Command Center</h2>
-                    <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-0.5">Live Anomaly Intelligence · Farmintelytics Agro Node</p>
+                    <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest mt-0.5">Live Anomaly Intelligence · Farmintelytics Agro Node</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
                     <div>
                       <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Operational Status</span>
                       <span className="text-xs font-bold text-gray-800">{alerts.filter(a => a.status === 'Active').length} Active Anomalies</span>
@@ -5215,7 +5381,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     {/* Severity mini-filters */}
                     <div className="flex items-center gap-1.5">
                       {['All', 'Critical', 'Warning', 'Info'].map(sev => {
-                        const activeColor = sev === 'Critical' ? 'bg-red-600 text-white' : sev === 'Warning' ? 'bg-amber-500 text-white' : sev === 'Info' ? 'bg-blue-500 text-white' : 'bg-gray-800 text-white';
+                        const activeColor = sev === 'Critical' ? 'bg-green-600 text-white' : sev === 'Warning' ? 'bg-green-500 text-white' : sev === 'Info' ? 'bg-green-500 text-white' : 'bg-gray-800 text-white';
                         return (
                           <button
                             key={sev}
@@ -5275,8 +5441,8 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         const isWarn = p.warnCount > 0 && !isCrit;
                         const isSelected = selectedAlertPlot === p.id;
 
-                        const dotColor = isCrit ? 'bg-red-500' : isWarn ? 'bg-amber-500' : 'bg-blue-400';
-                        const badgeBg = isCrit ? 'bg-red-50 text-red-700 border-red-200' : isWarn ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200';
+                        const dotColor = isCrit ? 'bg-green-500' : isWarn ? 'bg-green-500' : 'bg-green-400';
+                        const badgeBg = isCrit ? 'bg-green-50 text-green-700 border-green-200' : isWarn ? 'bg-green-50 text-green-700 border-green-200' : 'bg-green-50 text-green-700 border-green-200';
 
                         return (
                           <button
@@ -5300,9 +5466,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                             {/* Mini severity badges */}
                             <div className="flex items-center gap-1.5 mt-2.5 pl-4.5">
-                              {p.critCount > 0 && <span className="text-[9px] font-black bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-full">{p.critCount} Critical</span>}
-                              {p.warnCount > 0 && <span className="text-[9px] font-black bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">{p.warnCount} Warning</span>}
-                              {p.infoCount > 0 && <span className="text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full">{p.infoCount} Info</span>}
+                              {p.critCount > 0 && <span className="text-[9px] font-black bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded-full">{p.critCount} Critical</span>}
+                              {p.warnCount > 0 && <span className="text-[9px] font-black bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded-full">{p.warnCount} Warning</span>}
+                              {p.infoCount > 0 && <span className="text-[9px] font-black bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded-full">{p.infoCount} Info</span>}
                             </div>
                           </button>
                         );
@@ -5347,11 +5513,11 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
                                 {critCount > 0 ? (
-                                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                                  <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0" />
                                 ) : warnCount > 0 ? (
-                                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                  <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0" />
                                 ) : (
-                                  <span className="w-2.5 h-2.5 rounded-full bg-blue-400 shrink-0" />
+                                  <span className="w-2.5 h-2.5 rounded-full bg-green-400 shrink-0" />
                                 )}
                                 <h3 className="text-xl font-extrabold text-gray-950 tracking-tight leading-tight">{meta.name}</h3>
                               </div>
@@ -5369,9 +5535,9 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           {/* Stats row */}
                           <div className="grid grid-cols-4 gap-3">
                             {[
-                              { label: 'Active Incidents', value: activePlotAlerts.length, color: activePlotAlerts.length > 0 ? 'text-red-600' : 'text-gray-400', bg: activePlotAlerts.length > 0 ? 'bg-red-50/70 border-red-100' : 'bg-gray-50/50 border-gray-150' },
-                              { label: 'Critical', value: critCount, color: critCount > 0 ? 'text-red-700' : 'text-gray-400', bg: critCount > 0 ? 'bg-red-50/70 border-red-100' : 'bg-gray-50/50 border-gray-150' },
-                              { label: 'Warning', value: warnCount, color: warnCount > 0 ? 'text-amber-700' : 'text-gray-400', bg: warnCount > 0 ? 'bg-amber-50/70 border-amber-100' : 'bg-gray-50/50 border-gray-150' },
+                              { label: 'Active Incidents', value: activePlotAlerts.length, color: activePlotAlerts.length > 0 ? 'text-green-700' : 'text-gray-400', bg: activePlotAlerts.length > 0 ? 'bg-green-50/70 border-green-100' : 'bg-gray-50/50 border-gray-150' },
+                              { label: 'Critical', value: critCount, color: critCount > 0 ? 'text-green-700' : 'text-gray-400', bg: critCount > 0 ? 'bg-green-50/70 border-green-100' : 'bg-gray-50/50 border-gray-150' },
+                              { label: 'Warning', value: warnCount, color: warnCount > 0 ? 'text-green-700' : 'text-gray-400', bg: warnCount > 0 ? 'bg-green-50/70 border-green-100' : 'bg-gray-50/50 border-gray-150' },
                               { label: 'Acknowledged', value: plotAlerts.length - activePlotAlerts.length, color: (plotAlerts.length - activePlotAlerts.length) > 0 ? 'text-green-700' : 'text-gray-400', bg: (plotAlerts.length - activePlotAlerts.length) > 0 ? 'bg-green-50/70 border-green-100' : 'bg-gray-50/50 border-gray-150' }
                             ].map((s, i) => (
                               <div key={i} className={`${s.bg} border rounded-xl p-3 text-center`}>
@@ -5431,10 +5597,10 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                               {plotAlerts.map((alert) => {
                                 const isActive = alert.status === 'Active';
                                 const isCrit = alert.severity === 'Critical';
-                                let severityColor = 'bg-blue-50 text-blue-700 border-blue-200';
-                                let dotColor = isCrit ? 'bg-red-500' : alert.severity === 'Warning' ? 'bg-amber-500' : 'bg-blue-400';
-                                if (isCrit) severityColor = 'bg-red-50 text-red-700 border-red-200';
-                                else if (alert.severity === 'Warning') severityColor = 'bg-amber-50 text-amber-700 border-amber-200';
+                                let severityColor = 'bg-green-50 text-green-700 border-green-200';
+                                let dotColor = isCrit ? 'bg-green-500' : alert.severity === 'Warning' ? 'bg-green-500' : 'bg-green-400';
+                                if (isCrit) severityColor = 'bg-green-50 text-green-700 border-green-200';
+                                else if (alert.severity === 'Warning') severityColor = 'bg-green-50 text-green-700 border-green-200';
 
                                 return (
                                   <div key={alert.id} className="relative">
@@ -5504,6 +5670,12 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
 
                 {/* ═══ MAP ═══ */}
                 <div className="flex-1 relative min-w-0 map-wrapper-pane">
+                  {tileRefreshing && currentTileUrl && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-1.5 bg-black/60 text-white text-[10px] font-semibold px-3 py-1.5 rounded-full pointer-events-none">
+                      <svg className="animate-spin h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      Loading {(selectedIndex || 'NDVI').toUpperCase()} · {effectiveSensor === 'sentinel-1' ? 'S1 SAR' : effectiveSensor === 'landsat' ? 'L9' : 'S2'}…
+                    </div>
+                  )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
                     <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
@@ -5934,7 +6106,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <p className="text-xs text-gray-400 font-semibold mt-1">Satellite derived NDVI analysis mapping canopy health distribution.</p>
                       </div>
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                        isStressed ? 'bg-amber-55/60 text-amber-800 border border-amber-200' : 'bg-green-50 text-green-700 border border-green-200'
+                        isStressed ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-green-50 text-green-700 border border-green-200'
                       }`}>
                         {isStressed ? 'Warning (Stress)' : 'Optimal Performance'}
                       </span>
@@ -6021,7 +6193,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                         <p className="text-xs text-gray-400 font-semibold mt-1">Root-zone water content tracking (NDMI) combined with meteorology logs.</p>
                       </div>
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                        isStressed ? 'bg-red-50 text-red-700 border border-red-200 animate-pulse' : 'bg-green-50 text-green-700 border border-green-200'
+                        isStressed ? 'bg-green-50 text-green-700 border border-green-200 animate-pulse' : 'bg-green-50 text-green-700 border border-green-200'
                       }`}>
                         {isStressed ? 'Deficit Alert' : 'Moisture Adequate'}
                       </span>
@@ -6055,7 +6227,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       </div>
                       <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-center">
                         <span className="text-[8px] text-gray-400 font-bold uppercase block">Rainfall</span>
-                        <span className="text-xs font-black text-blue-700 mt-1 block">—</span>
+                        <span className="text-xs font-black text-green-700 mt-1 block">—</span>
                       </div>
                     </div>
 
@@ -6863,7 +7035,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
             {/* Header */}
             <div className="px-6 py-4.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <div className="flex items-center gap-2.5">
-                <Settings2 className={brandingMode === 'AM' ? 'text-green-600' : 'text-blue-600'} size={19} />
+                <Settings2 className={brandingMode === 'AM' ? 'text-green-600' : 'text-green-600'} size={19} />
                 <span className="text-base font-extrabold text-gray-950">Settings Center</span>
               </div>
               <button 
@@ -6889,7 +7061,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                     onClick={() => setSettingsTab(tab.id)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all ${
                       settingsTab === tab.id
-                        ? (brandingMode === 'AM' ? 'bg-green-50 text-green-700 font-extrabold' : 'bg-blue-50 text-blue-700 font-extrabold')
+                        ? (brandingMode === 'AM' ? 'bg-green-50 text-green-700 font-extrabold' : 'bg-green-50 text-green-700 font-extrabold')
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
@@ -6958,18 +7130,18 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                       
                       <div 
                         onClick={() => setBrandingMode('FT')}
-                        className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover:border-blue-500/50 ${
-                          brandingMode === 'FT' ? 'border-blue-600 bg-blue-50/20 shadow-sm' : 'border-gray-200'
+                        className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover:border-green-500/50 ${
+                          brandingMode === 'FT' ? 'border-green-600 bg-green-50/20 shadow-sm' : 'border-gray-200'
                         }`}
                       >
                         <div>
                           <div className="text-xs font-extrabold text-gray-900 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
                             Farm Tools Harvest Mode (FT)
                           </div>
                           <div className="text-[10px] text-gray-400 mt-1">Operational harvest tools, blue/orange branding, FT initials.</div>
                         </div>
-                        {brandingMode === 'FT' && <CheckCircle2 size={16} className="text-blue-600" />}
+                        {brandingMode === 'FT' && <CheckCircle2 size={16} className="text-green-600" />}
                       </div>
                     </div>
                   </div>
@@ -7033,7 +7205,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                             </span>
                             <button 
                               onClick={() => setSettingsUsers(prev => prev.filter(u => u.id !== user.id))}
-                              className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded"
+                              className="p-1 hover:bg-green-50 text-gray-400 hover:text-green-700 rounded"
                             >
                               <Trash2 size={13} />
                             </button>
@@ -7085,7 +7257,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                           }
                         }}
                         className={`w-full py-2 rounded-lg text-xs font-bold text-white transition-all ${
-                          brandingMode === 'AM' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                          brandingMode === 'AM' ? 'bg-green-600 hover:bg-green-700' : 'bg-green-600 hover:bg-green-700'
                         }`}
                       >
                         Add Member
@@ -7111,7 +7283,7 @@ const AgroMonitor = ({ onBack, onSignOut }) => {
                   setTimeout(() => setShowProfileSaved(false), 2000);
                 }}
                 className={`px-4.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all hover:scale-102 active:scale-98 ${
-                  brandingMode === 'AM' ? 'bg-green-600 hover:bg-green-700 shadow-green-600/10' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/10'
+                  brandingMode === 'AM' ? 'bg-green-600 hover:bg-green-700 shadow-green-600/10' : 'bg-green-600 hover:bg-green-700 shadow-blue-600/10'
                 }`}
               >
                 Save Changes

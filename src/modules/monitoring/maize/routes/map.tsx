@@ -97,7 +97,49 @@ function PlotMarker({
 }
 
 function MapPage() {
-  const [selected, setSelected] = useState<Plot>(PLOTS[0]);
+  const { cropSummary, cropBlocks, cropLoading } = useMonitoring();
+  
+  const plots = useMemo(() => {
+    if (!cropBlocks || cropBlocks.length === 0) return [];
+    return cropBlocks.map((p: any) => {
+      let polygon: [number, number][] = [];
+      if (p.geometry && p.geometry.coordinates && p.geometry.coordinates[0]) {
+        polygon = p.geometry.coordinates[0].map(([lng, lat]: [number, number]) => [lat, lng]);
+      }
+      const latSum = polygon.reduce((s, pt) => s + pt[0], 0);
+      const lngSum = polygon.reduce((s, pt) => s + pt[1], 0);
+      const centroid: [number, number] = polygon.length > 0
+        ? [latSum / polygon.length, lngSum / polygon.length]
+        : [-0.53, 35.275];
+
+      const ndvi = p.current_indices?.ndvi ?? 0.65;
+      const statusAlert = p.health_class === "Critical" ? "Heat Stress" : p.health_class === "Stressed" ? "Drought Risk" : "Healthy";
+      return {
+        id: p.id,
+        name: p.plot_nb ? `Plot ${p.plot_nb}` : p.id,
+        area: p.area_ha ?? 10.0,
+        ndvi,
+        gcvi: p.current_indices?.gndvi ?? +(ndvi * 6.0).toFixed(1),
+        ndre: p.current_indices?.ndre ?? +(ndvi * 0.7).toFixed(2),
+        vhi: Math.round(ndvi * 100),
+        stage: p.stage ?? "Vegetative",
+        predictedYield: p.yield_t_ha ?? +(ndvi * 5.2).toFixed(2),
+        lastSeasonYield: p.yield_t_ha ? +(p.yield_t_ha * 0.95).toFixed(2) : +(ndvi * 4.8).toFixed(2),
+        status: statusAlert as any,
+        lat: centroid[0],
+        lng: centroid[1],
+      };
+    });
+  }, [cropBlocks]);
+
+  const [selected, setSelected] = useState<any>(null);
+
+  useEffect(() => {
+    if (plots.length > 0 && !selected) {
+      setSelected(plots[0]);
+    }
+  }, [plots, selected]);
+
   const [active, setActive] = useState<Record<string, boolean>>({
     boundaries: true,
     ndvi: true,
@@ -106,9 +148,43 @@ function MapPage() {
   const [layerOpacity, setLayerOpacity] = useState<Record<string, number>>({});
   const [source, setSource] = useState<"sentinel" | "landsat">("sentinel");
   const [basemap, setBasemap] = useState<"satellite" | "terrain" | "streets">("satellite");
-  const [date, setDate] = useState("Apr 22, 2026");
+  const [date, setDate] = useState("Now · Dec '25");
   const [layerOpen, setLayerOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
+
+  // Zarr raster slider state
+  const [timeIndex, setTimeIndex] = useState(0);
+  const [sliderData, setSliderData] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [zarrBounds, setZarrBounds] = useState<any>(null);
+
+  const primaryLayer = active.ndvi ? "ndvi" : active.vhi ? "vhi" : "ndvi";
+  const tenant = cropSummary?.tenant || "olam";
+
+  useEffect(() => {
+    fetchTimeseriesSlider({
+      farm: tenant,
+      index: primaryLayer,
+      start: "2024-01-01",
+      end: "2027-12-31"
+    })
+      .then(data => {
+        setSliderData(data);
+        if (data?.timeline) {
+          setTimeline(data.timeline);
+          setTimeIndex(Math.max(0, data.timeline.length - 1));
+        }
+        if (data?.zarr_bounds) setZarrBounds(data.zarr_bounds);
+      })
+      .catch(err => console.error("Slider fetch error:", err));
+  }, [primaryLayer, tenant]);
+
+  const currentTileUrl = useMemo(() => {
+    if (!timeline || timeline.length === 0) return null;
+    const currentEntry = timeline[Math.min(timeIndex, timeline.length - 1)];
+    return currentEntry ? sliderData?.tiles?.[currentEntry.date] : null;
+  }, [sliderData, timeline, timeIndex]);
+
   useEffect(() => setMounted(true), []);
 
   return (
@@ -123,7 +199,7 @@ function MapPage() {
             }
           >
             <FarmMap
-              selected={selected}
+              selected={selected || plots[0]}
               onSelect={setSelected}
               showBoundaries={!!active.boundaries}
               showNDVI={!!active.ndvi}
@@ -132,6 +208,9 @@ function MapPage() {
               basemap={basemap}
               source={source}
               date={date}
+              plots={plots}
+              currentTileUrl={currentTileUrl}
+              zarrBounds={zarrBounds}
             />
           </Suspense>
         ) : (
@@ -145,8 +224,8 @@ function MapPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-[10px] font-black uppercase tracking-wider">Imagery Explorer</span>
-                  <span className="text-xs text-primary font-mono font-bold">{date}</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-800">Imagery Explorer</span>
+                  <span className="text-xs text-emerald-700 font-mono font-bold">{date}</span>
                 </div>
               </div>
               
@@ -158,7 +237,7 @@ function MapPage() {
                       onClick={() => setBasemap(b)}
                       className={cn(
                         "flex-1 px-2 py-1 text-[9px] font-black rounded-md transition-all uppercase",
-                        basemap === b ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+                        basemap === b ? "bg-white shadow-sm text-emerald-700 font-bold" : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {b}
@@ -170,7 +249,7 @@ function MapPage() {
                     onClick={() => setSource("sentinel")}
                     className={cn(
                       "px-2 py-0.5 text-[9px] font-black rounded-md transition-all",
-                      source === "sentinel" ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
+                      source === "sentinel" ? "bg-white shadow-sm text-emerald-700 font-bold" : "text-muted-foreground"
                     )}
                   >
                     SENTINEL
@@ -179,7 +258,7 @@ function MapPage() {
                     onClick={() => setSource("landsat")}
                     className={cn(
                       "px-2 py-0.5 text-[9px] font-black rounded-md transition-all",
-                      source === "landsat" ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
+                      source === "landsat" ? "bg-white shadow-sm text-emerald-700 font-bold" : "text-muted-foreground"
                     )}
                   >
                     LANDSAT
@@ -194,11 +273,11 @@ function MapPage() {
               max={100}
               defaultValue={68}
               onChange={(e) => setDate(`Season Day ${e.target.value} · 2026`)}
-              className="w-full h-1.5 accent-primary appearance-none bg-muted rounded-full cursor-pointer"
+              className="w-full h-1.5 accent-emerald-600 appearance-none bg-muted rounded-full cursor-pointer"
             />
           </div>
           <div className="flex-1" />
-          <Card className="px-3 py-2 flex items-center gap-2 pointer-events-auto shadow-lg">
+          <Card className="px-3 py-2 flex items-center gap-2 pointer-events-auto shadow-lg bg-white border border-slate-100">
             <Search className="h-4 w-4 text-muted-foreground" />
             <input
               placeholder="Search plot or location"
@@ -212,11 +291,11 @@ function MapPage() {
         <div
           className={`absolute top-20 right-4 bottom-4 w-[340px] z-10 transition-transform ${layerOpen ? "translate-x-0" : "translate-x-[calc(100%+1rem)]"}`}
         >
-          <Card className="h-full overflow-hidden flex flex-col shadow-2xl">
-            <div className="px-4 py-3 border-b flex items-center justify-between">
+          <Card className="h-full overflow-hidden flex flex-col shadow-2xl bg-white border border-emerald-100">
+            <div className="px-4 py-3 border-b flex items-center justify-between border-slate-100">
               <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-primary" />
-                <span className="font-semibold text-sm">Layers</span>
+                <Layers className="h-4 w-4 text-emerald-700" />
+                <span className="font-semibold text-sm text-slate-800">Layers</span>
               </div>
               <Button
                 variant="ghost"
@@ -224,20 +303,20 @@ function MapPage() {
                 className="h-7 w-7"
                 onClick={() => setLayerOpen(false)}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 text-slate-500" />
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
               {LAYERS.map((g) => (
                 <div key={g.group}>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">
+                  <p className="text-[10px] uppercase tracking-wider text-emerald-800 font-bold mb-2">
                     {g.group}
                   </p>
                   <div className="space-y-1">
                     {g.items.map((l) => {
                       const on = !!active[l.id];
                       return (
-                        <div key={l.id} className={cn("rounded-md transition-colors", on && "bg-muted/50")}>
+                        <div key={l.id} className={cn("rounded-md transition-colors", on && "bg-emerald-50/20")}>
                           <div className="flex items-start gap-3 p-2">
                             <Switch
                               id={l.id}
@@ -247,10 +326,10 @@ function MapPage() {
                               }
                             />
                             <div className="flex-1 min-w-0">
-                              <Label htmlFor={l.id} className="text-sm font-bold">
+                              <Label htmlFor={l.id} className="text-sm font-bold text-slate-800">
                                 {l.name}
                               </Label>
-                              <p className="text-[11px] text-muted-foreground">
+                              <p className="text-[11px] text-slate-400">
                                 {l.desc}
                               </p>
                             </div>
@@ -258,7 +337,7 @@ function MapPage() {
                           {on && (
                             <div className="px-4 pb-3 space-y-3">
                               <div>
-                                <div className="flex justify-between text-[10px] font-bold uppercase mb-1">
+                                <div className="flex justify-between text-[10px] font-bold uppercase mb-1 text-slate-500">
                                   <span>Opacity</span>
                                   <span>{layerOpacity[l.id] ?? 70}%</span>
                                 </div>
@@ -266,12 +345,12 @@ function MapPage() {
                                   type="range" min={0} max={100} 
                                   value={layerOpacity[l.id] ?? 70} 
                                   onChange={e => setLayerOpacity({ ...layerOpacity, [l.id]: +e.target.value })}
-                                  className="w-full h-1 accent-primary appearance-none bg-muted rounded-full cursor-pointer"
+                                  className="w-full h-1 accent-emerald-600 appearance-none bg-muted rounded-full cursor-pointer"
                                 />
                               </div>
                               {/* Inline Legend for specific layers */}
                               {l.id === "ndvi" && (
-                                <div className="flex items-center gap-3 text-[9px] font-bold">
+                                <div className="flex items-center gap-3 text-[9px] font-bold text-slate-500">
                                   <div className="flex items-center gap-1"><span className="h-2 w-2 bg-[#15803d] rounded-full"/>High</div>
                                   <div className="flex items-center gap-1"><span className="h-2 w-2 bg-[#f59e0b] rounded-full"/>Med</div>
                                   <div className="flex items-center gap-1"><span className="h-2 w-2 bg-[#78716c] rounded-full"/>Low</div>
@@ -287,15 +366,15 @@ function MapPage() {
               ))}
 
 
-              <div className="pt-2 border-t">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">
                   Legend — Plot Status
                 </p>
                 <div className="space-y-1.5">
                   {Object.entries(statusColor).map(([k, c]) => (
-                    <div key={k} className="flex items-center gap-2 text-xs">
+                    <div key={k} className="flex items-center gap-2 text-xs text-slate-600 font-medium">
                       <div
-                        className="h-3 w-3 rounded-sm"
+                        className="h-3 w-3 rounded-sm border border-slate-200"
                         style={{ background: c }}
                       />
                       {k}
@@ -306,57 +385,55 @@ function MapPage() {
             </div>
 
             {/* Selected plot card */}
-            <div className="border-t p-4 bg-muted/20">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    {selected.id}
-                  </p>
-                  <p className="font-semibold">{selected.name}</p>
+            {selected && (
+              <div className="border-t p-4 bg-slate-50 border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-xs text-slate-400 font-mono">
+                      {selected.id}
+                    </p>
+                    <p className="font-semibold text-slate-800">{selected.name}</p>
+                  </div>
+                  <Badge
+                    variant="secondary"
+                    className="bg-emerald-50 text-emerald-800 border-emerald-100 font-bold uppercase tracking-wider text-[9px]"
+                  >
+                    {selected.status}
+                  </Badge>
                 </div>
-                <Badge
-                  variant="secondary"
-                  style={{
-                    background: statusColor[selected.status] + "22",
-                    color: statusColor[selected.status],
-                    borderColor: statusColor[selected.status] + "55",
-                  }}
-                >
-                  {selected.status}
-                </Badge>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-[10px] uppercase text-muted-foreground">
-                    NDVI
-                  </p>
-                  <p className="font-mono font-bold">
-                    {selected.ndvi.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase text-muted-foreground">
-                    Yield
-                  </p>
-                  <p className="font-mono font-bold">
-                    {selected.predictedYield.toFixed(1)}t
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase text-muted-foreground">
-                    Area
-                  </p>
-                  <p className="font-mono font-bold">{selected.area}ha</p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[10px] uppercase text-slate-400 font-bold">
+                      NDVI
+                    </p>
+                    <p className="font-mono font-bold text-slate-700">
+                      {selected.ndvi.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase text-slate-400 font-bold">
+                      Yield
+                    </p>
+                    <p className="font-mono font-bold text-slate-700">
+                      {selected.predictedYield.toFixed(1)}t
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase text-slate-400 font-bold">
+                      Area
+                    </p>
+                    <p className="font-mono font-bold text-slate-700">{selected.area}ha</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </Card>
         </div>
 
         {!layerOpen && (
           <Button
             onClick={() => setLayerOpen(true)}
-            className="absolute top-20 right-4 z-10 shadow-lg"
+            className="absolute top-20 right-4 z-10 shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"
             size="sm"
           >
             <Layers className="h-4 w-4 mr-2" /> Layers

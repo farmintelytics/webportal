@@ -34,6 +34,9 @@ export function MapView({
   onSelect?: (p: Plot) => void;
   selectedId?: string;
   height?: string;
+  currentTileUrl?: string | null;
+  zarrBounds?: any;
+  primaryLayer?: string;
 }) {
   const baseUrl =
     basemap === "street"
@@ -62,6 +65,17 @@ export function MapView({
         }
         url={baseUrl}
       />
+      {currentTileUrl && (
+        <TileLayer
+          key={currentTileUrl}
+          url={currentTileUrl}
+          opacity={0.8}
+          bounds={zarrBounds || undefined}
+          maxZoom={22}
+          maxNativeZoom={18}
+          zIndex={300}
+        />
+      )}
       <TileLayer 
         attribution="&copy; Esri Boundaries"
         url={BOUNDARIES_TILE_URL}
@@ -74,16 +88,22 @@ export function MapView({
               const c = colorFor(p, id);
               const isSel = selectedId === p.id;
               const op = layers[id] ?? 0.6;
+              // If raster is active and this layer matches primary layer, make polygon transparent
+              const isRasterVisible = currentTileUrl && id === primaryLayer;
+              const fillC = isRasterVisible ? "transparent" : c;
+              const fillOp = isRasterVisible ? 0 : (op * 0.8);
+              const outColor = isRasterVisible ? "#ffffff" : (isSel ? "#0f172a" : c);
+              
               return (
                 <Polygon
                   key={p.id + id}
                   positions={p.polygon}
                   pathOptions={{
-                    color: isSel ? "#0f172a" : c,
-                    weight: isSel ? 2.5 : 1,
-                    fillColor: c,
-                    fillOpacity: op * 0.8,
-                    opacity: op,
+                    color: outColor,
+                    weight: isSel ? 2.5 : (isRasterVisible ? 1.5 : 1),
+                    fillColor: fillC,
+                    fillOpacity: fillOp,
+                    opacity: isRasterVisible ? 0.7 : op,
                   }}
                   eventHandlers={{ click: () => onSelect?.(p) }}
                 >

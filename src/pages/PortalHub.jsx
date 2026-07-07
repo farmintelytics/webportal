@@ -19,7 +19,7 @@ import {
   ChevronDown,
   Trees
 } from 'lucide-react';
-import { fetchTenants } from '../services/agromonitorApi';
+import { fetchTenants, fetchCropMonitoringConfig } from '../services/agromonitorApi';
 
 
 const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (
@@ -55,13 +55,35 @@ const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (
   </button>
 );
 
+const TENANT_ALLOWED_MODULES = {
+  okomu: [
+    'management-ffb', 'rs-ffb', 'carbon-ffb', 'activity-ffb',
+    'custom-agromonitor-okomu',
+    'group-management', 'group-monitoring', 'carbon-groups',
+    'forestry-intel', 'carbon-estimator', 'advisor', 'finance-hub'
+  ],
+  olam: [
+    'management-maize', 'rs-maize',
+    'management-rice', 'rs-rice',
+    'management-cassava', 'rs-cassava',
+    'management-cocoa', 'rs-cocoa',
+    'management-sugarcane', 'rs-sugarcane',
+    'management-cashew', 'rs-cashew',
+    'management-rubber', 'rs-rubber',
+    'custom-agromonitor-olam',
+    'group-management', 'group-monitoring', 'carbon-groups',
+    'forestry-intel', 'carbon-estimator', 'advisor', 'finance-hub'
+  ]
+};
+
 const PortalHub = ({ onSelectModule }) => {
-  const [activeTab, setActiveTab] = React.useState('management');
+  const [activeTab, setActiveTab] = React.useState('monitoring');
   const [customModules, setCustomModules] = React.useState([
     { id: 'custom-agromonitor-olam', title: 'Olam Agro Monitoring', crop: 'Olam', icon: <Satellite />, active: true },
     { id: 'custom-agromonitor-okomu', title: 'Okomu Agro Monitoring', crop: 'Okomu', icon: <Satellite />, active: true },
   ]);
 
+  // Load tenant list for the Organization section (dynamic agro-monitoring cards)
   React.useEffect(() => {
     async function loadTenants() {
       try {
@@ -83,12 +105,16 @@ const PortalHub = ({ onSelectModule }) => {
     loadTenants();
   }, []);
 
+  // All cards are active pre-login. The user clicks a card → login happens →
+  // the individual portal enforces tenant-level access after authentication.
+  const filterModules = (modules) => modules.map(m => ({ ...m, active: m.active !== false }));
+
   const sections = [
     {
       id: 'management',
       title: 'Management Solutions',
       description: 'Workforce logistics, biometrics, and smallholder group planning for large-scale estate and cooperative operations.',
-      modules: [
+      modules: filterModules([
         { id: 'management-ffb',       title: 'FFB Intelligence',  crop: 'Oil Palm',  icon: <Sprout />,     active: true  },
         { id: 'management-maize',     title: 'Maize Hub',         crop: 'Maize',     icon: <Wheat />,      active: true  },
         { id: 'management-cassava',   title: 'Cassava Core',      crop: 'Cassava',   icon: <Container />,  active: true  },
@@ -98,13 +124,13 @@ const PortalHub = ({ onSelectModule }) => {
         { id: 'management-cashew',    title: 'Cashew Hub',        crop: 'Cashew',    icon: <Activity />,   active: true  },
         { id: 'management-rubber',    title: 'Rubber Hub',        crop: 'Rubber',    icon: <Droplets />,   active: true  },
         { id: 'group-management',     title: 'Groups Hub',        crop: 'Smallholder', icon: <Users />,    active: true  },
-      ]
+      ])
     },
     {
       id: 'monitoring',
       title: 'Geospatial Intelligence',
       description: 'Multispectral satellite imagery and drone-level field surveillance for high-precision monitoring.',
-      modules: [
+      modules: filterModules([
         { id: 'rs-ffb',       title: 'Oil Palm',    crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
         { id: 'rs-maize',     title: 'Maize Hub',    crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
         { id: 'rs-cassava',   title: 'Cassava',     crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
@@ -115,41 +141,41 @@ const PortalHub = ({ onSelectModule }) => {
         { id: 'rs-rubber',    title: 'Rubber',      crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
         { id: 'rs-drone',     title: 'Drone Intel',  crop: 'Aerial',    icon: <Plane />, active: true  },
         { id: 'group-monitoring', title: 'Smallholder', crop: 'Fusion',    icon: <Satellite />, active: true  },
-      ]
+      ])
     },
     {
       id: 'sustainability',
       title: 'Sustainability & Carbon',
       description: 'Carbon sequestration monitoring, forestry biomass estimation, and smallholder group carbon verification.',
-      modules: [
+      modules: filterModules([
         { id: 'carbon-ffb',       title: 'Estate Carbon', crop: 'Industrial', icon: <Leaf />, active: true  },
         { id: 'carbon-groups',    title: 'Group Carbon',  crop: 'Smallholder', icon: <Globe />, active: true  },
         { id: 'forestry-intel',   title: 'Forestry Intel', crop: 'High Density', icon: <Trees />, active: true  },
         { id: 'carbon-estimator', title: 'Carbon Est.',   crop: 'Analytical', icon: <Activity />, active: true  },
-      ]
+      ])
     },
     {
       id: 'payments',
       title: 'Finance & Ledger',
       description: 'Immutable farm ledgers and secure multi-crop disbursement systems.',
-      modules: [
+      modules: filterModules([
         { id: 'finance-hub', title: 'Central Ledger', crop: 'Multi-Crop', icon: <CreditCard />, active: true  },
-      ]
+      ])
     },
     {
       id: 'field-advisory',
       title: 'Field Advisory',
       description: 'Geo-referenced field logs and location-aware agronomic insights.',
-      modules: [
+      modules: filterModules([
         { id: 'activity-ffb', title: 'Field Logs',    crop: 'Operations', icon: <ClipboardList />, active: true  },
         { id: 'advisor',      title: 'Farm Advisor',    crop: 'Agronomy',   icon: <MessageSquare />, active: true  },
-      ]
+      ])
     },
     {
       id: 'custom',
       title: 'Custom Solutions',
       description: 'Bespoke operational gateways and proprietary analytics models tailored for specific agri-businesses.',
-      modules: customModules,
+      modules: filterModules(customModules),
     },
   ];
 
@@ -187,11 +213,7 @@ const PortalHub = ({ onSelectModule }) => {
 
         <div className="flex flex-wrap items-center gap-12 mb-10 border-b border-gray-100">
           {[
-            { id: 'management', label: 'Management' },
             { id: 'monitoring', label: 'Monitoring' },
-            { id: 'sustainability', label: 'Sustainability' },
-            { id: 'payments', label: 'Payments' },
-            { id: 'field-advisory', label: 'Advisory' },
             { id: 'custom', label: 'Organization' }
           ].map(tab => (
             <button 

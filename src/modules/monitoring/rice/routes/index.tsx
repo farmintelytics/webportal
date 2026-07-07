@@ -10,7 +10,7 @@ import {
 
 import { Dashboard } from "./dashboard";
 import { cn } from "@monitoring-shared/lib/utils";
-import { fetchPlotsIntelligence } from "../../../../services/agromonitorApi";
+import { fetchPlotsIntelligence, fetchTimeseriesSlider } from "../../../../services/agromonitorApi";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -81,6 +81,7 @@ const LAYERS: LayerDef[] = [
 ];
 
 export function MapHome() {
+  const { cropSummary, cropBlocks, cropLoading } = useMonitoring();
   const [open, setOpen] = useState(true);
   const [basemap, setBasemap] = useState<"satellite" | "street" | "terrain">("satellite");
   const [active, setActive] = useState<ActiveLayers>({ alert: 0.7 });
@@ -88,55 +89,82 @@ export function MapHome() {
   const [sel, setSel] = useState<Plot | null>(null);
   const [source, setSource] = useState<"sentinel" | "landsat">("sentinel");
   const [date, setDate] = useState("Now · Dec '25");
-  const [plotsData, setPlotsData] = useState<Plot[]>(plots);
+
+  // Zarr raster slider state
+  const [timeIndex, setTimeIndex] = useState(0);
+  const [sliderData, setSliderData] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [zarrBounds, setZarrBounds] = useState<any>(null);
+
+  // Use the expanded layer or the first active one as the primary layer for raster loading
+  const primaryLayer = expanded || Object.keys(active)[0] || "ndvi";
+  const tenant = cropSummary?.tenant || "olam";
 
   useEffect(() => {
-    fetchPlotsIntelligence()
-      .then((res) => {
-        if (res && res.length > 0) {
-          const mapped = res.map((p: any) => {
-            let polygon: [number, number][] = [];
-            if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
-              polygon = p.boundary.coordinates[0].map(([lng, lat]: [number, number]) => [lat, lng]);
-            }
-            const latSum = polygon.reduce((s, pt) => s + pt[0], 0);
-            const lngSum = polygon.reduce((s, pt) => s + pt[1], 0);
-            const centroid: [number, number] = polygon.length > 0
-              ? [latSum / polygon.length, lngSum / polygon.length]
-              : [10.45, 105.63];
-
-            const ndvi = p.indices?.ndvi ?? 0.65;
-            const ndmi = p.indices?.ndmi ?? 0.45;
-            const alert = p.indices?.uas_anomaly_score > 0.4 ? "critical" : p.indices?.uas_anomaly_score > 0.15 ? "stressed" : "healthy";
-
-            return {
-              id: p.plot_id,
-              name: p.name,
-              area: p.area_ha ?? 10.0,
-              polygon,
-              centroid,
-              suitability: ndvi > 0.6 ? "High" : ndvi > 0.4 ? "Moderate" : "Low",
-              suitabilityScore: Math.round(ndvi * 100),
-              ndvi,
-              ndre: +(ndvi * 0.7).toFixed(2),
-              lswi: ndmi,
-              vhi: Math.round(ndvi * 100),
-              stage: p.stage ?? "Vegetative",
-              daysSincePlanting: 45,
-              predictedYield: +(ndvi * 5.2).toFixed(2),
-              lastSeasonYield: +(ndvi * 4.8).toFixed(2),
-              alert,
-              recommendedPlanting: "May",
-              soilScore: 85,
-              waterScore: 80,
-              climateScore: 78,
-            };
-          });
-          setPlotsData(mapped);
+    fetchTimeseriesSlider({
+      farm: tenant,
+      index: primaryLayer,
+      start: "2024-01-01",
+      end: "2027-12-31"
+    })
+      .then(data => {
+        setSliderData(data);
+        if (data?.timeline) {
+          setTimeline(data.timeline);
+          setTimeIndex(Math.max(0, data.timeline.length - 1));
         }
+        if (data?.zarr_bounds) setZarrBounds(data.zarr_bounds);
       })
-      .catch((err) => console.error("Error fetching plots intelligence:", err));
-  }, []);
+      .catch(err => console.error("Slider fetch error:", err));
+  }, [primaryLayer, tenant]);
+
+  const currentTileUrl = useMemo(() => {
+    if (!timeline || timeline.length === 0) return null;
+    const currentEntry = timeline[Math.min(timeIndex, timeline.length - 1)];
+    return currentEntry ? sliderData?.tiles?.[currentEntry.date] : null;
+  }, [sliderData, timeline, timeIndex]);
+
+  const plotsData = useMemo(() => {
+    if (!cropBlocks || cropBlocks.length === 0) return [];
+    return cropBlocks.map((p: any) => {
+      let polygon: [number, number][] = [];
+      if (p.geometry && p.geometry.coordinates && p.geometry.coordinates[0]) {
+        polygon = p.geometry.coordinates[0].map(([lng, lat]: [number, number]) => [lat, lng]);
+      }
+      const latSum = polygon.reduce((s, pt) => s + pt[0], 0);
+      const lngSum = polygon.reduce((s, pt) => s + pt[1], 0);
+      const centroid: [number, number] = polygon.length > 0
+        ? [latSum / polygon.length, lngSum / polygon.length]
+        : [10.45, 105.63];
+
+      const ndvi = p.current_indices?.ndvi ?? 0.65;
+      const ndmi = p.current_indices?.ndmi ?? p.current_indices?.ndwi ?? 0.45;
+      const alert = p.health_class === "Critical" ? "critical" : p.health_class === "Stressed" ? "stressed" : "healthy";
+
+      return {
+        id: p.id,
+        name: p.plot_nb ? `Plot ${p.plot_nb}` : p.id,
+        area: p.area_ha ?? 10.0,
+        polygon,
+        centroid,
+        suitability: ndvi > 0.6 ? "High" : ndvi > 0.4 ? "Moderate" : "Low",
+        suitabilityScore: Math.round(ndvi * 100),
+        ndvi,
+        ndre: p.current_indices?.ndre ?? +(ndvi * 0.7).toFixed(2),
+        lswi: p.current_indices?.lswi ?? ndmi,
+        vhi: Math.round(ndvi * 100),
+        stage: p.stage ?? "Vegetative",
+        daysSincePlanting: 45,
+        predictedYield: p.yield_t_ha ?? +(ndvi * 5.2).toFixed(2),
+        lastSeasonYield: p.yield_t_ha ? +(p.yield_t_ha * 0.95).toFixed(2) : +(ndvi * 4.8).toFixed(2),
+        alert,
+        recommendedPlanting: "May",
+        soilScore: 85,
+        waterScore: 80,
+        climateScore: 78,
+      };
+    });
+  }, [cropBlocks]);
 
   const toggle = (id: LayerId) => {
     setActive((a) => {
@@ -154,7 +182,16 @@ export function MapHome() {
   return (
     <AppLayout title="Map View" subtitle="Sentinel-1 · Sentinel-2 · MODIS · CHIRPS · SoilGrids">
       <div className="relative rounded-xl border border-border bg-card overflow-hidden shadow-soft" style={{ height: "calc(100vh - 180px)", minHeight: 560 }}>
-        <MapView layers={active} basemap={basemap} onSelect={setSel} selectedId={sel?.id} plots={plotsData} />
+        <MapView 
+          layers={active} 
+          basemap={basemap} 
+          onSelect={setSel} 
+          selectedId={sel?.id} 
+          plots={plotsData}
+          currentTileUrl={currentTileUrl}
+          zarrBounds={zarrBounds}
+          primaryLayer={primaryLayer}
+        />
 
         {/* Imagery Explorer (Top Left) */}
         <div className="absolute top-4 left-4 z-[1000] pointer-events-none">
@@ -163,7 +200,7 @@ export function MapHome() {
               <div className="flex items-center gap-2">
                 <Satellite className="h-3.5 w-3.5 text-primary"/>
                 <span className="text-[10px] font-black uppercase tracking-wider">Imagery Explorer</span>
-                <span className="text-xs text-primary font-mono font-bold">{date}</span>
+                <span className="text-xs text-primary font-mono font-bold">{timeline[timeIndex]?.label || "Loading..."}</span>
               </div>
             <div className="flex items-center justify-between gap-4 mt-2">
               <div className="flex bg-muted p-0.5 rounded-lg flex-1">
@@ -193,8 +230,8 @@ export function MapHome() {
             </div>
           </div>
           <input 
-            type="range" min={0} max={23} defaultValue={23}
-            onChange={e => setDate(`Month ${e.target.value} · 2025`)}
+            type="range" min={0} max={Math.max(0, timeline.length - 1)} value={timeIndex}
+            onChange={e => setTimeIndex(+e.target.value)}
             className="w-full h-1.5 accent-primary appearance-none bg-muted rounded-full cursor-pointer mt-2"
           />
         </div>

@@ -121,6 +121,9 @@ export function FarmMap({
   selectedId?: string;
   basemap?: Basemap;
   blocks?: Block[];
+  currentTileUrl?: string | null;
+  zarrBounds?: any;
+  primaryLayer?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -134,6 +137,17 @@ export function FarmMap({
     <MapContainer center={mapCenter} zoom={14} className="h-full w-full" zoomControl={false}>
       <TileLayer key={basemap} attribution={tile.attribution} url={tile.url} />
       {tile.overlay && <TileLayer key={`${basemap}-overlay`} url={tile.overlay} attribution="" />}
+      {currentTileUrl && (
+        <TileLayer
+          key={currentTileUrl}
+          url={currentTileUrl}
+          opacity={0.8}
+          bounds={zarrBounds || undefined}
+          maxZoom={22}
+          maxNativeZoom={18}
+          zIndex={300}
+        />
+      )}
       <FitBounds blocks={blocks} />
       {blocks.map((b) => {
         let fill = "transparent";
@@ -146,6 +160,12 @@ export function FarmMap({
         const stroke = enabled("boundaries") ? "#fcd34d" : "transparent";
         const isSel = selectedId === b.id;
         
+        const isRasterVisible = currentTileUrl && enabled(primaryLayer || "");
+        if (isRasterVisible) {
+          fill = "transparent";
+          fillOpacity = 0;
+        }
+        
         // Apply Ramer-Douglas-Peucker simplification to improve rendering performance and minimize lag
         const simplifiedPolygon = simplifyPolygon(b.polygon as [number, number][]);
 
@@ -154,8 +174,8 @@ export function FarmMap({
             key={b.id}
             positions={simplifiedPolygon}
             pathOptions={{
-              color: isSel ? "#fef08a" : stroke,
-              weight: isSel ? 3 : 2,
+              color: isRasterVisible ? "#ffffff" : (isSel ? "#fef08a" : stroke),
+              weight: isSel ? 3 : (isRasterVisible ? 1.5 : 2),
               fillColor: fill,
               fillOpacity,
             }}

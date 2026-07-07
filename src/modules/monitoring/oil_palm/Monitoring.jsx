@@ -1,0 +1,34 @@
+import React, { useMemo } from 'react';
+import { createRouter, RouterProvider, createMemoryHistory } from '@tanstack/react-router';
+import { routeTree } from './routeTree.gen';
+import { MonitoringProvider } from '../shared/MonitoringContext';
+import { useCropMonitoring } from '../shared/useCropMonitoring';
+import 'leaflet/dist/leaflet.css';
+import './styles.css';
+
+export default function Monitoring({ onBack, onSignOut }) {
+  const router = useMemo(() => {
+    const memoryHistory = createMemoryHistory({ initialEntries: ['/'] });
+    return createRouter({ routeTree, history: memoryHistory, defaultPreload: 'intent' });
+  }, []);
+
+  const { summary, blocks, indices, mapCenter, loading, error } = useCropMonitoring('ffb');
+
+  return (
+    <div className='monitoring-theme-oil_palm min-h-screen w-full'>
+      <MonitoringProvider
+        onBack={onBack}
+        onSignOut={onSignOut}
+        cropType="ffb"
+        cropSummary={summary}
+        cropBlocks={blocks}
+        cropIndices={indices}
+        cropLoading={loading}
+        cropError={error}
+        mapCenter={mapCenter}
+      >
+        <RouterProvider router={router} />
+      </MonitoringProvider>
+    </div>
+  );
+}

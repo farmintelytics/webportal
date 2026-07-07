@@ -47,7 +47,7 @@ import EstimatorPortal from './modules/sustainability/estimator/EstimatorPortal'
 import RiceMonitoring from './modules/monitoring/rice/Monitoring';
 import MaizeMonitoring from './modules/monitoring/maize/Monitoring';
 import CocoaMonitoring from './modules/monitoring/cocoa/Monitoring';
-import FFBMonitoring from './modules/monitoring/ffb/Monitoring';
+import OilPalmMonitoring from './modules/monitoring/oil_palm/Monitoring';
 import CassavaMonitoring from './modules/monitoring/cassava/Monitoring';
 import SugarcaneMonitoring from './modules/monitoring/sugarcane/Monitoring';
 
@@ -58,6 +58,10 @@ import GroupsDashboard from './modules/cooperative/Dashboard';
 import FinanceDashboard from './modules/finance/Dashboard';
 
 import AgroMonitor from './modules/agro-monitor/AgroMonitor';
+
+// === Super Admin Portal ===
+import AdminLogin from './farmintelytics-admin/AdminLogin';
+import AdminPortal from './farmintelytics-admin/AdminPortal';
 
 import { crops } from './constants/crops.jsx';
 import { Zap } from 'lucide-react';
@@ -181,7 +185,7 @@ const PortalPage = () => {
     // Remote-sensing monitoring portals
     if (moduleId.startsWith('rs-')) {
       const rsApps = {
-        'rs-ffb':      <FFBMonitoring />,
+        'rs-ffb':      <OilPalmMonitoring />,
         'rs-sugarcane':<SugarcaneMonitoring />,
         'rs-rice':     <RiceMonitoring />,
         'rs-cocoa':    <CocoaMonitoring />,
@@ -289,6 +293,8 @@ const App = () => {
       <Route path="/login"                  element={<LoginPage />} />
       <Route path="/portal"                 element={<PortalPage />} />
       <Route path={AGROMONITOR_PATH}        element={<AgroMonitorPage />} />
+      <Route path="/admin/login"            element={<AdminLogin />} />
+      <Route path="/admin/*"               element={<AdminPortal />} />
       {/* Catch-all: back to hub */}
       <Route path="*"                       element={<Navigate to="/" replace />} />
     </Routes>

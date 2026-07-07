@@ -1,26 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Polygon, LayersControl, Tooltip as LeafletTooltip, useMap, Marker, Popup } from "react-leaflet";
+import { useEffect, useMemo, useState } from "react";
+import { MapContainer, TileLayer, Polygon, useMap, Tooltip as LeafletTooltip, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { blocks, type HealthClass, type Block } from "../lib/cocoa-data";
-import { Layers, Search, X, Eye, EyeOff, Crosshair, ChevronDown, ChevronRight, Calendar } from "lucide-react";
+import { type HealthClass, type Block } from "../lib/cocoa-data";
+import { Layers, Search, X, Eye, EyeOff, ChevronDown, ChevronRight, Calendar } from "lucide-react";
 import { cn } from "@monitoring-shared/lib/utils";
+import { useMonitoring } from "../../shared/MonitoringContext";
+import { fetchTimeseriesSlider } from "../../../../services/agromonitorApi";
 
 
 // Schematic farm geographic coords centered on Ashanti, Ghana cocoa region
 const FARM_CENTER: [number, number] = [6.685, -1.625];
-
-// Generate realistic-looking polygon coords for each block (small offsets in degrees)
-const blockShapes: Record<string, [number, number][]> = {
-  B1: [[6.690, -1.632], [6.692, -1.628], [6.689, -1.625], [6.686, -1.628], [6.687, -1.631]],
-  B2: [[6.692, -1.628], [6.694, -1.624], [6.691, -1.621], [6.689, -1.625]],
-  B3: [[6.694, -1.624], [6.696, -1.620], [6.693, -1.617], [6.691, -1.621]],
-  B4: [[6.696, -1.620], [6.698, -1.616], [6.695, -1.613], [6.693, -1.617]],
-  B5: [[6.686, -1.628], [6.689, -1.625], [6.687, -1.621], [6.683, -1.620], [6.682, -1.625]],
-  B6: [[6.689, -1.625], [6.691, -1.621], [6.689, -1.617], [6.687, -1.621]],
-  B7: [[6.691, -1.621], [6.693, -1.617], [6.690, -1.614], [6.689, -1.617]],
-  B8: [[6.693, -1.617], [6.695, -1.613], [6.692, -1.610], [6.690, -1.614]],
-};
 
 const healthColor = (h: HealthClass) => {
   switch (h) {
@@ -51,7 +41,7 @@ interface LayerDef {
 
 const LAYERS: LayerDef[] = [
   { key: "boundaries", label: "Farm Boundaries", group: "Operational", desc: "Plot polygons & block IDs",
-    legend: [{ color: "#1e40af", label: "Boundary outline" }] },
+    legend: [{ color: "#16a34a", label: "Boundary outline" }] },
   { key: "health", label: "Canopy Health (NDRE class)", group: "Monitoring", desc: "Health classification per block",
     legend: [
       { color: "#16a34a", label: "Excellent (NDRE ≥ 0.35)" },
@@ -88,13 +78,11 @@ const LAYERS: LayerDef[] = [
     ] },
   { key: "rainfall", label: "CHIRPS Rainfall (3-mo)", group: "Monitoring", desc: "Rolling rainfall accumulation",
     legend: [
-      { color: "#1d4ed8", label: "≥ 480 mm" },
-      { color: "#60a5fa", label: "400–480 mm" },
-      { color: "#fde68a", label: "< 400 mm" },
+      { color: "#1d4ed8", label: "Rolling precipitation totals" },
     ] },
 ];
 
-const colorForLayer = (b: Block, key: LayerKey): string => {
+const colorForLayer = (b: any, key: LayerKey): string => {
   switch (key) {
     case "health": return healthColor(b.health);
     case "ndvi": return ndviColor(b.ndvi);
@@ -115,7 +103,7 @@ const colorForLayer = (b: Block, key: LayerKey): string => {
       if (b.rainfall3mo >= 480) return "#1d4ed8";
       if (b.rainfall3mo >= 400) return "#60a5fa";
       return "#fde68a";
-    case "boundaries": return "#1e40af";
+    case "boundaries": return "#16a34a";
   }
 };
 
@@ -125,6 +113,9 @@ interface Props {
 }
 
 export function MapView({ selected, onSelect }: Props) {
+  const { cropSummary, cropBlocks, cropLoading } = useMonitoring();
+  const tenant = cropSummary?.tenant || "olam";
+
   const [activeLayers, setActiveLayers] = useState<Record<LayerKey, boolean>>({
     boundaries: true, health: true, ndvi: false, ndre: false, lswi: false, soil: false, rainfall: false,
   });
@@ -136,14 +127,89 @@ export function MapView({ selected, onSelect }: Props) {
   const [panelOpen, setPanelOpen] = useState(true);
   const [search, setSearch] = useState("");
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ Operational: true, Monitoring: true, Biophysical: false });
-  const [timeIndex, setTimeIndex] = useState(11);
+  const [timeIndex, setTimeIndex] = useState(0);
 
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+  const plotsData = useMemo(() => {
+    if (!cropBlocks || cropBlocks.length === 0) return [];
+    return cropBlocks.map((p: any) => {
+      let polygon: [number, number][] = [];
+      let center: [number, number] = FARM_CENTER;
+      if (p.geometry && p.geometry.coordinates && p.geometry.coordinates[0]) {
+        polygon = p.geometry.coordinates[0].map(([lng, lat]: [number, number]) => [lat, lng]);
+        const lats = polygon.map(pt => pt[0]);
+        const lngs = polygon.map(pt => pt[1]);
+        center = [lats.reduce((a,b)=>a+b,0)/lats.length, lngs.reduce((a,b)=>a+b,0)/lngs.length];
+      }
+      const ndvi = p.current_indices?.ndvi ?? 0.65;
+      const ndre = p.current_indices?.ndre ?? +(ndvi * 0.7).toFixed(2);
+      const lswi = p.current_indices?.lswi ?? p.current_indices?.ndwi ?? 0.45;
+      const statusVal = p.health_class === "Critical" ? "Severely Stressed" : p.health_class === "Stressed" ? "Stressed" : ndvi > 0.7 ? "Excellent" : "Good";
+      return {
+        id: p.id,
+        name: p.plot_nb ? `Block ${p.plot_nb}` : p.id,
+        area: p.area_ha ?? 2.0,
+        health: statusVal as HealthClass,
+        ndvi,
+        ndre,
+        lswi,
+        rainfall3mo: cropSummary?.average_rainfall_mm ?? 420,
+        predictedYield: p.yield_t_ha ? Math.round(p.yield_t_ha * 1000) : Math.round(ndvi * 2400),
+        polygon,
+        center
+      };
+    });
+  }, [cropBlocks, cropSummary]);
+
+  // Zarr raster slider state
+  const [sliderData, setSliderData] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [zarrBounds, setZarrBounds] = useState<any>(null);
+
+  const biophysicalActiveLayer = useMemo(() => {
+    if (activeLayers.ndvi) return "ndvi";
+    if (activeLayers.ndre) return "ndre";
+    if (activeLayers.lswi) return "lswi";
+    return null;
+  }, [activeLayers]);
+
+  useEffect(() => {
+    if (!biophysicalActiveLayer) return;
+    fetchTimeseriesSlider({
+      farm: tenant,
+      index: biophysicalActiveLayer,
+      start: "2024-01-01",
+      end: "2027-12-31"
+    })
+      .then(data => {
+        setSliderData(data);
+        if (data?.timeline) {
+          setTimeline(data.timeline);
+          setTimeIndex(Math.max(0, data.timeline.length - 1));
+        }
+        if (data?.zarr_bounds) setZarrBounds(data.zarr_bounds);
+      })
+      .catch(err => console.error("Slider fetch error:", err));
+  }, [biophysicalActiveLayer, tenant]);
+
+  const currentTileUrl = useMemo(() => {
+    if (!biophysicalActiveLayer || !timeline || timeline.length === 0) return null;
+    const currentEntry = timeline[Math.min(timeIndex, timeline.length - 1)];
+    return currentEntry ? sliderData?.tiles?.[currentEntry.date] : null;
+  }, [sliderData, timeline, timeIndex, biophysicalActiveLayer]);
+
+  const bounds = useMemo<LatLngBoundsExpression>(() => {
+    if (plotsData.length === 0) return [[6.68, -1.63], [6.69, -1.62]];
+    const lats = plotsData.map(p => p.center[0]);
+    const lngs = plotsData.map(p => p.center[1]);
+    return [[Math.min(...lats) - 0.005, Math.min(...lngs) - 0.005], [Math.max(...lats) + 0.005, Math.max(...lngs) + 0.005]];
+  }, [plotsData]);
+
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
-    return blocks.filter((b) => b.name.toLowerCase().includes(search.toLowerCase()) || b.id.toLowerCase().includes(search.toLowerCase())).slice(0, 5);
-  }, [search]);
+    return plotsData.filter((b) => b.name.toLowerCase().includes(search.toLowerCase()) || b.id.toLowerCase().includes(search.toLowerCase())).slice(0, 5);
+  }, [search, plotsData]);
 
   const activeLayerDefs = LAYERS.filter((l) => activeLayers[l.key]);
   const primaryFillLayer = activeLayerDefs.find((l) => l.key !== "boundaries");
@@ -155,7 +221,8 @@ export function MapView({ selected, onSelect }: Props) {
         zoom={15}
         scrollWheelZoom
         className="w-full h-full"
-        style={{ background: "var(--secondary)" }}
+        style={{ background: "#0d1f0d" }}
+        zoomControl={false}
       >
         <TileLayer
           url={
@@ -173,32 +240,52 @@ export function MapView({ selected, onSelect }: Props) {
           opacity={0.6}
         />
 
-        {blocks.map((b) => {
+        {currentTileUrl && biophysicalActiveLayer && (
+          <TileLayer
+            url={currentTileUrl}
+            opacity={opacity[biophysicalActiveLayer] ?? 0.7}
+            bounds={zarrBounds || undefined}
+            zIndex={300}
+          />
+        )}
+
+        {plotsData.map((b) => {
           const fillKey = primaryFillLayer?.key ?? "boundaries";
           const fillColor = colorForLayer(b, fillKey);
           const isSel = selected === b.id;
-          const showFill = !!primaryFillLayer;
+          
+          const isRasterActive = biophysicalActiveLayer && currentTileUrl;
+          const strokeColor = isRasterActive ? "#ffffff" : (activeLayers.boundaries ? "#16a34a" : fillColor);
+          const drawFillColor = isRasterActive ? "transparent" : fillColor;
+          const drawFillOpacity = isRasterActive ? 0 : (primaryFillLayer ? opacity[primaryFillLayer.key] : 0.05);
+
+          const polyBounds = b.polygon.length > 0 ? b.polygon : [
+            [b.center[0] - 0.002, b.center[1] - 0.002],
+            [b.center[0] - 0.002, b.center[1] + 0.002],
+            [b.center[0] + 0.002, b.center[1] + 0.002],
+            [b.center[0] + 0.002, b.center[1] - 0.002],
+          ];
+
           return (
             <Polygon
               key={b.id}
-              positions={blockShapes[b.id]}
+              positions={polyBounds}
               eventHandlers={{ click: () => onSelect?.(b.id) }}
               pathOptions={{
-                color: activeLayers.boundaries ? "#1e40af" : fillColor,
-                weight: isSel ? 3 : activeLayers.boundaries ? 1.5 : 0.5,
-                fillColor,
-                fillOpacity: showFill ? (primaryFillLayer ? opacity[primaryFillLayer.key] : 0.5) : 0.05,
-                dashArray: isSel ? "" : undefined,
+                color: isSel ? "#fef08a" : strokeColor,
+                weight: isSel ? 3 : (isRasterActive ? 1.5 : (activeLayers.boundaries ? 2 : 0.5)),
+                fillColor: drawFillColor,
+                fillOpacity: drawFillOpacity,
               }}
             >
               <LeafletTooltip direction="center" permanent className="block-tooltip">
                 <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,.7)" }}>{b.id}</span>
               </LeafletTooltip>
               <Popup>
-                <div style={{ minWidth: 180 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{b.name}</div>
-                  <div style={{ fontSize: 11, color: "#555" }}>{b.area} ha · {b.health}</div>
-                  <div style={{ marginTop: 6, fontSize: 11 }}>
+                <div style={{ minWidth: 180 }} className="p-1">
+                  <div className="font-semibold text-slate-900 text-sm">{b.name}</div>
+                  <div className="text-xs text-slate-500">{b.area} ha · {b.health}</div>
+                  <div className="mt-2 text-xs text-slate-700">
                     NDVI {b.ndvi.toFixed(2)} · NDRE {b.ndre.toFixed(2)}<br />
                     Predicted: {b.predictedYield} kg/ha
                   </div>
@@ -208,7 +295,8 @@ export function MapView({ selected, onSelect }: Props) {
           );
         })}
 
-        {searchResults.length > 0 && <FlyTo position={blockShapes[searchResults[0].id][0]} />}
+        {searchResults.length > 0 && <FlyTo position={searchResults[0].center} />}
+        <FitBounds bounds={bounds} />
       </MapContainer>
 
       {/* Imagery Explorer (Top) */}
@@ -217,9 +305,11 @@ export function MapView({ selected, onSelect }: Props) {
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5 text-primary"/>
-                <span className="text-[10px] font-black uppercase tracking-wider">Imagery Explorer</span>
-                <span className="text-xs text-primary font-mono font-bold">{months[timeIndex]} '26</span>
+                <Calendar className="h-3.5 w-3.5 text-emerald-700"/>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-800">Imagery Explorer</span>
+                <span className="text-xs text-emerald-700 font-mono font-bold">
+                  {timeline.length > 0 ? (timeline[timeIndex]?.date ?? "Now") : "Now · Dec '25"}
+                </span>
               </div>
             </div>
             
@@ -231,7 +321,7 @@ export function MapView({ selected, onSelect }: Props) {
                     onClick={() => setBasemap(b)}
                     className={cn(
                       "flex-1 px-2 py-1 text-[9px] font-black rounded-md transition-all uppercase",
-                      basemap === b ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+                      basemap === b ? "bg-white shadow-sm text-emerald-700 font-bold" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
                     {b}
@@ -241,19 +331,19 @@ export function MapView({ selected, onSelect }: Props) {
               <div className="flex bg-muted p-0.5 rounded-lg">
                 <button 
                   onClick={() => setSource("sentinel")}
-                  className={cn("px-2 py-0.5 text-[9px] font-black rounded-md transition-all", source === "sentinel" ? "bg-white shadow-sm text-primary" : "text-muted-foreground")}
+                  className={cn("px-2 py-0.5 text-[9px] font-black rounded-md transition-all", source === "sentinel" ? "bg-white shadow-sm text-emerald-700 font-bold" : "text-muted-foreground")}
                 >SENTINEL</button>
                 <button 
                   onClick={() => setSource("landsat")}
-                  className={cn("px-2 py-0.5 text-[9px] font-black rounded-md transition-all", source === "landsat" ? "bg-white shadow-sm text-primary" : "text-muted-foreground")}
+                  className={cn("px-2 py-0.5 text-[9px] font-black rounded-md transition-all", source === "landsat" ? "bg-white shadow-sm text-emerald-700 font-bold" : "text-muted-foreground")}
                 >LANDSAT</button>
               </div>
             </div>
           </div>
           <input 
-            type="range" min={0} max={11} value={timeIndex}
-            onChange={e => setTimeIndex(+e.target.value)}
-            className="w-full h-1.5 accent-primary appearance-none bg-muted rounded-full cursor-pointer"
+            type="range" min={0} max={Math.max(0, timeline.length - 1)} value={timeIndex}
+            onChange={e => setTimeIndex(Number(e.target.value))}
+            className="w-full h-1.5 accent-emerald-600 appearance-none bg-muted rounded-full cursor-pointer"
           />
         </div>
         <div className="relative w-72 pointer-events-auto">
@@ -262,7 +352,7 @@ export function MapView({ selected, onSelect }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search farms, plots…"
-            className="w-full h-10 pl-9 pr-9 text-sm bg-white border border-border rounded-lg shadow-md focus:outline-none focus:border-primary"
+            className="w-full h-10 pl-9 pr-9 text-sm bg-white border border-slate-100 rounded-lg shadow-md focus:outline-none focus:border-emerald-600"
           />
         </div>
       </div>
@@ -271,23 +361,23 @@ export function MapView({ selected, onSelect }: Props) {
       {!panelOpen && (
         <button
           onClick={() => setPanelOpen(true)}
-          className="absolute top-3 right-3 z-[400] size-11 rounded-lg bg-white border border-border shadow-md flex items-center justify-center hover:bg-card transition"
+          className="absolute top-3 right-3 z-[400] size-11 rounded-lg bg-emerald-600 text-white shadow-md flex items-center justify-center hover:bg-emerald-700 transition"
           title="Layers"
         >
-          <Layers className="size-5 text-foreground" />
+          <Layers className="size-5" />
         </button>
       )}
 
       {/* Layer drawer */}
       {panelOpen && (
-        <div className="absolute top-3 right-3 z-[400] w-80 max-h-[calc(100%-1.5rem)] flex flex-col bg-white border border-border rounded-lg shadow-xl">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="absolute top-3 right-3 z-[400] w-80 max-h-[calc(100%-1.5rem)] flex flex-col bg-white border border-emerald-100 rounded-lg shadow-xl">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <Layers className="size-4 text-primary" />
-              <span className="text-sm font-semibold">Map Layers</span>
+              <Layers className="size-4 text-emerald-700" />
+              <span className="text-sm font-semibold text-slate-800">Map Layers</span>
             </div>
-            <button onClick={() => setPanelOpen(false)} className="size-7 rounded hover:bg-secondary flex items-center justify-center">
-              <X className="size-4 text-muted-foreground" />
+            <button onClick={() => setPanelOpen(false)} className="size-7 rounded hover:bg-slate-50 flex items-center justify-center">
+              <X className="size-4 text-slate-500" />
             </button>
           </div>
 
@@ -296,49 +386,61 @@ export function MapView({ selected, onSelect }: Props) {
               const layers = LAYERS.filter((l) => l.group === group);
               const open = openGroups[group];
               return (
-                <div key={group} className="rounded-md border border-border/60 overflow-hidden">
+                <div key={group} className="rounded-md border border-slate-100 overflow-hidden">
                   <button
                     onClick={() => setOpenGroups({ ...openGroups, [group]: !open })}
-                    className="w-full flex items-center justify-between px-3 py-2 bg-secondary/40 hover:bg-secondary/60 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                    className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-500"
                   >
                     <span>{group}</span>
                     {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
                   </button>
                   {open && (
-                    <div className="divide-y divide-border/60">
+                    <div className="divide-y divide-slate-100">
                       {layers.map((layer) => {
                         const on = activeLayers[layer.key];
                         return (
                           <div key={layer.key} className="px-3 py-2.5">
                             <div className="flex items-start gap-2">
                               <button
-                                onClick={() => setActiveLayers({ ...activeLayers, [layer.key]: !on })}
-                                className={`mt-0.5 size-4 rounded flex items-center justify-center transition ${on ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
+                                onClick={() => {
+                                  setActiveLayers(prev => {
+                                    const next = { ...prev };
+                                    if (layer.group === "Biophysical") {
+                                      // Mutually exclusive biophysical layers
+                                      LAYERS.filter(ly => ly.group === "Biophysical").forEach(ly => {
+                                        next[ly.key] = false;
+                                      });
+                                    }
+                                    next[layer.key] = !on;
+                                    return next;
+                                  });
+                                }}
+                                className={`mt-0.5 size-4 rounded flex items-center justify-center transition ${on ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-400"}`}
                               >
                                 {on ? <Eye className="size-2.5" /> : <EyeOff className="size-2.5" />}
                               </button>
                               <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium text-foreground">{layer.label}</div>
-                                <div className="text-[10px] text-muted-foreground">{layer.desc}</div>
+                                <div className="text-xs font-medium text-slate-800">{layer.label}</div>
+                                <div className="text-[10px] text-slate-400">{layer.desc}</div>
                               </div>
                             </div>
                             {on && (
                               <div className="mt-2 ml-6 space-y-2">
                                 <div>
-                                  <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                                  <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
                                     <span>Opacity</span><span>{Math.round(opacity[layer.key] * 100)}%</span>
                                   </div>
                                   <input
                                     type="range" min={0} max={100} value={opacity[layer.key] * 100}
                                     onChange={(e) => setOpacity({ ...opacity, [layer.key]: Number(e.target.value) / 100 })}
-                                    className="w-full h-1 accent-primary"
+                                    className="w-full h-1 accent-emerald-600"
                                   />
                                 </div>
                                 <div className="space-y-1">
                                   {layer.legend.map((l) => (
-                                    <div key={l.label} className="flex items-center gap-2 text-[10px]">
-                                      <span className="size-2.5 rounded-sm border border-border/60" style={{ background: l.color }} />
-                                      <span className="text-muted-foreground">{l.label}</span>
+                                    <div key={l.label} className="flex items-center gap-2 text-[10px] text-slate-500">
+                                      <span className="size-2.5 rounded-sm border border-slate-100" style={{ background: l.color }} />
+                                      <span>{l.label}</span>
                                     </div>
                                   ))}
                                 </div>

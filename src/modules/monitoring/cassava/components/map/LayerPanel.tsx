@@ -47,30 +47,45 @@ const groups: { name: string; layers: Layer[] }[] = [
   },
 ];
 
-export function LayerPanel() {
-  const [active, setActive] = useState<Record<string, boolean>>({ boundaries: true, ndvi: true });
-  const [opacity, setOpacity] = useState<Record<string, number>>({});
+interface Props {
+  active: Record<string, boolean>;
+  setActive: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  opacity: Record<string, number>;
+  setOpacity: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+}
+
+export function LayerPanel({ active, setActive, opacity, setOpacity }: Props) {
   const [open, setOpen] = useState<Record<string, boolean>>({ Biophysical: true, Monitoring: true, Operational: false });
 
   return (
-    <Card className="p-3 shadow-modal max-h-[70vh] overflow-y-auto">
-      <div className="font-semibold text-sm mb-2">Map Layers</div>
+    <Card className="p-3 shadow-modal max-h-[70vh] overflow-y-auto bg-white border border-emerald-100">
+      <div className="font-semibold text-sm mb-2 text-slate-800">Map Layers</div>
       {groups.map(g => (
         <div key={g.name} className="mb-2">
           <button
             onClick={() => setOpen(o => ({ ...o, [g.name]: !o[g.name] }))}
-            className="w-full flex items-center justify-between text-xs uppercase tracking-wide font-semibold text-muted-foreground py-1.5"
+            className="w-full flex items-center justify-between text-xs uppercase tracking-wide font-semibold text-slate-500 py-1.5 hover:text-slate-800"
           >
             {g.name}
             <ChevronDown className={cn("size-3 transition-transform", open[g.name] && "rotate-180")} />
           </button>
           {open[g.name] && g.layers.map(l => (
-            <div key={l.id} className="py-1.5 border-b border-border/50 last:border-0">
+            <div key={l.id} className="py-1.5 border-b border-slate-100 last:border-0">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm">{l.name}</span>
+                <span className="text-sm text-slate-700">{l.name}</span>
                 <Switch
                   checked={!!active[l.id]}
-                  onCheckedChange={v => setActive(s => ({ ...s, [l.id]: v }))}
+                  onCheckedChange={v => {
+                    setActive(s => {
+                      const next = { ...s };
+                      if (g.name === "Biophysical") {
+                        // Mutually exclusive biophysical layers for clear raster interpretation
+                        groups[0].layers.forEach(ly => { next[ly.id] = false; });
+                      }
+                      next[l.id] = v;
+                      return next;
+                    });
+                  }}
                 />
               </div>
               {active[l.id] && (
@@ -85,7 +100,7 @@ export function LayerPanel() {
                       {l.legend.map(le => (
                         <div key={le.label} className="flex items-center gap-1">
                           <span className="size-2.5 rounded" style={{ background: le.color }} />
-                          <span className="text-muted-foreground">{le.label}</span>
+                          <span className="text-slate-400 font-medium">{le.label}</span>
                         </div>
                       ))}
                     </div>
