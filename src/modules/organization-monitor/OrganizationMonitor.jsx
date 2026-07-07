@@ -1583,11 +1583,17 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
   const [healthBoundariesOpacity, setHealthBoundariesOpacity] = useState(100);
   const [healthShowNdvi, setHealthShowNdvi] = useState(true);
   const [healthNdviOpacity, setHealthNdviOpacity] = useState(80);
+  const [healthShowSavi, setHealthShowSavi] = useState(false);
+  const [healthSaviOpacity, setHealthSaviOpacity] = useState(80);
+  const [healthShowNdwi, setHealthShowNdwi] = useState(false);
+  const [healthNdwiOpacity, setHealthNdwiOpacity] = useState(80);
   const [healthShowChlorophyll, setHealthShowChlorophyll] = useState(false);
   const [healthChlorophyllOpacity, setHealthChlorophyllOpacity] = useState(70);
   const [healthShowWater, setHealthShowWater] = useState(false);
   const [healthWaterOpacity, setHealthWaterOpacity] = useState(70);
   const [healthPestOpacity, setHealthPestOpacity] = useState(70);
+  const [healthShowRainfall, setHealthShowRainfall] = useState(false);
+  const [healthRainfallOpacity, setHealthRainfallOpacity] = useState(80);
 
   // Moisture Content map layers states
   const [moistureShowLayers, setMoistureShowLayers] = useState(true);
@@ -1651,13 +1657,25 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
 
   const cardStyle = glassmorphismEnabled ? 'glass shadow-premium border border-white/20' : 'bg-white border border-gray-100 shadow-sm';
 
-  const getHealthPlotStyleOutline = () => ({
-    color: healthShowBoundaries ? '#000000' : 'transparent',
-    weight: healthShowBoundaries ? 2.5 : 0,
-    opacity: healthBoundariesOpacity / 100,
-    fillColor: 'transparent',
-    fillOpacity: 0
-  });
+  const getHealthPlotStyleOutline = (plot) => {
+    let color = '#000000';
+    let fillColor = 'transparent';
+    let fillOpacity = 0;
+    
+    if (healthShowRainfall && plot?.cumulative_rainfall_14d != null) {
+      const rain = plot.cumulative_rainfall_14d;
+      fillColor = rain > 150 ? '#6d28d9' : rain > 50 ? '#2563eb' : rain > 10 ? '#60a5fa' : '#fbbf24';
+      fillOpacity = healthRainfallOpacity / 100;
+    }
+    
+    return {
+      color: healthShowBoundaries ? color : 'transparent',
+      weight: healthShowBoundaries ? 2.5 : 0,
+      opacity: healthBoundariesOpacity / 100,
+      fillColor: fillColor,
+      fillOpacity: fillOpacity
+    };
+  };
 
   const getHealthPlotStyleFill = (plot, layer) => {
     let fillColor = 'transparent';
@@ -2037,7 +2055,7 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
           {healthShowBoundaries && (
             <Polygon
               positions={plot.coords}
-              pathOptions={getHealthPlotStyleOutline()}
+              pathOptions={getHealthPlotStyleOutline(plot)}
               eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
             />
           )}
@@ -2208,6 +2226,9 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
           area: `${p.area_ha || 10.0} HA`,
           health: healthVal,
           ndvi: ndviVal,
+          savi: p.indices?.savi ?? null,
+          ndwi: p.indices?.ndwi ?? null,
+          cumulative_rainfall_14d: p.indices?.cumulative_rainfall_14d ?? null,
           chlorophyll: p.indices?.chlorophyll ?? null,
           waterStress: p.indices?.ndmi ?? null,
           pestRisk: p.indices?.uas_anomaly_score > 0.4 ? 'High Risk' : p.indices?.uas_anomaly_score > 0.15 ? 'Moderate Risk' : 'Low Risk',
@@ -2235,6 +2256,9 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
           area: `${p.area_ha || 10.0} HA`,
           health: healthVal,
           ndvi: ndviVal,
+          savi: p.indices?.savi ?? null,
+          ndwi: p.indices?.ndwi ?? null,
+          cumulative_rainfall_14d: p.indices?.cumulative_rainfall_14d ?? null,
           chlorophyll: p.indices?.chlorophyll ?? null,
           waterStress: p.indices?.ndmi ?? null,
           pestRisk: p.indices?.uas_anomaly_score > 0.4 ? 'High Risk' : p.indices?.uas_anomaly_score > 0.15 ? 'Moderate Risk' : 'Low Risk',
@@ -4548,7 +4572,7 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                           {healthBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical
                         </div>
                         {healthBioExpanded && (
-                          <div className="space-y-3">
+                          <div className="space-y-3 flex flex-col gap-3">
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDVI {renderInfoTooltip("NDVI")}</div><span className="text-[10px] text-gray-400">Normalized Difference Vegetation Index</span></div>
@@ -4564,7 +4588,56 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Stressed ({'<'}0.3)</span></div>
                             </div>
                           )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">SAVI {renderInfoTooltip("SAVI")}</div><span className="text-[10px] text-gray-400">Soil Adjusted Vegetation Index</span></div>
+                            <button onClick={() => {
+                              const next = !healthShowSavi;
+                              setHealthShowSavi(next);
+                              if (next) {
+                                setSelectedIndex('savi');
+                                setHealthShowNdvi(false);
+                                setHealthShowNdwi(false);
+                              }
+                            }} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowSavi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: healthShowSavi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {healthShowSavi && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Optimal (&gt;0.4)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Good (0.2-0.4)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.1-0.2)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Stressed ({'<'}0.1)</span></div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDWI {renderInfoTooltip("NDWI")}</div><span className="text-[10px] text-gray-400">Normalized Difference Water Index</span></div>
+                            <button onClick={() => {
+                              const next = !healthShowNdwi;
+                              setHealthShowNdwi(next);
+                              if (next) {
+                                setSelectedIndex('ndwi');
+                                setHealthShowNdvi(false);
+                                setHealthShowSavi(false);
+                              }
+                            }} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowNdwi ? '#16A34A' : '#E5E7EB' }}>
+                              <div style={{ transform: healthShowNdwi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                            </button>
+                          </div>
+                          {healthShowNdwi && (
+                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">High Water Content (&gt;0.3)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Water (0.0 to 0.3)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (-0.3 to 0.0)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Water stressed (&lt;-0.3)</span></div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Chlorophyll {renderInfoTooltip("Chlorophyll")}</div><span className="text-[10px] text-gray-400">Canopy chlorophyll content</span></div>
                             <button onClick={() => setHealthShowChlorophyll(!healthShowChlorophyll)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowChlorophyll ? '#16A34A' : '#E5E7EB' }}>
@@ -4579,7 +4652,8 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#ef4444'}}/><span className="text-[10px] font-semibold text-gray-500">Low</span></div>
                             </div>
                           )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Water Stress {renderInfoTooltip("Water Stress")}</div><span className="text-[10px] text-gray-400">Crop water stress level</span></div>
                             <button onClick={() => setHealthShowWater(!healthShowWater)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowWater ? '#16A34A' : '#E5E7EB' }}>
@@ -4594,7 +4668,8 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Severe</span></div>
                             </div>
                           )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDRE {renderInfoTooltip("NDRE")}</div><span className="text-[10px] text-gray-400">Red Edge nitrogen status</span></div>
                             <button onClick={() => setHealthShowNdre(!healthShowNdre)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowNdre ? '#16A34A' : '#E5E7EB' }}>
@@ -4612,7 +4687,8 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                         </div>
                           </div>
                         )}
-                      </div>                      <div className="space-y-3">
+                      </div>
+                      <div className="space-y-3">
                         <div
                           onClick={() => setHealthMonExpanded(!healthMonExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
@@ -4633,10 +4709,11 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Wet (0.7-1.0)</span></div>
                               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moist (0.4-0.7)</span></div>
                               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (0.2-0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Drought ({'<'}0.2)</span></div>
+                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Drought ({'<'}-0.2)</span></div>
                             </div>
                           )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+                        </div>
+                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Pest Risk {renderInfoTooltip("Pest Risk")}</div><span className="text-[10px] text-gray-400">Pest pressure assessment</span></div>
                             <button onClick={() => setHealthShowPest(!healthShowPest)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowPest ? '#16A34A' : '#E5E7EB' }}>
