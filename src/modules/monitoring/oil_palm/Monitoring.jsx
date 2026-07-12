@@ -3,6 +3,7 @@ import { createRouter, RouterProvider, createMemoryHistory } from '@tanstack/rea
 import { routeTree } from './routeTree.gen';
 import { MonitoringProvider } from '../shared/MonitoringContext';
 import { useCropMonitoring } from '../shared/useCropMonitoring';
+import CropDashboardLayout from '../shared/CropDashboardLayout';
 import 'leaflet/dist/leaflet.css';
 import './styles.css';
 
@@ -27,7 +28,7 @@ export default function Monitoring({ onBack, onSignOut }) {
         cropError={error}
         mapCenter={mapCenter}
       >
-        <RouterProvider router={router} />
+        <CropDashboardLayout onBack={onBack} onSignOut={onSignOut} cropType="oil_palm" cropSummary={summary} cropBlocks={blocks} cropIndices={indices} cropLoading={loading} cropError={error} mapCenter={mapCenter} />
       </MonitoringProvider>
     </div>
   );

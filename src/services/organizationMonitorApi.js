@@ -400,13 +400,13 @@ export async function queryAiAgent(question) {
 }
 
 /**
- * GET /raster/indices?tenant={tenant}
- * Lists available zarr index files for a tenant from MinIO.
+ * GET /raster/indices
+ * Lists available zarr index files for the authenticated tenant from MinIO.
+ * The tenant is resolved server-side from the Bearer token — never sent by the client.
  * Returns { tenant, indices: [{ index, zarr_name, lo, hi, cmap }] }
  */
-export async function fetchRasterIndices(tenant) {
-  const params = tenant ? `?tenant=${tenant}` : '';
-  return apiFetch(`/raster/indices${params}`);
+export async function fetchRasterIndices() {
+  return apiFetch('/raster/indices');
 }
 
 /**

@@ -86,6 +86,16 @@ export async function deleteFarm(farmId) {
   return adminFetch(`/farms/${farmId}`, { method: 'DELETE' });
 }
 
+/**
+ * POST /farms/{farm_id}/generate-config
+ * Renders a ready-to-run pipeline batch YAML from the farm registry entry and
+ * writes it into the shared pipeline configs folder.
+ * Returns { status, filename, boundary_expected_at, boundary_uploaded, content }.
+ */
+export async function generateFarmConfig(farmId) {
+  return adminFetch(`/farms/${farmId}/generate-config`, { method: 'POST' });
+}
+
 // ─── Boundaries ───────────────────────────────────────────────────────────────
 
 export async function uploadBoundary(farmId, file) {
@@ -221,4 +231,38 @@ export async function deleteMinioObject(key) {
     body: JSON.stringify({ key }),
   });
 }
+
+
+// ─── Users / Account Management ───────────────────────────────────────────────
+
+export async function fetchUsers({ accountType, search, page = 1, pageSize = 50 } = {}) {
+  const p = new URLSearchParams({ page, page_size: pageSize });
+  if (accountType) p.set('account_type', accountType);
+  if (search)      p.set('search', search);
+  return adminFetch(`/users?${p}`);
+}
+
+export async function createUser(data) {
+  return adminFetch('/users', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateUser(userId, data) {
+  return adminFetch(`/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function toggleUserActive(userId) {
+  return adminFetch(`/users/${userId}/toggle-active`, { method: 'PATCH' });
+}
+
+export async function resetUserPassword(userId, password = null) {
+  return adminFetch(`/users/${userId}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify(password ? { password } : {}),
+  });
+}
+
+export async function deleteUser(userId) {
+  return adminFetch(`/users/${userId}`, { method: 'DELETE' });
+}
+
 

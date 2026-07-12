@@ -50,6 +50,8 @@ import CocoaMonitoring from './modules/monitoring/cocoa/Monitoring';
 import OilPalmMonitoring from './modules/monitoring/oil_palm/Monitoring';
 import CassavaMonitoring from './modules/monitoring/cassava/Monitoring';
 import SugarcaneMonitoring from './modules/monitoring/sugarcane/Monitoring';
+import CashewMonitoring from './modules/monitoring/cashew/Monitoring';
+import RubberMonitoring from './modules/monitoring/rubber/Monitoring';
 
 // === Cooperative & Group Management ===
 import GroupsDashboard from './modules/cooperative/Dashboard';
@@ -135,7 +137,15 @@ const LoginPage = () => {
 
   // In restricted mode the module is fixed; otherwise read from sessionStorage
   const moduleId = RESTRICTED_MODULE || sessionStorage.getItem('fi_module');
-  const moduleName = MODULE_NAMES[moduleId] || moduleId;
+  // Dynamically onboarded organizations get a friendly title derived from
+  // their slug ("custom-agromonitor-acme_farms" → "Acme Farms Agro Monitoring")
+  const prettyDynamicName = (id) => {
+    if (!id?.startsWith('custom-agromonitor-')) return id;
+    const words = id.replace('custom-agromonitor-', '').split(/[_-]+/).filter(Boolean);
+    const title = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return `${title} Agro Monitoring`;
+  };
+  const moduleName = MODULE_NAMES[moduleId] || prettyDynamicName(moduleId);
 
   // Where does the portal land after login?
   const portalPath = (moduleId && moduleId.startsWith('custom-agromonitor'))
@@ -145,23 +155,11 @@ const LoginPage = () => {
   const handleLogin = () => navigate(portalPath);
   const handleBack  = RESTRICTED_MODULE ? null : () => navigate('/');
 
-  let defaultEmail = "";
-  let defaultCode = "";
-  if (moduleId === 'custom-agromonitor-olam') {
-    defaultEmail = "olam@farmintelytics.com";
-    defaultCode = "olam123";
-  } else if (moduleId === 'custom-agromonitor-okomu') {
-    defaultEmail = "okomu@farmintelytics.com";
-    defaultCode = "okomu123";
-  }
-
   return (
     <Login
       onLogin={handleLogin}
       moduleName={moduleName}
       onBack={handleBack}
-      defaultEmail={defaultEmail}
-      defaultCode={defaultCode}
     />
   );
 };
@@ -180,6 +178,32 @@ const PortalPage = () => {
 
   if (!moduleId) return <Navigate to="/" replace />;
 
+  // ── Organization-level module licensing ──
+  // The admin portal assigns each organization its allowed modules
+  // (TenantConfig.allowed_modules); the list is stored at login. A module
+  // outside that list must not open, whichever tile was clicked.
+  let allowedModules = null;
+  try {
+    const raw = localStorage.getItem('fi_allowed_modules');
+    if (raw) allowedModules = JSON.parse(raw);
+  } catch { allowedModules = null; }
+  if (Array.isArray(allowedModules) && allowedModules.length > 0 && !allowedModules.includes(moduleId)) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen p-20 text-center bg-white">
+        <div className="w-20 h-20 rounded-[2.5rem] bg-black text-white flex items-center justify-center mx-auto mb-8 shadow-2xl">
+          <Zap size={32} className="text-[var(--brand-primary)]" />
+        </div>
+        <h2 className="text-4xl font-black text-black mb-4 tracking-tighter uppercase">Not Enabled</h2>
+        <p className="text-black/60 font-bold max-w-md uppercase text-[11px] tracking-[0.2em]">
+          This module is not enabled for your organization. Contact your administrator to request access.
+        </p>
+        <button onClick={handleBackToHub} className="mt-8 px-6 py-3 bg-black text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-800 transition-all">
+          Back to Hub
+        </button>
+      </div>
+    );
+  }
+
   // ── resolve the component for this module ──
   const getContent = () => {
     // Remote-sensing monitoring portals
@@ -191,11 +215,13 @@ const PortalPage = () => {
         'rs-cocoa':    <CocoaMonitoring />,
         'rs-cassava':  <CassavaMonitoring />,
         'rs-maize':    <MaizeMonitoring />,
+        'rs-cashew':   <CashewMonitoring />,
+        'rs-rubber':   <RubberMonitoring />,
       };
       if (rsApps[moduleId]) {
         return React.cloneElement(rsApps[moduleId], { onSignOut: handleSignOut, onBack: handleBackToHub });
       }
-      const cropMap = { 'rs-cashew': 'Cashew', 'rs-rubber': 'Rubber', 'rs-drone': 'Drone Intelligence' };
+      const cropMap = { 'rs-drone': 'Drone Intelligence' };
       return <MonitoringPortal cropName={cropMap[moduleId] || 'Crop'} onSignOut={handleSignOut} onBack={handleBackToHub} />;
     }
 

@@ -1,4 +1,4 @@
-﻿import { blocks, alerts, totals, rainfall, ageClassColor, ageClassLabel } from "../lib/mock-data";
+import { blocks, alerts, totals, rainfall, ageClassColor, ageClassLabel } from "../lib/mock-data";
 import { useMonitoring } from "../../shared/MonitoringContext";
 import { StatusBadge } from "../components/StatusBadge";
 import {
@@ -134,11 +134,11 @@ export function Dashboard() {
                 <thead>
                   <tr className="text-muted-foreground">
                     <th className="text-left pl-1 py-1 sticky left-0 bg-card">Block</th>
-                    {cireHeatmap[0].cells.map(c => <th key={c.month} className="px-1">{c.month}</th>)}
+                    {cireHeatmap.length > 0 && cireHeatmap[0].cells.map(c => <th key={c.month} className="px-1">{c.month}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {cireHeatmap.map(row => (
+                  {cireHeatmap.length > 0 ? cireHeatmap.map(row => (
                     <tr key={row.id}>
                       <td className="font-semibold pl-1 py-0.5 sticky left-0 bg-card">{row.id}</td>
                       {row.cells.map((c, i) => (
@@ -147,7 +147,7 @@ export function Dashboard() {
                         </td>
                       ))}
                     </tr>
-                  ))}
+                  )) : null}
                 </tbody>
               </table>
             </div>

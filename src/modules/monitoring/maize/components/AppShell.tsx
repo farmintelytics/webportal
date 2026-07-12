@@ -3,13 +3,10 @@ import { ReactNode } from "react";
 import {
   BarChart3,
   Map as MapIcon,
-  FileText,
-  Bot,
   Sprout,
   Bell,
   Search,
   User,
-  Database,
   LogOut,
 } from "lucide-react";
 import { Input } from "@monitoring-shared/ui/input";
@@ -18,9 +15,6 @@ import { Button } from "@monitoring-shared/ui/button";
 const NAV = [
   { to: "/", label: "Dashboard", icon: BarChart3 },
   { to: "/map", label: "Map View", icon: MapIcon },
-  { to: "/reports", label: "Reports", icon: FileText },
-  { to: "/data", label: "Data", icon: Database },
-  { to: "/ai-assistant", label: "AI Assistant", icon: Bot },
 ];
 
 import { useMonitoring } from "../../shared/MonitoringContext";

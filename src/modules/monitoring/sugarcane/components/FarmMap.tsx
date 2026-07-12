@@ -114,7 +114,7 @@ function simplifyPolygon(points: [number, number][], tolerance: number = 0.00005
 }
 
 export function FarmMap({
-  layers, onSelect, selectedId, basemap = "satellite", blocks = [],
+  layers, onSelect, selectedId, basemap = "satellite", blocks = [], currentTileUrl, zarrBounds, primaryLayer,
 }: {
   layers: MapLayer[];
   onSelect: (b: Block) => void;

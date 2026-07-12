@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Map, LayoutDashboard, Sparkles, FileText, Database, ChevronLeft, LogOut, Sprout } from "lucide-react";
+import { Map, LayoutDashboard, ChevronLeft, LogOut, Sprout } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@monitoring-shared/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@monitoring-shared/ui/tooltip";
@@ -8,9 +8,6 @@ import { Avatar, AvatarFallback } from "@monitoring-shared/ui/avatar";
 const items = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard", label: "Map View", icon: Map },
-  { to: "/ai-assistant", label: "AI Assistant", icon: Sparkles },
-  { to: "/reports", label: "Reports", icon: FileText },
-  { to: "/data", label: "Data Management", icon: Database },
 ];
 
 import { useMonitoring } from "../../../shared/MonitoringContext";

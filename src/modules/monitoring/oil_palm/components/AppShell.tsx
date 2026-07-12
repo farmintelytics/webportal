@@ -1,7 +1,7 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useState, ReactNode } from "react";
 import {
-  Map, LayoutDashboard, Sparkles, FileText, Database,
+  Map, LayoutDashboard,
   Bell, Search, ChevronLeft, ChevronRight, LogOut, Trees,
 } from "lucide-react";
 import { cn } from "@monitoring-shared/lib/utils";
@@ -9,18 +9,13 @@ import { cn } from "@monitoring-shared/lib/utils";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard", label: "Map View", icon: Map },
-  { to: "/ai-assistant", label: "AI Assistant", icon: Sparkles },
-  { to: "/reports", label: "Reports", icon: FileText },
-  { to: "/data", label: "Data Management", icon: Database },
 ] as const;
 
 const titles: Record<string, string> = {
   "/": "Operations Dashboard",
   "/dashboard": "Plantation Map",
-  "/ai-assistant": "AI Agronomy Assistant",
-  "/reports": "Reports",
-  "/data": "Data Management",
 };
+
 
 import { useMonitoring } from "../../shared/MonitoringContext";
 

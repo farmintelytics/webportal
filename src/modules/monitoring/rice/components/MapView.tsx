@@ -27,6 +27,9 @@ export function MapView({
   onSelect,
   selectedId,
   height = "400px",
+  currentTileUrl,
+  zarrBounds,
+  primaryLayer,
 }: {
   plots?: Plot[];
   layers?: Record<LayerId, number> | any;

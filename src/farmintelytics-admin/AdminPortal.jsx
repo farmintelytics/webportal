@@ -3,9 +3,10 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import {
   Building2, Map, Key, Activity, LayoutDashboard, LogOut,
   ChevronRight, Shield, KanbanSquare, Menu, X, Layers,
-  Clock, Settings, Database,
+  Clock, Settings, Database, Users, Rocket,
 } from 'lucide-react';
 
+import Onboarding from './pages/Onboarding';
 import Organizations from './pages/Organizations';
 import Farms from './pages/Farms';
 import Boundaries from './pages/Boundaries';
@@ -15,14 +16,17 @@ import Tasks from './pages/Tasks';
 import Scheduler from './pages/Scheduler';
 import PipelineConfig from './pages/PipelineConfig';
 import Inventory from './pages/Inventory';
+import UsersPage from './pages/Users';
 
 const NAV_ITEMS = [
-  { id: 'organizations', label: 'Organizations', icon: Building2, path: '/admin/organizations' },
-  { id: 'farms',         label: 'Farm Registry',  icon: Layers,    path: '/admin/farms' },
-  { id: 'boundaries',   label: 'Boundaries',      icon: Map,       path: '/admin/boundaries' },
+  { id: 'onboarding',    label: 'Onboard Company', icon: Rocket,    path: '/admin/onboarding' },
+  { id: 'users',         label: 'User Accounts',   icon: Users,     path: '/admin/users' },
+  { id: 'organizations', label: 'Organizations',   icon: Building2, path: '/admin/organizations' },
+  { id: 'farms',         label: 'Farm Registry',   icon: Layers,    path: '/admin/farms' },
+  { id: 'boundaries',   label: 'Boundaries',       icon: Map,       path: '/admin/boundaries' },
   { id: 'inventory',    label: 'Data Sync & MinIO', icon: Database, path: '/admin/inventory' },
-  { id: 'credentials',  label: 'Credentials',     icon: Key,       path: '/admin/credentials' },
-  { id: 'scheduler',    label: 'Scheduler',       icon: Clock,     path: '/admin/scheduler' },
+  { id: 'credentials',  label: 'Credentials',      icon: Key,       path: '/admin/credentials' },
+  { id: 'scheduler',    label: 'Scheduler',        icon: Clock,     path: '/admin/scheduler' },
   { id: 'configs',      label: 'Configs Builder',  icon: Settings,  path: '/admin/configs' },
   { id: 'tasks',        label: 'Task Board',       icon: KanbanSquare, path: '/admin/tasks' },
   { id: 'logs',         label: 'Logs',             icon: Activity,  path: '/admin/logs' },
@@ -192,7 +196,9 @@ const AdminPortal = () => {
         {/* Page content */}
         <div style={{ flex: 1, overflow: 'auto', background: '#f8fafc' }}>
           <Routes>
-            <Route index element={<Navigate to="organizations" replace />} />
+            <Route index element={<Navigate to="users" replace />} />
+            <Route path="onboarding"    element={<Onboarding />} />
+            <Route path="users"         element={<UsersPage />} />
             <Route path="organizations" element={<Organizations />} />
             <Route path="farms"         element={<Farms />} />
             <Route path="boundaries"    element={<Boundaries />} />

@@ -42,8 +42,18 @@ import {
   CloudRain,
   Leaf
 } from 'lucide-react';
-import { MapContainer, TileLayer, ZoomControl, Polygon, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+
+function MapRecenter({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center && center[0] !== undefined) {
+      map.setView(center, map.getZoom());
+    }
+  }, [map, center]);
+  return null;
+}
 import { 
   SimpleCard, 
   MetricTile, 
@@ -186,16 +196,35 @@ const MonitoringPortal = ({ cropName, onSignOut, onBack }) => {
       try {
         const res = await api.fetchPlotsIntelligence();
         if (active) {
-          const mappedPlots = res.map(p => ({
-            id: p.plot_id,
-            area: `${p.area_ha} HA`,
-            health: p.indices.ndvi > 0.7 ? '98%' : p.indices.ndvi > 0.55 ? '75%' : '35%',
-            status: p.indices.ndvi > 0.55 ? 'Healthy' : 'Stressed',
-            ndvi: p.indices.ndvi,
-            layman: p.indices.ndvi > 0.55 ? config.layman.health : config.layman.stress,
-            advice: p.indices.ndvi > 0.55 ? 'No action needed.' : 'Inspect and apply remediation.',
-            history: [0.3, 0.45, 0.58, p.indices.ndvi - 0.05, p.indices.ndvi, p.indices.ndvi]
-          }));
+          const mappedPlots = res.map(p => {
+            let coords = [];
+            if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+              coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
+            } else {
+              coords = [
+                [6.43, 5.27],
+                [6.435, 5.27],
+                [6.435, 5.275],
+                [6.43, 5.275]
+              ];
+            }
+            const ndviVal = p.indices?.ndvi ?? 0.48;
+            return {
+              id: p.plot_id,
+              name: p.name || p.plot_id,
+              area: `${p.area_ha || 10.0} HA`,
+              health: ndviVal > 0.7 ? '98%' : ndviVal > 0.55 ? '75%' : '35%',
+              status: ndviVal > 0.55 ? 'Healthy' : 'Stressed',
+              ndvi: ndviVal,
+              savi: p.indices?.savi ?? null,
+              ndwi: p.indices?.ndwi ?? null,
+              cumulative_rainfall_14d: p.indices?.cumulative_rainfall_14d ?? null,
+              layman: ndviVal > 0.55 ? config.layman.health : config.layman.stress,
+              advice: ndviVal > 0.55 ? 'No action needed.' : 'Inspect and apply remediation.',
+              history: [0.3, 0.45, 0.58, ndviVal - 0.05, ndviVal, ndviVal],
+              coords
+            };
+          });
           setPlots(mappedPlots);
         }
       } catch (err) {
@@ -215,6 +244,13 @@ const MonitoringPortal = ({ cropName, onSignOut, onBack }) => {
     { key: 'action', label: 'Drill Down', render: (_, row) => <button onClick={() => { setSelectedPlot(row); setActiveTab('geospatial'); }} className="text-sky-600 font-black uppercase text-[10px] hover:underline">View History</button> }
   ];
 
+  const mapCenter = useMemo(() => {
+    if (plots && plots.length > 0 && plots[0].coords && plots[0].coords.length > 0) {
+      return plots[0].coords[0];
+    }
+    return [6.43, 5.27];
+  }, [plots]);
+
   const renderContent = () => {
     switch (activeTab) {
       case 'geospatial':
@@ -231,12 +267,13 @@ const MonitoringPortal = ({ cropName, onSignOut, onBack }) => {
              </div>
 
              <div className="flex-1 bg-gray-200 relative overflow-hidden">
-                <MapContainer center={[6.5244, 3.3792]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                   <MapRecenter center={mapCenter} />
                    {layers.filter(l => l.active).map(layer => (
                      <TileLayer key={layer.id} url={layer.url || "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"} opacity={layer.opacity / 100} />
                    ))}
                    {plots.map(plot => (
-                     <Polygon key={plot.id} positions={[[6.5244, 3.3792], [6.5264, 3.3792], [6.5264, 3.3812], [6.5244, 3.3812]]} pathOptions={{ color: '#10b981', fillOpacity: 0.2 }} eventHandlers={{ click: () => setSelectedPlot(plot) }} />
+                     <Polygon key={plot.id} positions={plot.coords} pathOptions={{ color: '#10b981', fillOpacity: 0.2 }} eventHandlers={{ click: () => setSelectedPlot(plot) }} />
                    ))}
                    <ZoomControl position="bottomleft" />
                 </MapContainer>

@@ -70,7 +70,7 @@ const FarmModal = ({ orgs, farms, onSave, onClose }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label style={labelStyle}>Farm Name *</label>
-              <input style={inputStyle} placeholder="e.g. Okomu Main Estate" value={form.farm_name} onChange={e => setForm(f => ({ ...f, farm_name: e.target.value }))} />
+              <input style={inputStyle} placeholder="Farm or estate name" value={form.farm_name} onChange={e => setForm(f => ({ ...f, farm_name: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Farm ID (slug)</label>

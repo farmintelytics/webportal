@@ -91,7 +91,7 @@ const Credentials = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
             <div>
               <label style={labelStyle}>Email *</label>
-              <input type="email" style={inputStyle} placeholder="tenant@farmintelytics.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+              <input type="email" style={inputStyle} placeholder="Login email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Access Code <span style={{ color: '#475569', fontWeight: 600 }}>(blank = auto-generate)</span></label>

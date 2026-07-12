@@ -1,3 +1,4 @@
+import { CROP_META } from '../../../services/cropMonitoringApi';
 import React, { useState, useMemo, useEffect, useRef, createPortal } from 'react';
 import { 
   Globe, 
@@ -71,7 +72,7 @@ import {
 } from 'lucide-react';
 import { MapContainer, TileLayer, ZoomControl, Polygon, Popup, Tooltip, useMap, Pane } from 'react-leaflet';
 import ReactDOM from 'react-dom';
-import * as api from '../../services/organizationMonitorApi';
+import * as api from '../../../services/organizationMonitorApi';
 import 'leaflet/dist/leaflet.css';
 import { Line, Bar, Radar, Doughnut } from 'react-chartjs-2';
 import {
@@ -867,7 +868,15 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const OrganizationMonitor = ({ onBack, onSignOut }) => {
+// Lowercase crop ids (as passed by the per-crop Monitoring wrappers) → display labels
+const CROP_CONFIG_KEYS = {
+  rice: 'Rice', maize: 'Maize', cashew: 'Cashew', cocoa: 'Cocoa',
+  ffb: 'Oil Palm', oil_palm: 'Oil Palm', rubber: 'Rubber',
+  cassava: 'Cassava', sugarcane: 'SugarCane',
+};
+
+const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, cropLoading, cropError, mapCenter, onBack, onSignOut }) => {
+  const cropLabel = CROP_META[cropType]?.label || CROP_CONFIG_KEYS[cropType] || cropType;
   // Tenant identity comes strictly from the authenticated session — no default
   // organization. Without a session, bounce straight back to login.
   const tenant = localStorage.getItem('fi_tenant');
@@ -878,10 +887,12 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
   // Display name comes from the organization's TenantConfig (stored at login)
   const tenantDisplayName = localStorage.getItem('fi_display_name')
     || (tenant ? tenant.charAt(0).toUpperCase() + tenant.slice(1) : '');
-  // Map center from the organization's TenantConfig (stored at login)
+  // Map center comes from TenantConfig: the mapCenter prop (fetched live) first,
+  // then the copy stored at login, then a neutral default.
   let storedMapCenter = null;
   try { storedMapCenter = JSON.parse(localStorage.getItem('fi_map_center') || 'null'); } catch { storedMapCenter = null; }
-  const defaultMapCenter = Array.isArray(storedMapCenter) && storedMapCenter.length === 2 ? storedMapCenter : [6.436, 5.273];
+  const defaultMapCenter = mapCenter
+    || (Array.isArray(storedMapCenter) && storedMapCenter.length === 2 ? storedMapCenter : [6.436, 5.273]);
 
   // Extract numeric farm ID from real plot IDs like PLOT-042 → '42', or fall back to '1'
   const getBackendFarmId = (plotId) => {
@@ -905,7 +916,11 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Same live backend data as the organization view — the crop pages must render
+  // the identical experience (map, splits, calendar, charts, alerts, boundary).
+  // Crop-specific narrowing (index profiles, legends) layers on top via cropType.
   useEffect(() => {
+    if (!hasSession) return; // no authenticated session — redirect effect handles it
     let active = true;
     async function loadBackendData() {
       try {
@@ -961,7 +976,7 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
   useEffect(() => {
     async function loadIndices() {
       try {
-        const data = await api.fetchRasterIndices(tenant);
+        const data = await api.fetchRasterIndices();
         if (data?.indices?.length) setAvailableIndices(data.indices);
       } catch (err) {
         console.error('Failed to fetch raster indices:', err);
@@ -969,6 +984,34 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
     }
     loadIndices();
   }, [tenant]);
+
+  // ── Crop-specific index profile (from /crop-monitoring/indices) ──────────
+  // Ordered by agronomic priority, each entry carries the crop-specific label,
+  // notes and legend classification for this crop's interpretation.
+  const cropProfileEntries = useMemo(() => cropIndices?.indices || [], [cropIndices]);
+  const cropPrimaryIndex = cropIndices?.primary_index || null;
+
+  // Only what is relevant to this crop AND actually present in the tenant's
+  // zarr store is offered; if the intersection is empty (e.g. sparse archive)
+  // fall back to everything available so the map never goes blank.
+  const displayIndices = useMemo(() => {
+    if (!availableIndices.length) return [];
+    if (!cropProfileEntries.length) return availableIndices;
+    const avail = new Map(availableIndices.map(i => [String(i.index).toLowerCase(), i]));
+    const filtered = cropProfileEntries
+      .filter(e => avail.has(e.key))
+      .map(e => avail.get(e.key));
+    return filtered.length > 0 ? filtered : availableIndices;
+  }, [availableIndices, cropProfileEntries]);
+
+  // Start on the crop's primary index once data is available (once only)
+  const primaryAppliedRef = useRef(false);
+  useEffect(() => {
+    if (primaryAppliedRef.current || !cropPrimaryIndex || !availableIndices.length) return;
+    const exists = availableIndices.some(i => String(i.index).toLowerCase() === cropPrimaryIndex);
+    if (exists) setSelectedIndex(cropPrimaryIndex);
+    primaryAppliedRef.current = true;
+  }, [cropPrimaryIndex, availableIndices]);
 
   const [refreshSlider, setRefreshSlider] = useState(0);
   const [selectedSensor, setSelectedSensor] = useState('sentinel-2'); // 'sentinel-2' | 'landsat'
@@ -1630,8 +1673,14 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
 
   // Collapsible sidebar section groups states (collapsed/false by default)
   const [intelOpExpanded, setIntelOpExpanded] = useState(false);
-  const [intelBioExpanded, setIntelBioExpanded] = useState(false);
+  const [intelBioExpanded, setIntelBioExpanded] = useState(true);
   const [intelMonExpanded, setIntelMonExpanded] = useState(false);
+
+  // Crop legend cards: which index legends are manually expanded
+  // (the index currently rendered on the map is always expanded)
+  const [expandedLegendKeys, setExpandedLegendKeys] = useState([]);
+  const toggleLegendKey = (key) => setExpandedLegendKeys(prev =>
+    prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
 
   const [healthOpExpanded, setHealthOpExpanded] = useState(false);
   const [healthBioExpanded, setHealthBioExpanded] = useState(false);
@@ -2655,8 +2704,8 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                 onChange={e => setSelectedIndex(e.target.value)}
                 className="text-xs font-bold px-2 py-1 rounded-full border border-green-200 bg-white text-green-700 cursor-pointer focus:outline-none focus:border-green-500"
               >
-                {availableIndices.length > 0
-                  ? availableIndices
+                {displayIndices.length > 0
+                  ? displayIndices
                       .filter(idx => isSarIndex
                         ? SAR_INDICES.has(idx.index.toLowerCase())
                         : !SAR_INDICES.has(idx.index.toLowerCase()))
@@ -3307,7 +3356,7 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
             </div>
             <div>
               <h1 className="text-base font-bold tracking-tight text-gray-900 leading-none">
-                {tenantDisplayName} {brandingMode === 'AM' ? 'Agro Monitoring' : 'Farm Tools'}
+                {tenantDisplayName} {cropLabel} {brandingMode === 'AM' ? 'Monitoring' : 'Farm Tools'}
               </h1>
               <p className={`text-[11px] font-semibold uppercase tracking-widest mt-1 leading-none ${brandingMode === 'AM' ? 'text-green-600' : 'text-green-600'}`}>
                 {brandingMode === 'AM' ? 'Enterprise Satellite Node' : 'Agricultural Operations Hub'}
@@ -4244,188 +4293,47 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                           onClick={() => setIntelBioExpanded(!intelBioExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {intelBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical Indices
+                          {intelBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {cropLabel} Index Legends
                         </div>
                         {intelBioExpanded && (
                           <div className="space-y-3">
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Growth Stage {renderInfoTooltip("Growth Stage")}</div><span className="text-[10px] text-gray-400">Crop phenology classification</span></div>
-                            <button onClick={() => setIntelShowGrowth(!intelShowGrowth)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowGrowth ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowGrowth ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowGrowth && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Germination</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Vegetative</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Flowering</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Fruiting</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Maturity</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">EVI {renderInfoTooltip("EVI")}</div><span className="text-[10px] text-gray-400">Enhanced Vegetation Index</span></div>
-                            <button onClick={() => setIntelShowEvi(!intelShowEvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowEvi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowEvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowEvi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High (0.7–1.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.5–0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.3–0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Stressed ({'<'}0.3)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LSWI {renderInfoTooltip("LSWI")}</div><span className="text-[10px] text-gray-400">Land Surface Water Index</span></div>
-                            <button onClick={() => setIntelShowLswi(!intelShowLswi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowLswi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowLswi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowLswi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Wet (0.5–0.8)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moist (0.2–0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (-0.1 to 0.2)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Very Dry (&lt;-0.1)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">VHI {renderInfoTooltip("VHI")}</div><span className="text-[10px] text-gray-400">Vegetation Health Index</span></div>
-                            <button onClick={() => setIntelShowVhi(!intelShowVhi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowVhi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowVhi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowVhi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">No Stress (&gt;=60)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Mild (40-60)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (20-40)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Severe ({'<'}20)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">CVI {renderInfoTooltip("CVI")}</div><span className="text-[10px] text-gray-400">Chlorophyll Vegetation Index</span></div>
-                            <button onClick={() => setIntelShowCvi(!intelShowCvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowCvi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowCvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowCvi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#166534'}}/><span className="text-[10px] font-semibold text-gray-500">Dense (&gt;3.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#22c55e'}}/><span className="text-[10px] font-semibold text-gray-500">Good (2.0-3.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (1.0-2.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#ef4444'}}/><span className="text-[10px] font-semibold text-gray-500">Poor ({'<'}1.0)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDRE {renderInfoTooltip("NDRE")}</div><span className="text-[10px] text-gray-400">Normalized Difference Red Edge</span></div>
-                            <button onClick={() => setIntelShowNdre(!intelShowNdre)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowNdre ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowNdre ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowNdre && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High N (&gt;0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Good N (0.3-0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low N (0.1-0.3)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Deficient ({'<'}0.1)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">WDI {renderInfoTooltip("WDI")}</div><span className="text-[10px] text-gray-400">Water Deficit Index</span></div>
-                            <button onClick={() => setIntelShowWdi(!intelShowWdi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowWdi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowWdi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowWdi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Well-watered (0.0-0.2)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Mild stress (0.2-0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.4-0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Severe (0.7-1.0)</span></div>
-                            </div>
-                          )}
-                        </div>
-                          </div>
-                        )}
-                      </div>                      <div className="space-y-3">
-                        <div
-                          onClick={() => setIntelMonExpanded(!intelMonExpanded)}
-                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
-                        >
-                          {intelMonExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Monitoring
-                        </div>
-                        {intelMonExpanded && (
-                          <div className="space-y-3">
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">DPRVI {renderInfoTooltip("DPRVI")}</div><span className="text-[10px] text-gray-400">Dual-Pol Radar Vegetation Index</span></div>
-                            <button onClick={() => setIntelShowDprvi(!intelShowDprvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowDprvi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowDprvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowDprvi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Mature (&gt;0.6)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Growing (0.4-0.6)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Sprouting (0.2-0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Bare ({'<'}0.2)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">RVI {renderInfoTooltip("RVI")}</div><span className="text-[10px] text-gray-400">Radar Vegetation Index</span></div>
-                            <button onClick={() => setIntelShowRvi(!intelShowRvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowRvi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowRvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowRvi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High (&gt;0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.4-0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.2-0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Very Low ({'<'}0.2)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Flood Risk {renderInfoTooltip("Flood Risk")}</div><span className="text-[10px] text-gray-400">Surface inundation risk</span></div>
-                            <button onClick={() => setIntelShowFlood(!intelShowFlood)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowFlood ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowFlood ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowFlood && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">High Risk</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Risk</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low Risk</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">No Risk</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">UAS Anomaly {renderInfoTooltip("UAS Anomaly")}</div><span className="text-[10px] text-gray-400">Drone-detected anomalies</span></div>
-                            <button onClick={() => setIntelShowUas(!intelShowUas)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowUas ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowUas ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowUas && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">High Anomaly</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Anomaly</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Normal</span></div>
-                            </div>
-                          )}
-                        </div>
+                            {/* Crop-specific legend cards — driven by /crop-monitoring/indices:
+                                each card carries this crop's interpretation (label, classes, notes),
+                                so NDWI reads as flood classes for rice but disease risk for cashew. */}
+                            {cropProfileEntries.map(entry => {
+                              const isSelected = (selectedIndex || '').toLowerCase() === entry.key;
+                              const isOpen = isSelected || expandedLegendKeys.includes(entry.key);
+                              return (
+                                <div key={entry.key} className={`border rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5 ${isSelected ? 'border-green-300 ring-1 ring-green-100' : 'border-gray-100'}`}>
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">
+                                        {entry.crop_label || entry.label} {renderInfoTooltip(entry.label)}
+                                        {isSelected && <span className="text-[8px] font-black uppercase tracking-wider text-green-700 bg-green-50 border border-green-200 rounded-full px-1.5 py-0.5">On Map</span>}
+                                      </div>
+                                      <span className="text-[10px] text-gray-400">{entry.full || entry.label}</span>
+                                    </div>
+                                    <button onClick={() => toggleLegendKey(entry.key)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: isOpen ? '#16A34A' : '#E5E7EB' }}>
+                                      <div style={{ transform: isOpen ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                                    </button>
+                                  </div>
+                                  {isOpen && (
+                                    <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                                      {(entry.legend || []).map((cls, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                          <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: cls.color }} />
+                                          <span className="text-[10px] font-semibold text-gray-500">{cls.label} ({cls.range?.[0]} to {cls.range?.[1]})</span>
+                                        </div>
+                                      ))}
+                                      {entry.notes && <p className="text-[10px] text-gray-400 leading-snug pt-1 border-t border-gray-50">{entry.notes}</p>}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {cropProfileEntries.length === 0 && (
+                              <p className="text-[10px] text-gray-400 px-1">Crop index profile unavailable — connect to the backend to load this crop's legends.</p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -7643,4 +7551,4 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
   );
 };
 
-export default OrganizationMonitor;
+export default CropDashboardLayout;

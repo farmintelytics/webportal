@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
    Globe,
    Layers,
+   LogOut,
    Satellite,
    Map as MapIcon,
    Activity,
@@ -103,7 +104,7 @@ const CONFIG = {
    drillDownType: 'Cluster Health Anomaly'
 };
 
-const GroupsMonitoring = ({ onBack }) => {
+const GroupsMonitoring = ({ onBack, onSignOut }) => {
    const [activeTab, setActiveTab] = useState('overview');
    const [showLayerList, setShowLayerList] = useState(true);
    const [dateRange, setDateRange] = useState('Current Season Analytics');

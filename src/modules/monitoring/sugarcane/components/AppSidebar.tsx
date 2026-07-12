@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Map, BarChart3, FileText, Database, Sprout, Sparkles, LogOut, ChevronRight, ChevronLeft } from "lucide-react";
+import { Map, BarChart3, Sprout, LogOut, ChevronRight, ChevronLeft } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter, useSidebar,
@@ -9,13 +9,9 @@ import { useMonitoring } from "../../shared/MonitoringContext";
 const main = [
   { title: "Dashboard", url: "/", icon: BarChart3 },
   { title: "Map View", url: "/map", icon: Map },
-  { title: "AI Assistant", url: "/assistant", icon: Sparkles, badge: "AI" },
 ];
 
-const ops = [
-  { title: "Reports", url: "/reports", icon: FileText },
-  { title: "Data Management", url: "/data", icon: Database },
-];
+const ops: never[] = [];
 
 export function AppSidebar() {
   const { state, toggleSidebar } = useSidebar();
@@ -76,31 +72,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/50">Operations</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {ops.map((item) => {
-                const active = pathname === item.url;
-                return (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      tooltip={item.title}
-                      className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:font-semibold hover:bg-sidebar-accent"
-                    >
-                      <Link to={item.url} className="flex items-center gap-2.5">
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border bg-sidebar p-3 space-y-3">

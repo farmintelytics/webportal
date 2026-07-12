@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, Lock, Mail, Eye, EyeOff, ShieldCheck, Globe, Zap, CreditCard, Landmark, Coins, Plane, Radar, Satellite, Users, Layers, UserCheck, Grid } from 'lucide-react';
-import { login } from '../services/organizationMonitorApi';
+import { login, fetchCropMonitoringConfig } from '../services/organizationMonitorApi';
 
 const Login = ({ onLogin, moduleName, onBack, defaultEmail = '', defaultCode = '' }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -26,10 +26,24 @@ const Login = ({ onLogin, moduleName, onBack, defaultEmail = '', defaultCode = '
     setError('');
     try {
       const response = await login(email, accessCode);
-      if (response.status === 'success' && response.token) {
+      if (response.status === 'success' && response.token && response.tenant) {
         localStorage.setItem('fi_token', response.token);
         localStorage.setItem('fi_email', response.email);
-        localStorage.setItem('fi_tenant', response.tenant || 'okomu');
+        localStorage.setItem('fi_tenant', response.tenant);
+        // Pull the organization's config (display name, licensed modules) so
+        // the portal shows exactly what this company's account allows.
+        try {
+          const config = await fetchCropMonitoringConfig();
+          if (config?.display_name) localStorage.setItem('fi_display_name', config.display_name);
+          if (Array.isArray(config?.modules)) localStorage.setItem('fi_allowed_modules', JSON.stringify(config.modules));
+          if (Array.isArray(config?.allowed_crops)) localStorage.setItem('fi_allowed_crops', JSON.stringify(config.allowed_crops));
+          if (Array.isArray(config?.map_center)) localStorage.setItem('fi_map_center', JSON.stringify(config.map_center));
+        } catch (_) {
+          localStorage.removeItem('fi_display_name');
+          localStorage.removeItem('fi_allowed_modules');
+          localStorage.removeItem('fi_allowed_crops');
+          localStorage.removeItem('fi_map_center');
+        }
         onLogin();
       } else {
         setError(response.message || 'Authentication failed');

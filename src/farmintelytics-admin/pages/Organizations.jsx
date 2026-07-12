@@ -44,8 +44,28 @@ const MODULE_LABELS = {
 };
 
 const emptyForm = () => ({
-  company_name: '', schema_name: '', allowed_crops: [], allowed_modules: [], map_center_lat: 6.685, map_center_lon: -1.625,
+  company_name: '', schema_name: '', allowed_crops: [], allowed_modules: [], map_center_lat: 6.43, map_center_lon: 5.27,
 });
+
+// Mirrors the backend _slugify: lowercase, non-alphanumerics → underscores
+export const slugify = (text) => (text || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+// Compose the module list for an access model.
+// 'organization' → the company-wide agromonitor dashboard;
+// 'crop' → per-crop monitoring + management portals; 'both' → union.
+export const modulesForAccessModel = (model, crops, slug) => {
+  const orgModules = slug ? [`custom-agromonitor-${slug}`] : [];
+  const cropModules = (crops || []).flatMap(c => [`rs-${c}`, `management-${c}`]);
+  if (model === 'organization') return orgModules;
+  if (model === 'crop') return cropModules;
+  return [...orgModules, ...cropModules];
+};
+
+export const ACCESS_MODELS = [
+  { id: 'organization', label: 'Organization View', desc: 'One company-wide satellite dashboard (like Okomu / Olam)' },
+  { id: 'crop', label: 'Crop Monitoring', desc: 'Per-crop monitoring + management portals for each allowed crop' },
+  { id: 'both', label: 'Both', desc: 'Organization dashboard plus per-crop portals' },
+];
 
 const OrgModal = ({ org, onSave, onClose }) => {
   const [form, setForm] = useState(org ? {
@@ -55,14 +75,28 @@ const OrgModal = ({ org, onSave, onClose }) => {
     map_center_lat: org.map_center_lat, map_center_lon: org.map_center_lon,
   } : emptyForm());
   const [saving, setSaving] = useState(false);
+  const [accessModel, setAccessModel] = useState(null); // null = manual module selection
 
-  const toggleCrop = (c) => setForm(f => ({
-    ...f, allowed_crops: f.allowed_crops.includes(c) ? f.allowed_crops.filter(x => x !== c) : [...f.allowed_crops, c],
-  }));
+  const effectiveSlug = () => form.schema_name.trim() || slugify(form.company_name);
 
-  const toggleModule = (m) => setForm(f => ({
-    ...f, allowed_modules: f.allowed_modules.includes(m) ? f.allowed_modules.filter(x => x !== m) : [...f.allowed_modules, m],
-  }));
+  const applyAccessModel = (model, crops = form.allowed_crops) => {
+    setAccessModel(model);
+    setForm(f => ({ ...f, allowed_modules: modulesForAccessModel(model, crops, effectiveSlug()) }));
+  };
+
+  const toggleCrop = (c) => setForm(f => {
+    const crops = f.allowed_crops.includes(c) ? f.allowed_crops.filter(x => x !== c) : [...f.allowed_crops, c];
+    // Keep the module list in sync with the chosen access model
+    const modules = accessModel ? modulesForAccessModel(accessModel, crops, effectiveSlug()) : f.allowed_modules;
+    return { ...f, allowed_crops: crops, allowed_modules: modules };
+  });
+
+  const toggleModule = (m) => {
+    setAccessModel(null); // manual tweak — stop auto-managing the list
+    setForm(f => ({
+      ...f, allowed_modules: f.allowed_modules.includes(m) ? f.allowed_modules.filter(x => x !== m) : [...f.allowed_modules, m],
+    }));
+  };
 
   const handleSave = async () => {
     if (!form.company_name.trim()) return;
@@ -90,11 +124,11 @@ const OrgModal = ({ org, onSave, onClose }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <label style={labelStyle}>Company Name *</label>
-            <input style={inputStyle} placeholder="e.g. Okomu Oil Palm Company" value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))} />
+            <input style={inputStyle} placeholder="Company display name" value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))} />
           </div>
           <div>
             <label style={labelStyle}>Schema / Slug ID</label>
-            <input style={inputStyle} placeholder="Auto-generated if blank (e.g. okomu)" value={form.schema_name} onChange={e => setForm(f => ({ ...f, schema_name: e.target.value }))} />
+            <input style={inputStyle} placeholder="Auto-generated if blank" value={form.schema_name} onChange={e => setForm(f => ({ ...f, schema_name: e.target.value }))} />
             <p style={{ color: '#64748b', fontSize: '11px', marginTop: '4px' }}>Unique identifier used by the pipeline. Leave blank to auto-generate.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -127,9 +161,31 @@ const OrgModal = ({ org, onSave, onClose }) => {
             </div>
           </div>
           <div>
+            <label style={labelStyle}>Access Model</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+              {ACCESS_MODELS.map(m => {
+                const active = accessModel === m.id;
+                return (
+                  <button key={m.id} onClick={() => applyAccessModel(m.id)} title={m.desc} style={{
+                    padding: '10px 8px', borderRadius: '10px', cursor: 'pointer', textAlign: 'left',
+                    background: active ? 'rgba(22,163,74,0.1)' : '#ffffff',
+                    border: active ? '1px solid rgba(22,163,74,0.4)' : '1px solid #cbd5e1',
+                    transition: 'all 0.15s',
+                  }}>
+                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: active ? '#15803d' : '#334155' }}>{m.label}</span>
+                    <span style={{ display: 'block', fontSize: '10px', color: '#64748b', marginTop: '2px', lineHeight: 1.35 }}>{m.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p style={{ color: '#64748b', fontSize: '11px', margin: '6px 0 0' }}>
+              Picking a model fills the module list below from the allowed crops — you can still fine-tune individual modules afterwards.
+            </p>
+          </div>
+          <div>
             <label style={labelStyle}>Allowed Modules</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '180px', overflowY: 'auto', padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-              {ALL_MODULES.map(m => {
+              {[...new Set([...ALL_MODULES, ...form.allowed_modules])].map(m => {
                 const active = form.allowed_modules.includes(m);
                 return (
                   <button key={m} onClick={() => toggleModule(m)} style={{
@@ -139,7 +195,7 @@ const OrgModal = ({ org, onSave, onClose }) => {
                     color: active ? '#3b82f6' : '#475569',
                     transition: 'all 0.15s',
                   }}>
-                    {MODULE_LABELS[m] || m}
+                    {MODULE_LABELS[m] || (m.startsWith('custom-agromonitor-') ? `Org Dashboard (${m.replace('custom-agromonitor-', '')})` : m)}
                   </button>
                 );
               })}

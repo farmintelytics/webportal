@@ -63,11 +63,11 @@ const JobModal = ({ job, configs, onSave, onClose }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <label style={labelStyle}>Job Name (Slug) *</label>
-            <input style={inputStyle} placeholder="e.g. okomu_5_day_sync" disabled={!!job} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+            <input style={inputStyle} placeholder="Job name" disabled={!!job} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           </div>
           <div>
             <label style={labelStyle}>Description</label>
-            <input style={inputStyle} placeholder="Runs the pipeline for Okomu every 5 days" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            <input style={inputStyle} placeholder="What this job does" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
           <div>
             <label style={labelStyle}>Config File (YAML) *</label>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { LayoutDashboard, Map, Sprout, FileText, MessageSquare, Bell, Leaf, LogOut } from "lucide-react";
+import { LayoutDashboard, Map, Sprout, Bell, Leaf, LogOut } from "lucide-react";
 import { useMonitoring } from "../../shared/MonitoringContext";
 
 const nav = [
@@ -7,8 +7,6 @@ const nav = [
   { to: "/dashboard", label: "Map View", icon: Map },
   { to: "/plots", label: "Plots", icon: Sprout },
   { to: "/alerts", label: "Alerts", icon: Bell },
-  { to: "/reports", label: "Reports", icon: FileText },
-  { to: "/assistant", label: "AI Assistant", icon: MessageSquare },
 ];
 
 export function Sidebar() {

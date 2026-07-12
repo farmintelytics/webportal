@@ -1,11 +1,9 @@
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
-import { LayoutDashboard, Map, FileText, Bell, Leaf, FileDown, Activity, Sparkles, MapPin, TrendingUp, Search, Bell as BellIcon, User } from "lucide-react";
+import { LayoutDashboard, Map, Bell, Leaf, FileDown, Activity, MapPin, TrendingUp, Search, Bell as BellIcon, User } from "lucide-react";
 
 const primaryNav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard", label: "Map View", icon: Map },
-  { to: "/reports", label: "Reports", icon: FileText },
-  { to: "/assistant", label: "AI Assistant", icon: Sparkles },
 ];
 
 const secondaryNav = [

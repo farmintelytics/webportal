@@ -249,11 +249,11 @@ const PipelineConfig = () => {
               <>
                 <div>
                   <label style={labelStyle}>Config Filename *</label>
-                  <input style={inputStyle} placeholder="e.g. okomu_batch_config.yaml" value={filename} onChange={e => setFilename(e.target.value)} />
+                  <input style={inputStyle} placeholder="Config filename (.yaml)" value={filename} onChange={e => setFilename(e.target.value)} />
                 </div>
                 <div>
                   <label style={labelStyle}>Batch Name *</label>
-                  <input style={inputStyle} placeholder="all_estates_monthly_monitoring_batch" value={batchName} onChange={e => setBatchName(e.target.value)} />
+                  <input style={inputStyle} placeholder="Batch name" value={batchName} onChange={e => setBatchName(e.target.value)} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                   <input type="checkbox" id="run_parallel" checked={runParallel} onChange={e => setRunParallel(e.target.checked)} style={{ accentColor: '#16a34a', cursor: 'pointer' }} />
@@ -274,7 +274,7 @@ const PipelineConfig = () => {
                     {importsList.length === 0 && <span style={{ color: '#475569', fontSize: '11px', fontStyle: 'italic' }}>No configs imported</span>}
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    <input style={{ ...inputStyle, flex: 1 }} placeholder="e.g. okomu_batch_config.yaml" value={importInput} onChange={e => setImportInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddImport(); } }} />
+                    <input style={{ ...inputStyle, flex: 1 }} placeholder="Config filename (.yaml)" value={importInput} onChange={e => setImportInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddImport(); } }} />
                     <button onClick={handleAddImport} style={{ padding: '8px 14px', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '10px', color: '#16a34a', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>Add</button>
                   </div>
                 </div>
