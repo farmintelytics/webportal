@@ -1,39 +1,27 @@
-import React, { useMemo } from 'react';
-import { createRouter, RouterProvider, createMemoryHistory } from '@tanstack/react-router';
-import { routeTree } from './routeTree.gen';
+import React from 'react';
 import { MonitoringProvider } from '../shared/MonitoringContext';
 import { useCropMonitoring } from '../shared/useCropMonitoring';
 import CropDashboardLayout from '../shared/CropDashboardLayout';
-import { SidebarProvider } from "@monitoring-shared/ui/sidebar";
 import 'leaflet/dist/leaflet.css';
-import './styles.css';
 
 export default function Monitoring({ onBack, onSignOut }) {
-  const router = useMemo(() => {
-    const memoryHistory = createMemoryHistory({ initialEntries: ['/'] });
-    return createRouter({ routeTree, history: memoryHistory, defaultPreload: 'intent' });
-  }, []);
-
-  // sugarcane uses NDMI/LSWI/WDI for moisture (user mentioned MDWI ≈ NDMI)
   const { summary, blocks, indices, mapCenter, loading, error } = useCropMonitoring('sugarcane');
 
   return (
-    <SidebarProvider>
-      <div className='monitoring-theme-sugarcane min-h-screen w-full text-foreground'>
-        <MonitoringProvider
-          onBack={onBack}
-          onSignOut={onSignOut}
-          cropType="sugarcane"
-          cropSummary={summary}
-          cropBlocks={blocks}
-          cropIndices={indices}
-          cropLoading={loading}
-          cropError={error}
-          mapCenter={mapCenter}
-        >
-          <CropDashboardLayout onBack={onBack} onSignOut={onSignOut} cropType="sugarcane" cropSummary={summary} cropBlocks={blocks} cropIndices={indices} cropLoading={loading} cropError={error} mapCenter={mapCenter} />
-        </MonitoringProvider>
-      </div>
-    </SidebarProvider>
+    <div className='monitoring-theme-sugarcane min-h-screen w-full'>
+      <MonitoringProvider
+        onBack={onBack}
+        onSignOut={onSignOut}
+        cropType="sugarcane"
+        cropSummary={summary}
+        cropBlocks={blocks}
+        cropIndices={indices}
+        cropLoading={loading}
+        cropError={error}
+        mapCenter={mapCenter}
+      >
+        <CropDashboardLayout onBack={onBack} onSignOut={onSignOut} cropType="sugarcane" cropSummary={summary} cropBlocks={blocks} cropIndices={indices} cropLoading={loading} cropError={error} mapCenter={mapCenter} />
+      </MonitoringProvider>
+    </div>
   );
 }

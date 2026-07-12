@@ -1,18 +1,10 @@
-import React, { useMemo } from 'react';
-import { createRouter, RouterProvider, createMemoryHistory } from '@tanstack/react-router';
-import { routeTree } from './routeTree.gen';
+import React from 'react';
 import { MonitoringProvider } from '../shared/MonitoringContext';
 import { useCropMonitoring } from '../shared/useCropMonitoring';
 import CropDashboardLayout from '../shared/CropDashboardLayout';
 import 'leaflet/dist/leaflet.css';
-import './styles.css';
 
 export default function Monitoring({ onBack, onSignOut }) {
-  const router = useMemo(() => {
-    const memoryHistory = createMemoryHistory({ initialEntries: ['/'] });
-    return createRouter({ routeTree, history: memoryHistory, defaultPreload: 'intent' });
-  }, []);
-
   const { summary, blocks, indices, mapCenter, loading, error } = useCropMonitoring('ffb');
 
   return (
