@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   Building2, Map, Key, Activity, LayoutDashboard, LogOut,
-  ChevronRight, Shield, KanbanSquare, Menu, X, Layers,
+  ChevronRight, Shield, Menu, X, Layers,
   Clock, Settings, Database, Users, Rocket,
 } from 'lucide-react';
 
@@ -12,7 +12,6 @@ import Farms from './pages/Farms';
 import Boundaries from './pages/Boundaries';
 import Credentials from './pages/Credentials';
 import Logs from './pages/Logs';
-import Tasks from './pages/Tasks';
 import Scheduler from './pages/Scheduler';
 import PipelineConfig from './pages/PipelineConfig';
 import Inventory from './pages/Inventory';
@@ -28,7 +27,6 @@ const NAV_ITEMS = [
   { id: 'credentials',  label: 'Credentials',      icon: Key,       path: '/admin/credentials' },
   { id: 'scheduler',    label: 'Scheduler',        icon: Clock,     path: '/admin/scheduler' },
   { id: 'configs',      label: 'Configs Builder',  icon: Settings,  path: '/admin/configs' },
-  { id: 'tasks',        label: 'Task Board',       icon: KanbanSquare, path: '/admin/tasks' },
   { id: 'logs',         label: 'Logs',             icon: Activity,  path: '/admin/logs' },
 ];
 
@@ -206,7 +204,6 @@ const AdminPortal = () => {
             <Route path="credentials"   element={<Credentials />} />
             <Route path="scheduler"     element={<Scheduler />} />
             <Route path="configs"       element={<PipelineConfig />} />
-            <Route path="tasks"         element={<Tasks />} />
             <Route path="logs"          element={<Logs />} />
           </Routes>
         </div>

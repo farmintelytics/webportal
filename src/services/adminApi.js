@@ -138,41 +138,6 @@ export async function fetchPipelineLogs(companyId, limit = 20) {
   return adminFetch(`/logs/pipeline?${p}`);
 }
 
-// ─── Tasks ────────────────────────────────────────────────────────────────────
-
-export async function fetchTaskBoard() {
-  return adminFetch('/tasks/board');
-}
-
-export async function fetchTasks({ status, priority, assignee } = {}) {
-  const p = new URLSearchParams();
-  if (status)   p.set('status', status);
-  if (priority) p.set('priority', priority);
-  if (assignee) p.set('assignee', assignee);
-  const qs = p.toString() ? `?${p}` : '';
-  return adminFetch(`/tasks${qs}`);
-}
-
-export async function createTask(data) {
-  return adminFetch('/tasks', { method: 'POST', body: JSON.stringify(data) });
-}
-
-export async function updateTask(id, data) {
-  return adminFetch(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-}
-
-export async function moveTask(id, status, position = 0) {
-  return adminFetch(`/tasks/${id}/move`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status, position }),
-  });
-}
-
-export async function deleteTask(id) {
-  return adminFetch(`/tasks/${id}`, { method: 'DELETE' });
-}
-
-
 // ─── Scheduler ────────────────────────────────────────────────────────────────
 
 export async function fetchSchedulerJobs() {
