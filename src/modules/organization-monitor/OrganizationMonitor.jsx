@@ -1615,9 +1615,13 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
   const [moistureBioExpanded, setMoistureBioExpanded] = useState(true);
 
   // New Settings Center states — profile comes from the authenticated session
-  const [profileName, setProfileName] = useState(() => (localStorage.getItem('fi_email') || 'Account').split('@')[0]);
+  const [profileName, setProfileName] = useState(() =>
+    localStorage.getItem('fi_full_name') || (localStorage.getItem('fi_email') || 'Account').split('@')[0]);
   const [profileEmail, setProfileEmail] = useState(() => localStorage.getItem('fi_email') || '');
-  const [profileRole, setProfileRole] = useState('Member');
+  const [profileRole, setProfileRole] = useState(() => {
+    const r = localStorage.getItem('fi_role') || 'admin';
+    return r.charAt(0).toUpperCase() + r.slice(1);
+  });
   const [brandingMode, setBrandingMode] = useState('AM'); // 'AM' or 'FT'
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);

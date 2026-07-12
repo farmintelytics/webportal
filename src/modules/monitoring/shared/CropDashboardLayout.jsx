@@ -1036,6 +1036,7 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
           start: '2026-01-01',
           end: '2026-03-31',
           sensor: sensorParam,
+          cropType, // raster tiles coloured with this crop's legend classes
         });
         setSliderData(data);
         // Keep zarr bounds in sync when index changes (SAR vs optical extents may differ)
@@ -1658,9 +1659,13 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
   const [moistureBioExpanded, setMoistureBioExpanded] = useState(true);
 
   // New Settings Center states — profile comes from the authenticated session
-  const [profileName, setProfileName] = useState(() => (localStorage.getItem('fi_email') || 'Account').split('@')[0]);
+  const [profileName, setProfileName] = useState(() =>
+    localStorage.getItem('fi_full_name') || (localStorage.getItem('fi_email') || 'Account').split('@')[0]);
   const [profileEmail, setProfileEmail] = useState(() => localStorage.getItem('fi_email') || '');
-  const [profileRole, setProfileRole] = useState('Member');
+  const [profileRole, setProfileRole] = useState(() => {
+    const r = localStorage.getItem('fi_role') || 'admin';
+    return r.charAt(0).toUpperCase() + r.slice(1);
+  });
   const [brandingMode, setBrandingMode] = useState('AM'); // 'AM' or 'FT'
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);

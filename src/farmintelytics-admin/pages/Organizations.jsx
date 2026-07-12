@@ -43,8 +43,30 @@ const MODULE_LABELS = {
   'finance-hub': 'Finance Hub'
 };
 
+// Full remote-sensing product catalog. The first 13 are generated as rasters
+// by the data pipeline; the last 4 are derived statistically in the backend.
+export const ALL_RS_INDICES = [
+  { id: 'ndvi',   label: 'NDVI · Vegetation Health' },
+  { id: 'evi',    label: 'EVI · Enhanced Vegetation' },
+  { id: 'reci',   label: 'RECI · Chlorophyll / Nitrogen' },
+  { id: 'ndmi',   label: 'NDMI · Canopy Moisture' },
+  { id: 'lswi',   label: 'LSWI · Surface Water' },
+  { id: 'ndwi',   label: 'NDWI · Water / Flood' },
+  { id: 'wdi',    label: 'WDI · Water Deficit' },
+  { id: 'ndre',   label: 'NDRE · Red-Edge Nitrogen' },
+  { id: 'cvi',    label: 'CVI · Chlorophyll Vegetation' },
+  { id: 'savi',   label: 'SAVI · Soil-Adjusted Veg.' },
+  { id: 'rvi',    label: 'RVI · SAR Biomass' },
+  { id: 'dprvi',  label: 'DpRVI · SAR Structure' },
+  { id: 'smi',    label: 'SMI · SAR Soil Moisture' },
+  { id: 'lai',    label: 'LAI · Leaf Area (derived)' },
+  { id: 'gndvi',  label: 'GNDVI · Green NDVI (derived)' },
+  { id: 'msi',    label: 'MSI · Moisture Stress (derived)' },
+  { id: 'msavi2', label: 'MSAVI2 · Mod. Soil Adj. (derived)' },
+];
+
 const emptyForm = () => ({
-  company_name: '', schema_name: '', allowed_crops: [], allowed_modules: [], map_center_lat: 6.43, map_center_lon: 5.27,
+  company_name: '', schema_name: '', allowed_crops: [], allowed_modules: [], allowed_indices: [], map_center_lat: 6.43, map_center_lon: 5.27,
 });
 
 // Mirrors the backend _slugify: lowercase, non-alphanumerics → underscores
@@ -72,6 +94,7 @@ const OrgModal = ({ org, onSave, onClose }) => {
     company_name: org.display_name, schema_name: org.schema_name,
     allowed_crops: org.allowed_crops || [],
     allowed_modules: org.allowed_modules || [],
+    allowed_indices: org.allowed_indices || [],
     map_center_lat: org.map_center_lat, map_center_lon: org.map_center_lon,
   } : emptyForm());
   const [saving, setSaving] = useState(false);
@@ -97,6 +120,10 @@ const OrgModal = ({ org, onSave, onClose }) => {
       ...f, allowed_modules: f.allowed_modules.includes(m) ? f.allowed_modules.filter(x => x !== m) : [...f.allowed_modules, m],
     }));
   };
+
+  const toggleIndex = (i) => setForm(f => ({
+    ...f, allowed_indices: f.allowed_indices.includes(i) ? f.allowed_indices.filter(x => x !== i) : [...f.allowed_indices, i],
+  }));
 
   const handleSave = async () => {
     if (!form.company_name.trim()) return;
@@ -159,6 +186,28 @@ const OrgModal = ({ org, onSave, onClose }) => {
                 );
               })}
             </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Allowed Satellite Indices</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '150px', overflowY: 'auto', padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+              {ALL_RS_INDICES.map(ix => {
+                const active = form.allowed_indices.includes(ix.id);
+                return (
+                  <button key={ix.id} onClick={() => toggleIndex(ix.id)} style={{
+                    padding: '5px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: 700,
+                    background: active ? 'rgba(22,163,74,0.1)' : '#ffffff',
+                    border: active ? '1px solid rgba(22,163,74,0.3)' : '1px solid #cbd5e1',
+                    color: active ? '#16a34a' : '#475569',
+                    transition: 'all 0.15s',
+                  }}>
+                    {ix.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 0' }}>
+              Only the selected indices appear on this organization's maps, dropdowns and legends. Leave all unselected to allow everything.
+            </p>
           </div>
           <div>
             <label style={labelStyle}>Access Model</label>

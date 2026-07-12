@@ -353,11 +353,14 @@ export async function fetchCropMonitoringConfig() {
  * @param {string} [options.sensor] - Data source (e.g., 'sentinel', 'landsat')
  * @param {number} [options.loadDelay] - Delay in seconds before returning (allows data to load)
  */
-export async function fetchTimeseriesSlider({ farm, index, start, end, sensor, loadDelay = 0 } = {}) {
+export async function fetchTimeseriesSlider({ farm, index, start, end, sensor, cropType, loadDelay = 0 } = {}) {
   const params = new URLSearchParams({ farm, index });
   if (start) params.set('start', start);
   if (end) params.set('end', end);
   if (sensor) params.set('sensor', sensor);
+  // crop_type makes the tile server colour rasters with the crop-specific
+  // legend classes, so map colours match the legend cards exactly
+  if (cropType) params.set('crop_type', cropType);
   if (loadDelay > 0) params.set('load_delay', loadDelay.toString());
   return apiFetch(`/timeseries/slider?${params}`);
 }

@@ -8,7 +8,7 @@ const Credentials = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState('');
-  const [form, setForm] = useState({ company_id: '', email: '', access_code: '', label: 'Primary' });
+  const [form, setForm] = useState({ company_id: '', email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' });
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
@@ -31,7 +31,7 @@ const Credentials = () => {
     setSaving(true);
     try {
       await createCredential({ ...form, access_code: form.access_code.trim() || '' });
-      setForm({ company_id: '', email: '', access_code: '', label: 'Primary' });
+      setForm({ company_id: '', email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' });
       setShowForm(false);
       await load();
     } catch (e) { setError(e.message); } finally { setSaving(false); }
@@ -88,13 +88,27 @@ const Credentials = () => {
               <input style={inputStyle} placeholder="Primary, Manager, etc." value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} />
             </div>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div>
+              <label style={labelStyle}>Account Holder Name</label>
+              <input style={inputStyle} placeholder="Full name" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Account Role</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                <option value="admin">Admin — full organization access</option>
+                <option value="analyst">Analyst — monitoring & reports</option>
+                <option value="viewer">Viewer — read-only</option>
+              </select>
+            </div>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
             <div>
               <label style={labelStyle}>Email *</label>
               <input type="email" style={inputStyle} placeholder="Login email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Access Code <span style={{ color: '#475569', fontWeight: 600 }}>(blank = auto-generate)</span></label>
+              <label style={labelStyle}>Access Code (password) <span style={{ color: '#475569', fontWeight: 600 }}>(blank = auto-generate)</span></label>
               <input style={inputStyle} placeholder="Auto-generated if blank" value={form.access_code} onChange={e => setForm(f => ({ ...f, access_code: e.target.value }))} />
             </div>
           </div>
@@ -125,8 +139,9 @@ const Credentials = () => {
                   <div key={cred.id} style={{ display: 'flex', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)', gap: '16px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span style={{ color: '#1e293b', fontSize: '13px', fontWeight: 600 }}>{cred.email}</span>
+                        <span style={{ color: '#1e293b', fontSize: '13px', fontWeight: 600 }}>{cred.full_name ? `${cred.full_name} — ` : ''}{cred.email}</span>
                         <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 7px', borderRadius: '5px', background: 'rgba(59,130,246,0.1)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.15)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{cred.label}</span>
+                        <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 7px', borderRadius: '5px', background: 'rgba(22,163,74,0.08)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.15)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{cred.role || 'admin'}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <code style={{ fontSize: '12px', color: '#475569', fontFamily: 'monospace', background: '#ffffff', padding: '2px 8px', borderRadius: '6px' }}>{cred.access_code}</code>

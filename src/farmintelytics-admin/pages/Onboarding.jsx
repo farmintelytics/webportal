@@ -3,7 +3,7 @@ import { Building2, Key, Layers, Map, Settings, Check, ChevronRight, AlertCircle
 import {
   createOrganization, createCredential, createFarm, uploadBoundary, generateFarmConfig, createSchedulerJob,
 } from '../../services/adminApi';
-import { slugify, modulesForAccessModel, ACCESS_MODELS } from './Organizations';
+import { slugify, modulesForAccessModel, ACCESS_MODELS, ALL_RS_INDICES } from './Organizations';
 
 const ALL_CROPS = ['ffb', 'maize', 'rice', 'cocoa', 'rubber', 'cassava', 'sugarcane', 'cashew'];
 const CROP_LABELS = {
@@ -48,8 +48,8 @@ const Onboarding = () => {
   const [done, setDone] = useState({ org: null, credential: null, farm: null, boundary: null, config: null });
 
   // ── Step forms ──
-  const [company, setCompany] = useState({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'both', allowed_crops: [] });
-  const [cred, setCred] = useState({ email: '', access_code: '', label: 'Primary' });
+  const [company, setCompany] = useState({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'both', allowed_crops: [], allowed_indices: [] });
+  const [cred, setCred] = useState({ email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' });
   const [farm, setFarm] = useState({
     farm_name: '', farm_id: '', sensors: ['sentinel-2', 'sentinel-1'],
     indices: ['NDVI', 'EVI', 'NDMI', 'RECI', 'NDWI', 'LSWI'],
@@ -77,6 +77,7 @@ const Onboarding = () => {
       schema_name: companySlug,
       allowed_crops: company.allowed_crops,
       allowed_modules,
+      allowed_indices: company.allowed_indices,
       map_center_lat: company.map_center_lat,
       map_center_lon: company.map_center_lon,
     });
@@ -90,6 +91,8 @@ const Onboarding = () => {
       email: cred.email,
       access_code: cred.access_code,
       label: cred.label || 'Primary',
+      full_name: cred.full_name,
+      role: cred.role,
     });
     setDone(d => ({ ...d, credential }));
     setStep(2);
@@ -242,6 +245,19 @@ const Onboarding = () => {
               ))}
             </div>
           </div>
+          <div>
+            <label style={labelStyle}>Allowed Satellite Indices</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '140px', overflowY: 'auto', padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+              {ALL_RS_INDICES.map(ix => (
+                <button key={ix.id} onClick={() => setCompany(co => ({ ...co, allowed_indices: toggleIn(co.allowed_indices, ix.id) }))} style={chip(company.allowed_indices.includes(ix.id))}>
+                  {ix.label}
+                </button>
+              ))}
+            </div>
+            <p style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 0' }}>
+              Only the selected indices show on this company's maps, dropdowns and legends. Leave all unselected to allow everything.
+            </p>
+          </div>
           <button onClick={submitCompany} disabled={busy || !company.company_name.trim() || (company.accessModel !== 'organization' && company.allowed_crops.length === 0)} style={primaryBtn(busy || !company.company_name.trim())}>
             {busy ? 'Creating…' : 'Create Organization'} <ChevronRight size={15} />
           </button>
@@ -254,13 +270,27 @@ const Onboarding = () => {
           <p style={{ color: '#16a34a', fontSize: '12px', fontWeight: 700, margin: 0 }}>
             ✓ Organization "{done.org?.display_name}" created ({done.org?.schema_name})
           </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={labelStyle}>Account Holder Name</label>
+              <input style={inputStyle} placeholder="Full name" value={cred.full_name} onChange={e => setCred(c => ({ ...c, full_name: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Account Role</label>
+              <select style={inputStyle} value={cred.role} onChange={e => setCred(c => ({ ...c, role: e.target.value }))}>
+                <option value="admin">Admin — full organization access</option>
+                <option value="analyst">Analyst — monitoring & reports</option>
+                <option value="viewer">Viewer — read-only</option>
+              </select>
+            </div>
+          </div>
           <div>
             <label style={labelStyle}>Login Email *</label>
             <input style={inputStyle} placeholder="Company login email" value={cred.email} onChange={e => setCred(c => ({ ...c, email: e.target.value }))} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label style={labelStyle}>Access Code</label>
+              <label style={labelStyle}>Access Code (password)</label>
               <input style={inputStyle} placeholder="Blank = auto-generate" value={cred.access_code} onChange={e => setCred(c => ({ ...c, access_code: e.target.value }))} />
             </div>
             <div>
@@ -416,7 +446,7 @@ const Onboarding = () => {
           {done.config?.content && (
             <pre style={{ margin: 0, padding: '14px', background: '#0f172a', color: '#86efac', borderRadius: '12px', fontSize: '11px', overflowX: 'auto', maxHeight: '240px' }}>{done.config.content}</pre>
           )}
-          <button onClick={() => { setStep(0); setDone({ org: null, credential: null, farm: null, boundary: null, config: null }); setCompany({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'both', allowed_crops: [] }); setCred({ email: '', access_code: '', label: 'Primary' }); setFarm(f => ({ ...f, farm_name: '', farm_id: '' })); setBoundaryFile(null); }} style={primaryBtn(false)}>
+          <button onClick={() => { setStep(0); setDone({ org: null, credential: null, farm: null, boundary: null, config: null }); setCompany({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'both', allowed_crops: [], allowed_indices: [] }); setCred({ email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' }); setFarm(f => ({ ...f, farm_name: '', farm_id: '' })); setBoundaryFile(null); }} style={primaryBtn(false)}>
             <Rocket size={15} /> Onboard Another Company
           </button>
         </div>

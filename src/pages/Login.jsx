@@ -30,6 +30,9 @@ const Login = ({ onLogin, moduleName, onBack, defaultEmail = '', defaultCode = '
         localStorage.setItem('fi_token', response.token);
         localStorage.setItem('fi_email', response.email);
         localStorage.setItem('fi_tenant', response.tenant);
+        localStorage.setItem('fi_role', response.role || 'admin');
+        if (response.full_name) localStorage.setItem('fi_full_name', response.full_name);
+        else localStorage.removeItem('fi_full_name');
         // Pull the organization's config (display name, licensed modules) so
         // the portal shows exactly what this company's account allows.
         try {
