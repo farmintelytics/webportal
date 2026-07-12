@@ -1021,12 +1021,12 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
   // SAR indices are always Sentinel-1; optical defaults to user-chosen sensor
   const effectiveSensor = isSarIndex ? 'sentinel-1' : selectedSensor;
 
-  // Fetch timeseries slider and pre-rendered raster overlays
+  // Fetch timeseries slider and pre-rendered raster overlays.
+  // The previous tiles/timeline stay on screen while the new data loads —
+  // clearing them upfront caused the whole map to blink blank on every refetch.
   useEffect(() => {
     async function loadSliderData() {
       setTimelineLoading(true);
-      setSliderData(null);        // clear stale tiles while fetching
-      setTIMELINE_DATA([]);       // clear stale labels immediately
       try {
         const indexName = (selectedIndex || 'ndvi').toLowerCase();
         const sensorParam = isSarIndex ? 'sentinel-1' : selectedSensor;
@@ -1048,7 +1048,10 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
       }
     }
     loadSliderData();
-  }, [selectedPlot, selectedIndex, tenant, refreshSlider, selectedSensor]);
+    // NOTE: selectedPlot is deliberately NOT a dependency — clicking a plot
+    // fetches its pixel timeseries separately and must not reload (and blink)
+    // the whole farm raster.
+  }, [selectedIndex, tenant, refreshSlider, selectedSensor]);
 
   // Click handler to fetch Zarr pixel timeseries
   const handlePlotClick = async (plot, lat, lng) => {
@@ -4302,24 +4305,44 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
                         </div>
                         {intelBioExpanded && (
                           <div className="space-y-3">
-                            {/* Crop-specific legend cards — driven by /crop-monitoring/indices:
-                                each card carries this crop's interpretation (label, classes, notes),
-                                so NDWI reads as flood classes for rice but disease risk for cashew. */}
+                            {/* Crop-specific legend cards — driven by /crop-monitoring/indices.
+                                The switch puts that index's raster ON the map (one raster at a
+                                time — switching an index on replaces the current one; switching
+                                the active index off hides the raster layer). */}
                             {cropProfileEntries.map(entry => {
+                              const hasData = availableIndices.some(i => String(i.index).toLowerCase() === entry.key);
                               const isSelected = (selectedIndex || '').toLowerCase() === entry.key;
-                              const isOpen = isSelected || expandedLegendKeys.includes(entry.key);
+                              const isOnMap = isSelected && showRasterLayer;
+                              const isOpen = isOnMap || expandedLegendKeys.includes(entry.key);
+                              const handleSwitch = () => {
+                                if (!hasData) return;
+                                if (isOnMap) {
+                                  setShowRasterLayer(false);
+                                } else {
+                                  setSelectedIndex(entry.key);
+                                  setShowRasterLayer(true);
+                                }
+                              };
                               return (
-                                <div key={entry.key} className={`border rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5 ${isSelected ? 'border-green-300 ring-1 ring-green-100' : 'border-gray-100'}`}>
+                                <div key={entry.key} className={`border rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5 ${isOnMap ? 'border-green-300 ring-1 ring-green-100' : 'border-gray-100'} ${!hasData ? 'opacity-60' : ''}`}>
                                   <div className="flex items-center justify-between">
-                                    <div>
+                                    <div onClick={() => toggleLegendKey(entry.key)} style={{ cursor: 'pointer' }}>
                                       <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">
                                         {entry.crop_label || entry.label} {renderInfoTooltip(entry.label)}
-                                        {isSelected && <span className="text-[8px] font-black uppercase tracking-wider text-green-700 bg-green-50 border border-green-200 rounded-full px-1.5 py-0.5">On Map</span>}
+                                        {isOnMap && <span className="text-[8px] font-black uppercase tracking-wider text-green-700 bg-green-50 border border-green-200 rounded-full px-1.5 py-0.5">On Map</span>}
                                       </div>
-                                      <span className="text-[10px] text-gray-400">{entry.full || entry.label}</span>
+                                      <span className="text-[10px] text-gray-400">
+                                        {entry.full || entry.label}{!hasData && <span className="font-bold text-gray-400"> (No data)</span>}
+                                      </span>
                                     </div>
-                                    <button onClick={() => toggleLegendKey(entry.key)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: isOpen ? '#16A34A' : '#E5E7EB' }}>
-                                      <div style={{ transform: isOpen ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+                                    <button
+                                      onClick={handleSwitch}
+                                      disabled={!hasData}
+                                      title={!hasData ? 'No satellite data in the archive for this index yet' : isOnMap ? 'Hide this raster' : 'Show this raster on the map'}
+                                      className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0"
+                                      style={{ backgroundColor: isOnMap ? '#16A34A' : '#E5E7EB', cursor: hasData ? 'pointer' : 'not-allowed' }}
+                                    >
+                                      <div style={{ transform: isOnMap ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                                     </button>
                                   </div>
                                   {isOpen && (

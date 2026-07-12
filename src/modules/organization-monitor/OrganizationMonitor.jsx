@@ -978,12 +978,12 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
   // SAR indices are always Sentinel-1; optical defaults to user-chosen sensor
   const effectiveSensor = isSarIndex ? 'sentinel-1' : selectedSensor;
 
-  // Fetch timeseries slider and pre-rendered raster overlays
+  // Fetch timeseries slider and pre-rendered raster overlays.
+  // The previous tiles/timeline stay on screen while the new data loads —
+  // clearing them upfront caused the whole map to blink blank on every refetch.
   useEffect(() => {
     async function loadSliderData() {
       setTimelineLoading(true);
-      setSliderData(null);        // clear stale tiles while fetching
-      setTIMELINE_DATA([]);       // clear stale labels immediately
       try {
         const indexName = (selectedIndex || 'ndvi').toLowerCase();
         const sensorParam = isSarIndex ? 'sentinel-1' : selectedSensor;
@@ -1004,7 +1004,10 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
       }
     }
     loadSliderData();
-  }, [selectedPlot, selectedIndex, tenant, refreshSlider, selectedSensor]);
+    // NOTE: selectedPlot is deliberately NOT a dependency — clicking a plot
+    // fetches its pixel timeseries separately and must not reload (and blink)
+    // the whole farm raster.
+  }, [selectedIndex, tenant, refreshSlider, selectedSensor]);
 
   // Click handler to fetch Zarr pixel timeseries
   const handlePlotClick = async (plot, lat, lng) => {
