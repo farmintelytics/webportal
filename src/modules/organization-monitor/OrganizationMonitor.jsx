@@ -1637,11 +1637,73 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
 
   // Collapsible sidebar section groups states (collapsed/false by default)
   const [intelOpExpanded, setIntelOpExpanded] = useState(false);
-  const [intelBioExpanded, setIntelBioExpanded] = useState(false);
+  const [intelBioExpanded, setIntelBioExpanded] = useState(true);
+
+  // Legend cards: which index legends are manually expanded
+  // (the index currently rendered on the map is always expanded)
+  const [expandedLegendKeys, setExpandedLegendKeys] = useState([]);
+  const toggleLegendKey = (key) => setExpandedLegendKeys(prev =>
+    prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+
+  // Functional legend cards, driven by the tenant's real archive
+  // (/raster/indices now carries label + legend classes per index).
+  // The switch puts that index's raster ON the map — one raster at a time;
+  // switching the active index off hides the raster layer.
+  const renderIndexLegendCards = () => (
+    <>
+      {availableIndices.map(ix => {
+        const key = String(ix.index).toLowerCase();
+        const isSelected = (selectedIndex || '').toLowerCase() === key;
+        const isOnMap = isSelected && showRasterLayer;
+        const isOpen = isOnMap || expandedLegendKeys.includes(key);
+        const handleSwitch = () => {
+          if (isOnMap) { setShowRasterLayer(false); }
+          else { setSelectedIndex(key); setShowRasterLayer(true); }
+        };
+        return (
+          <div key={key} className={`border rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5 ${isOnMap ? 'border-green-300 ring-1 ring-green-100' : 'border-gray-100'}`}>
+            <div className="flex items-center justify-between">
+              <div onClick={() => toggleLegendKey(key)} style={{ cursor: 'pointer' }}>
+                <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">
+                  {ix.label || key.toUpperCase()} {renderInfoTooltip(ix.label || key.toUpperCase())}
+                  {isOnMap && <span className="text-[8px] font-black uppercase tracking-wider text-green-700 bg-green-50 border border-green-200 rounded-full px-1.5 py-0.5">On Map</span>}
+                </div>
+                <span className="text-[10px] text-gray-400">{ix.full || ix.label || key.toUpperCase()}</span>
+              </div>
+              <button
+                onClick={handleSwitch}
+                title={isOnMap ? 'Hide this raster' : 'Show this raster on the map'}
+                className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0"
+                style={{ backgroundColor: isOnMap ? '#16A34A' : '#E5E7EB' }}
+              >
+                <div style={{ transform: isOnMap ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
+              </button>
+            </div>
+            {isOpen && (
+              <div className="space-y-1.5 pt-1 border-t border-gray-50">
+                {(ix.legend || []).map((cls, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: cls.color }} />
+                    <span className="text-[10px] font-semibold text-gray-500">{cls.label} ({cls.range?.[0]} to {cls.range?.[1]})</span>
+                  </div>
+                ))}
+                {(!ix.legend || ix.legend.length === 0) && (
+                  <span className="text-[10px] text-gray-400">Continuous colour ramp ({ix.lo} to {ix.hi})</span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {availableIndices.length === 0 && (
+        <p className="text-[10px] text-gray-400 px-1">No satellite indices in the archive yet (No data).</p>
+      )}
+    </>
+  );
   const [intelMonExpanded, setIntelMonExpanded] = useState(false);
 
   const [healthOpExpanded, setHealthOpExpanded] = useState(false);
-  const [healthBioExpanded, setHealthBioExpanded] = useState(false);
+  const [healthBioExpanded, setHealthBioExpanded] = useState(true);
   const [healthMonExpanded, setHealthMonExpanded] = useState(false);
 
   const [yieldOpExpanded, setYieldOpExpanded] = useState(false);
@@ -4251,188 +4313,11 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                           onClick={() => setIntelBioExpanded(!intelBioExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {intelBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical Indices
+                          {intelBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Satellite Index Legends
                         </div>
                         {intelBioExpanded && (
                           <div className="space-y-3">
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Growth Stage {renderInfoTooltip("Growth Stage")}</div><span className="text-[10px] text-gray-400">Crop phenology classification</span></div>
-                            <button onClick={() => setIntelShowGrowth(!intelShowGrowth)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowGrowth ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowGrowth ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowGrowth && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Germination</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Vegetative</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Flowering</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Fruiting</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Maturity</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">EVI {renderInfoTooltip("EVI")}</div><span className="text-[10px] text-gray-400">Enhanced Vegetation Index</span></div>
-                            <button onClick={() => setIntelShowEvi(!intelShowEvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowEvi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowEvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowEvi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High (0.7–1.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.5–0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.3–0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Stressed ({'<'}0.3)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LSWI {renderInfoTooltip("LSWI")}</div><span className="text-[10px] text-gray-400">Land Surface Water Index</span></div>
-                            <button onClick={() => setIntelShowLswi(!intelShowLswi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowLswi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowLswi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowLswi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Wet (0.5–0.8)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moist (0.2–0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (-0.1 to 0.2)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Very Dry (&lt;-0.1)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">VHI {renderInfoTooltip("VHI")}</div><span className="text-[10px] text-gray-400">Vegetation Health Index</span></div>
-                            <button onClick={() => setIntelShowVhi(!intelShowVhi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowVhi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowVhi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowVhi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">No Stress (&gt;=60)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Mild (40-60)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (20-40)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Severe ({'<'}20)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">CVI {renderInfoTooltip("CVI")}</div><span className="text-[10px] text-gray-400">Chlorophyll Vegetation Index</span></div>
-                            <button onClick={() => setIntelShowCvi(!intelShowCvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowCvi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowCvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowCvi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#166534'}}/><span className="text-[10px] font-semibold text-gray-500">Dense (&gt;3.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#22c55e'}}/><span className="text-[10px] font-semibold text-gray-500">Good (2.0-3.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (1.0-2.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#ef4444'}}/><span className="text-[10px] font-semibold text-gray-500">Poor ({'<'}1.0)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDRE {renderInfoTooltip("NDRE")}</div><span className="text-[10px] text-gray-400">Normalized Difference Red Edge</span></div>
-                            <button onClick={() => setIntelShowNdre(!intelShowNdre)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowNdre ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowNdre ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowNdre && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High N (&gt;0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Good N (0.3-0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low N (0.1-0.3)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Deficient ({'<'}0.1)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">WDI {renderInfoTooltip("WDI")}</div><span className="text-[10px] text-gray-400">Water Deficit Index</span></div>
-                            <button onClick={() => setIntelShowWdi(!intelShowWdi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowWdi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowWdi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowWdi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Well-watered (0.0-0.2)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Mild stress (0.2-0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.4-0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Severe (0.7-1.0)</span></div>
-                            </div>
-                          )}
-                        </div>
-                          </div>
-                        )}
-                      </div>                      <div className="space-y-3">
-                        <div
-                          onClick={() => setIntelMonExpanded(!intelMonExpanded)}
-                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
-                        >
-                          {intelMonExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Monitoring
-                        </div>
-                        {intelMonExpanded && (
-                          <div className="space-y-3">
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">DPRVI {renderInfoTooltip("DPRVI")}</div><span className="text-[10px] text-gray-400">Dual-Pol Radar Vegetation Index</span></div>
-                            <button onClick={() => setIntelShowDprvi(!intelShowDprvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowDprvi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowDprvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowDprvi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Mature (&gt;0.6)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Growing (0.4-0.6)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Sprouting (0.2-0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Bare ({'<'}0.2)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">RVI {renderInfoTooltip("RVI")}</div><span className="text-[10px] text-gray-400">Radar Vegetation Index</span></div>
-                            <button onClick={() => setIntelShowRvi(!intelShowRvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowRvi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowRvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowRvi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High (&gt;0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.4-0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.2-0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Very Low ({'<'}0.2)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Flood Risk {renderInfoTooltip("Flood Risk")}</div><span className="text-[10px] text-gray-400">Surface inundation risk</span></div>
-                            <button onClick={() => setIntelShowFlood(!intelShowFlood)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowFlood ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowFlood ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowFlood && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">High Risk</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Risk</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low Risk</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">No Risk</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">UAS Anomaly {renderInfoTooltip("UAS Anomaly")}</div><span className="text-[10px] text-gray-400">Drone-detected anomalies</span></div>
-                            <button onClick={() => setIntelShowUas(!intelShowUas)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: intelShowUas ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: intelShowUas ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {intelShowUas && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">High Anomaly</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Anomaly</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Normal</span></div>
-                            </div>
-                          )}
-                        </div>
+                            {renderIndexLegendCards()}
                           </div>
                         )}
                       </div>
@@ -4623,165 +4508,11 @@ const OrganizationMonitor = ({ onBack, onSignOut }) => {
                           onClick={() => setHealthBioExpanded(!healthBioExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {healthBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Biophysical
+                          {healthBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Satellite Index Legends
                         </div>
                         {healthBioExpanded && (
-                          <div className="space-y-3 flex flex-col gap-3">
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDVI {renderInfoTooltip("NDVI")}</div><span className="text-[10px] text-gray-400">Normalized Difference Vegetation Index</span></div>
-                            <button onClick={() => setHealthShowNdvi(!healthShowNdvi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowNdvi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: healthShowNdvi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {healthShowNdvi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High (0.7-1.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.5-0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.3-0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Stressed ({'<'}0.3)</span></div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">SAVI {renderInfoTooltip("SAVI")}</div><span className="text-[10px] text-gray-400">Soil Adjusted Vegetation Index</span></div>
-                            <button onClick={() => {
-                              const next = !healthShowSavi;
-                              setHealthShowSavi(next);
-                              if (next) {
-                                setSelectedIndex('savi');
-                                setHealthShowNdvi(false);
-                                setHealthShowNdwi(false);
-                              }
-                            }} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowSavi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: healthShowSavi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {healthShowSavi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Optimal (&gt;0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Good (0.2-0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low (0.1-0.2)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Stressed ({'<'}0.1)</span></div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDWI {renderInfoTooltip("NDWI")}</div><span className="text-[10px] text-gray-400">Normalized Difference Water Index</span></div>
-                            <button onClick={() => {
-                              const next = !healthShowNdwi;
-                              setHealthShowNdwi(next);
-                              if (next) {
-                                setSelectedIndex('ndwi');
-                                setHealthShowNdvi(false);
-                                setHealthShowSavi(false);
-                              }
-                            }} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowNdwi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: healthShowNdwi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {healthShowNdwi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">High Water Content (&gt;0.3)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Water (0.0 to 0.3)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (-0.3 to 0.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Water stressed (&lt;-0.3)</span></div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Chlorophyll {renderInfoTooltip("Chlorophyll")}</div><span className="text-[10px] text-gray-400">Canopy chlorophyll content</span></div>
-                            <button onClick={() => setHealthShowChlorophyll(!healthShowChlorophyll)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowChlorophyll ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: healthShowChlorophyll ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {healthShowChlorophyll && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#166534'}}/><span className="text-[10px] font-semibold text-gray-500">High</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#22c55e'}}/><span className="text-[10px] font-semibold text-gray-500">Good</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#ef4444'}}/><span className="text-[10px] font-semibold text-gray-500">Low</span></div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Water Stress {renderInfoTooltip("Water Stress")}</div><span className="text-[10px] text-gray-400">Crop water stress level</span></div>
-                            <button onClick={() => setHealthShowWater(!healthShowWater)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowWater ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: healthShowWater ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {healthShowWater && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">No Stress</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Mild</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Severe</span></div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDRE {renderInfoTooltip("NDRE")}</div><span className="text-[10px] text-gray-400">Red Edge nitrogen status</span></div>
-                            <button onClick={() => setHealthShowNdre(!healthShowNdre)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowNdre ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: healthShowNdre ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {healthShowNdre && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">High N (&gt;0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#84cc16'}}/><span className="text-[10px] font-semibold text-gray-500">Good N (0.3-0.5)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#eab308'}}/><span className="text-[10px] font-semibold text-gray-500">Low N (0.1-0.3)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Deficient ({'<'}0.1)</span></div>
-                            </div>
-                          )}
-                        </div>
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-3">
-                        <div
-                          onClick={() => setHealthMonExpanded(!healthMonExpanded)}
-                          className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
-                        >
-                          {healthMonExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Monitoring
-                        </div>
-                        {healthMonExpanded && (
                           <div className="space-y-3">
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">SMI {renderInfoTooltip("SMI")}</div><span className="text-[10px] text-gray-400">Soil Moisture Index</span></div>
-                            <button onClick={() => setHealthShowSmi(!healthShowSmi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowSmi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: healthShowSmi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {healthShowSmi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">Wet (0.7-1.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moist (0.4-0.7)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (0.2-0.4)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Drought ({'<'}-0.2)</span></div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">Pest Risk {renderInfoTooltip("Pest Risk")}</div><span className="text-[10px] text-gray-400">Pest pressure assessment</span></div>
-                            <button onClick={() => setHealthShowPest(!healthShowPest)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: healthShowPest ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: healthShowPest ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {healthShowPest && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Low Risk</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#f97316'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate Risk</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">High Risk</span></div>
-                            </div>
-                          )}
-                        </div>
+                            {renderIndexLegendCards()}
                           </div>
                         )}
                       </div>
