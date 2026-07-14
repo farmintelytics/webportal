@@ -123,6 +123,31 @@ export async function deleteCredential(id) {
   return adminFetch(`/credentials/${id}`, { method: 'DELETE' });
 }
 
+// ─── Crop Index Thresholds (agronomist calibration) ──────────────────────────
+
+/**
+ * GET /crop-thresholds?crop_type=rice&company_id=
+ * Effective legend classes for every index in the crop's profile, each flagged
+ * `calibrated` (saved calibration) or not (shipped science-based default).
+ */
+export async function fetchCropThresholds(cropType, companyId = '') {
+  const p = new URLSearchParams({ crop_type: cropType });
+  if (companyId) p.set('company_id', companyId);
+  return adminFetch(`/crop-thresholds?${p}`);
+}
+
+/** PUT /crop-thresholds — save a calibration for one crop × index */
+export async function saveCropThreshold(data) {
+  return adminFetch('/crop-thresholds', { method: 'PUT', body: JSON.stringify(data) });
+}
+
+/** DELETE /crop-thresholds — reset one crop × index back to the default */
+export async function resetCropThreshold(cropType, indexKey, companyId = '') {
+  const p = new URLSearchParams({ crop_type: cropType, index_key: indexKey });
+  if (companyId) p.set('company_id', companyId);
+  return adminFetch(`/crop-thresholds?${p}`, { method: 'DELETE' });
+}
+
 // ─── Logs ─────────────────────────────────────────────────────────────────────
 
 export async function fetchLogs({ status, sensor, page = 1, pageSize = 50 } = {}) {
