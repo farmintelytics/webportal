@@ -24,7 +24,8 @@ import {
   User,
   Bell,
   Satellite,
-  Shield
+  Shield,
+  Globe
 } from 'lucide-react';
 import { 
   SimpleCard, 

@@ -4,6 +4,7 @@ import {
   Users, 
   Satellite, 
   Factory, 
+  CheckCircle2, 
   TrendingUp, 
   Weight, 
   AlertCircle,

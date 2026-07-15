@@ -20,24 +20,6 @@ const PipelineConfig = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  const loadConfigs = async () => {
-    try {
-      const data = await fetchPipelineConfigs();
-      setConfigs(data);
-      if (data.length > 0 && !selectedFile) {
-        handleSelect(data[0].filename);
-      }
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadConfigs();
-  }, []);
-
   const handleSelect = async (fname) => {
     setSelectedFile(fname);
     setError('');
@@ -71,6 +53,24 @@ const PipelineConfig = () => {
       setError(e.message);
     }
   };
+
+  const loadConfigs = async () => {
+    try {
+      const data = await fetchPipelineConfigs();
+      setConfigs(data);
+      if (data.length > 0 && !selectedFile) {
+        handleSelect(data[0].filename);
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConfigs();
+  }, []);
 
   const handleCreateNew = () => {
     setSelectedFile('');

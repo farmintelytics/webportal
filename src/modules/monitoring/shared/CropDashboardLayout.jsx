@@ -1028,6 +1028,17 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     primaryAppliedRef.current = true;
   }, [cropPrimaryIndex, availableIndices]);
 
+  // Declared here (not near their other timeline/calendar state below) because
+  // the slider- and timeline-building effects that follow reference their
+  // setters — declaring them after those effects put the setters in the
+  // temporal dead zone at the point of use (only safe because effects run
+  // post-render, but fragile and flagged by react-hooks/immutability).
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [zarrBounds, setZarrBounds] = useState(null);
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const [calendarYear,  setCalendarYear]  = useState(new Date().getFullYear());
+  const [selectedTimelineIndex, setSelectedTimelineIndex] = useState(2);
+
   const [refreshSlider, setRefreshSlider] = useState(0);
   const [selectedSensor, setSelectedSensor] = useState('sentinel-2'); // 'sentinel-2' | 'landsat'
 
@@ -1095,15 +1106,11 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     }
   };
 
-  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
-  const [calendarYear,  setCalendarYear]  = useState(new Date().getFullYear());
-
   // Real timeline loaded from backend zarr/TIF data — no mock values
   const [TIMELINE_DATA, setTIMELINE_DATA] = useState([]);
-  const [timelineLoading, setTimelineLoading] = useState(false);
   const [tileRefreshing, setTileRefreshing] = useState(false);
-  // Spatial bounds from zarr x/y arrays: [[min_lat, min_lng], [max_lat, max_lng]]
-  const [zarrBounds, setZarrBounds] = useState(null);
+  // (timelineLoading, zarrBounds, calendarMonth, calendarYear, selectedTimelineIndex
+  // are declared earlier — see note above the slider-fetching effect)
 
   // Build TIMELINE_DATA from sliderData — single source of truth, no separate NDVI fetch.
   // This guarantees currentTimeline.date always matches sliderData.tiles keys.
@@ -1159,7 +1166,6 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     }
   }, [sliderData, plots]);
 
-  const [selectedTimelineIndex, setSelectedTimelineIndex] = useState(2);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [compareTimelineIndex, setCompareTimelineIndex] = useState(3);
 

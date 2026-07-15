@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 
-export function MonitoringSidebar({ activeTab, setActiveTab, appName, onBack, items }) {
+export function MonitoringSidebar({ activeTab, setActiveTab, appName, onBack, onSignOut, items }) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -71,11 +71,11 @@ export function MonitoringTopBar({ title }) {
   );
 }
 
-export function MonitoringLayout({ appName, onBack, children, activeTab, setActiveTab, items }) {
+export function MonitoringLayout({ appName, onBack, onSignOut, children, activeTab, setActiveTab, items }) {
   const activeItem = items.find(i => i.id === activeTab);
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50 text-slate-900">
-      <MonitoringSidebar activeTab={activeTab} setActiveTab={setActiveTab} appName={appName} onBack={onBack} items={items} />
+      <MonitoringSidebar activeTab={activeTab} setActiveTab={setActiveTab} appName={appName} onBack={onBack} onSignOut={onSignOut} items={items} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <MonitoringTopBar title={activeItem?.label || "Monitoring"} />
         <div className="flex-1 overflow-hidden relative">{children}</div>
