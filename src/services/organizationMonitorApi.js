@@ -366,6 +366,21 @@ export async function fetchTimeseriesSlider({ farm, index, start, end, sensor, c
 }
 
 /**
+ * GET /composite-tiles/slider?farm={farm}&composite={composite}&start=&end=&sensor=
+ * Timeline + tile URLs for a basemap composite (true_color | false_color | sar_rgb),
+ * built from the raw bands the pipeline persists alongside each index. Same
+ * {date: url} shape as fetchTimeseriesSlider, so it drives the same time-slider
+ * / currentTileUrl mechanics — just pointed at a composite instead of an index.
+ */
+export async function fetchCompositeSlider({ farm, composite, start, end, sensor } = {}) {
+  const params = new URLSearchParams({ farm, composite });
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+  if (sensor) params.set('sensor', sensor);
+  return apiFetch(`/composite-tiles/slider?${params}`);
+}
+
+/**
  * GET /timeseries/pixel/?farm={farm}&index={index}&lat={lat}&lon={lon}&load_delay={delay}
  * Returns pixel-level Zarr time series data.
  * @param {Object} options

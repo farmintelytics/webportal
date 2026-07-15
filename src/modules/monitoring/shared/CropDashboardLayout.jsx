@@ -981,6 +981,12 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     return () => { active = false; };
   }, [tenant]);
   const [selectedBasemap, setSelectedBasemap] = useState('sentinel-2');
+  // Basemap ids that are live composites rendered from the tenant's own
+  // archive (as opposed to static external imagery like Google/ESRI) — these
+  // change with the time slider, same as the NDVI/NDMI overlay.
+  const COMPOSITE_BASEMAP_IDS = { 'true-color': 'true_color', 'false-color': 'false_color', 'sar-rgb': 'sar_rgb' };
+  const activeComposite = COMPOSITE_BASEMAP_IDS[selectedBasemap] || null;
+  const [compositeSliderData, setCompositeSliderData] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState('ndvi');
   const [mapOpacity, setMapOpacity] = useState(80);
   const [showRasterLayer, setShowRasterLayer] = useState(true);
@@ -999,6 +1005,26 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     }
     loadIndices();
   }, [tenant]);
+
+  // Fetch the composite's own timeline + tile URLs (same {date: url} shape as
+  // the index slider) whenever a composite basemap is selected. Cleared when
+  // switching away so a stale composite tile never lingers under a static
+  // basemap.
+  useEffect(() => {
+    if (!activeComposite) { setCompositeSliderData(null); return; }
+    let active = true;
+    async function loadCompositeSlider() {
+      try {
+        const data = await api.fetchCompositeSlider({ farm: tenant || 'farm_1', composite: activeComposite });
+        if (active) setCompositeSliderData(data);
+      } catch (err) {
+        console.error('Failed to fetch composite slider:', err);
+        if (active) setCompositeSliderData(null);
+      }
+    }
+    loadCompositeSlider();
+    return () => { active = false; };
+  }, [activeComposite, tenant]);
 
   // ── Crop-specific index profile (from /crop-monitoring/indices) ──────────
   // Ordered by agronomic priority, each entry carries the crop-specific label,
@@ -1250,6 +1276,14 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     return null;
   }, [sliderData, currentTimeline]);
 
+  // The composite basemap (true colour / false colour / SAR RGB) is keyed to
+  // the SAME acquisition date as the index overlay, so both move together
+  // under one time slider.
+  const compositeTileUrl = useMemo(() => {
+    if (!activeComposite || !currentTimeline || !compositeSliderData?.tiles) return null;
+    return compositeSliderData.tiles[currentTimeline.date] || null;
+  }, [activeComposite, compositeSliderData, currentTimeline]);
+
   // Brief flash to signal tile refresh to user when tile URL changes
   useEffect(() => {
     if (!currentTileUrl) return;
@@ -1441,7 +1475,12 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     const BASEMAPS = [
       { id: 'sentinel-2',    label: 'Sentinel-2',      sub: '10m Optical · ESA',  emoji: '🛰️' },
       { id: 'landsat-8',     label: 'Landsat-8',       sub: '30m Thermal · USGS', emoji: '🌍' },
-      { id: 'google-hybrid', label: 'Google Satellite', sub: 'High-Res Basemap',   emoji: '🗺️' }
+      { id: 'google-hybrid', label: 'Google Satellite', sub: 'High-Res Basemap',   emoji: '🗺️' },
+      // Live composites rendered from this tenant's own archive — move with
+      // the time slider, unlike the static sources above.
+      { id: 'true-color',    label: 'True Colour',     sub: 'Red-Green-Blue · Live',      emoji: '🎨' },
+      { id: 'false-color',   label: 'False Colour',    sub: 'NIR-Red-Green · Live',       emoji: '🌿' },
+      { id: 'sar-rgb',       label: 'SAR RGB',         sub: 'Sentinel-1 VV-VH · Live',    emoji: '📡' },
     ];
     const activeBasemapObj = BASEMAPS.find(b => b.id === selectedBasemap) || BASEMAPS[0];
 
@@ -1453,6 +1492,9 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
         >
           <span className="text-xs">{activeBasemapObj.emoji}</span>
           <span className="truncate max-w-[85px]">{activeBasemapObj.label}</span>
+          {activeComposite && !compositeTileUrl && (
+            <RefreshCw size={10} className="animate-spin text-gray-400" title="Loading composite tiles…" />
+          )}
           <ChevronDown size={11} className={`text-gray-400 transition-transform ${showBasemapDropdown ? 'rotate-180' : ''}`} />
         </button>
         {showBasemapDropdown && (
@@ -3209,11 +3251,15 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     return getIndexFiveClasses(val, indexName).color;
   };
 
+  // Static fallback (ESRI World Imagery) shown while a composite's own tiles
+  // are still loading, so the basemap never goes blank mid-fetch.
+  const STATIC_BASEMAP_FALLBACK = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
   const basemapUrl = useMemo(() => {
+    if (activeComposite) return compositeTileUrl || STATIC_BASEMAP_FALLBACK;
     if (selectedBasemap === 'google-hybrid') return 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
     if (selectedBasemap === 'landsat-8') return 'https://server.arcgisonline.com/ArcGIS/rest/services/Specialty/DeLorme_World_Base_Map/MapServer/tile/{z}/{y}/{x}';
-    return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-  }, [selectedBasemap]);
+    return STATIC_BASEMAP_FALLBACK;
+  }, [selectedBasemap, activeComposite, compositeTileUrl]);
 
   const triggerReportGeneration = async (overridePlot, overrideIndex) => {
     const targetPlot = overridePlot !== undefined ? overridePlot : reportPlot;
@@ -4267,7 +4313,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
           {showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}
@@ -4462,7 +4508,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
           {showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}
@@ -4660,7 +4706,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
           {showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}
@@ -4926,7 +4972,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
                     {showRasterLayer && currentTileUrl && (
                       <TileLayer
                         key={currentTileUrl}
@@ -5127,7 +5173,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
           {showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}
@@ -5868,7 +5914,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
           {showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}

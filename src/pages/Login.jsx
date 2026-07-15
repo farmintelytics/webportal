@@ -80,7 +80,7 @@ const Login = ({ onLogin, moduleName, onBack, defaultEmail = '', defaultCode = '
           { icon: <Plane size={20} />, text: 'Drone Surveillance Telemetry' },
           { icon: <Radar size={20} />, text: 'SAR Cloud-Penetrating Radar' }
         ],
-        btn: 'Connect to Ledger'
+        btn: 'Sign In'
       };
     }
     if (isCooperative) {
@@ -103,7 +103,7 @@ const Login = ({ onLogin, moduleName, onBack, defaultEmail = '', defaultCode = '
         { icon: <Globe size={20} />, text: 'Real-time Remote Sensing' },
         { icon: <Zap size={20} />, text: 'Predictive Yield Analytics' }
       ],
-      btn: 'Connect to Ledger'
+      btn: 'Sign In'
     };
   };
 
