@@ -875,8 +875,23 @@ const CROP_CONFIG_KEYS = {
   cassava: 'Cassava', sugarcane: 'SugarCane',
 };
 
-const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, cropLoading, cropError, mapCenter, onBack, onSignOut }) => {
-  const cropLabel = CROP_META[cropType]?.label || CROP_CONFIG_KEYS[cropType] || cropType;
+/**
+ * The single satellite-monitoring dashboard, used in two modes:
+ *
+ *   mode="crop"          one crop for the tenant — crop-specific legends
+ *                        (own class breakpoints + agronomic wording), index
+ *                        list narrowed to the crop's profile, rasters coloured
+ *                        with that crop's interpretation.
+ *   mode="organization"  the whole organization — generic legends built from
+ *                        whatever indices exist in the tenant's archive.
+ *
+ * These were two near-identical 7,400-line files that had to be edited in
+ * lockstep and had already drifted. Everything below is shared; the six
+ * genuinely mode-dependent points each branch on `isOrg`.
+ */
+const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks, cropIndices, cropLoading, cropError, mapCenter, onBack, onSignOut }) => {
+  const isOrg = mode === 'organization';
+  const cropLabel = isOrg ? '' : (CROP_META[cropType]?.label || CROP_CONFIG_KEYS[cropType] || cropType);
   // Tenant identity comes strictly from the authenticated session — no default
   // organization. Without a session, bounce straight back to login.
   const tenant = localStorage.getItem('fi_tenant');
@@ -1036,7 +1051,11 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
           start: '2026-01-01',
           end: '2026-03-31',
           sensor: sensorParam,
-          cropType, // raster tiles coloured with this crop's legend classes
+          // Crop mode: tiles are coloured with this crop's legend classes.
+          // Org mode: cropType is undefined, so no crop_type is sent and the
+          // tile server falls back to the generic classes — matching the
+          // generic legends shown in this mode.
+          cropType,
         });
         setSliderData(data);
         // Keep zarr bounds in sync when index changes (SAR vs optical extents may differ)
@@ -1690,59 +1709,101 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
   const toggleLegendKey = (key) => setExpandedLegendKeys(prev =>
     prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
 
-  // Crop-specific functional legend cards — reused by every map section's
-  // Map Layers sidebar. The switch puts that index's raster ON the map (one
-  // raster at a time); indices with no archive data show "(No data)".
-  const renderCropLegendCards = () => (
+  // ── Legend cards ────────────────────────────────────────────────────────
+  // Both modes render the same card; only the source of the entries differs:
+  //   crop mode — the crop's index profile, with crop-specific class
+  //               breakpoints and agronomic wording (indices absent from the
+  //               archive are shown disabled as "(No data)").
+  //   org  mode — every index actually present in the tenant's archive, with
+  //               the generic scientific classes.
+  // Normalising here means one card implementation, not two.
+  const legendEntries = useMemo(() => {
+    if (isOrg) {
+      return availableIndices.map(ix => {
+        const key = String(ix.index).toLowerCase();
+        const title = ix.label || key.toUpperCase();
+        return {
+          key,
+          title,
+          tooltip: title,
+          subtitle: ix.full || title,
+          legend: ix.legend || [],
+          notes: '',
+          hasData: true,
+          ramp: [ix.lo, ix.hi],
+        };
+      });
+    }
+    return cropProfileEntries.map(entry => ({
+      key: entry.key,
+      title: entry.crop_label || entry.label,
+      tooltip: entry.label,
+      subtitle: entry.full || entry.label,
+      legend: entry.legend || [],
+      notes: entry.notes || '',
+      hasData: availableIndices.some(i => String(i.index).toLowerCase() === entry.key),
+      ramp: null,
+    }));
+  }, [isOrg, availableIndices, cropProfileEntries]);
+
+  const emptyLegendMessage = isOrg
+    ? 'No satellite indices in the archive yet (No data).'
+    : "Crop index profile unavailable — connect to the backend to load this crop's legends.";
+
+  // Reused by every map section's Map Layers sidebar. The switch puts that
+  // index's raster ON the map — one raster at a time.
+  const renderLegendCards = () => (
     <>
-      {cropProfileEntries.map(entry => {
-        const hasData = availableIndices.some(i => String(i.index).toLowerCase() === entry.key);
+      {legendEntries.map(entry => {
         const isSelected = (selectedIndex || '').toLowerCase() === entry.key;
         const isOnMap = isSelected && showRasterLayer;
         const isOpen = isOnMap || expandedLegendKeys.includes(entry.key);
         const handleSwitch = () => {
-          if (!hasData) return;
+          if (!entry.hasData) return;
           if (isOnMap) { setShowRasterLayer(false); }
           else { setSelectedIndex(entry.key); setShowRasterLayer(true); }
         };
         return (
-          <div key={entry.key} className={`border rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5 ${isOnMap ? 'border-green-300 ring-1 ring-green-100' : 'border-gray-100'} ${!hasData ? 'opacity-60' : ''}`}>
+          <div key={entry.key} className={`border rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5 ${isOnMap ? 'border-green-300 ring-1 ring-green-100' : 'border-gray-100'} ${!entry.hasData ? 'opacity-60' : ''}`}>
             <div className="flex items-center justify-between">
               <div onClick={() => toggleLegendKey(entry.key)} style={{ cursor: 'pointer' }}>
                 <div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">
-                  {entry.crop_label || entry.label} {renderInfoTooltip(entry.label)}
+                  {entry.title} {renderInfoTooltip(entry.tooltip)}
                   {isOnMap && <span className="text-[8px] font-black uppercase tracking-wider text-green-700 bg-green-50 border border-green-200 rounded-full px-1.5 py-0.5">On Map</span>}
                 </div>
                 <span className="text-[10px] text-gray-400">
-                  {entry.full || entry.label}{!hasData && <span className="font-bold text-gray-400"> (No data)</span>}
+                  {entry.subtitle}{!entry.hasData && <span className="font-bold text-gray-400"> (No data)</span>}
                 </span>
               </div>
               <button
                 onClick={handleSwitch}
-                disabled={!hasData}
-                title={!hasData ? 'No satellite data in the archive for this index yet' : isOnMap ? 'Hide this raster' : 'Show this raster on the map'}
+                disabled={!entry.hasData}
+                title={!entry.hasData ? 'No satellite data in the archive for this index yet' : isOnMap ? 'Hide this raster' : 'Show this raster on the map'}
                 className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0"
-                style={{ backgroundColor: isOnMap ? '#16A34A' : '#E5E7EB', cursor: hasData ? 'pointer' : 'not-allowed' }}
+                style={{ backgroundColor: isOnMap ? '#16A34A' : '#E5E7EB', cursor: entry.hasData ? 'pointer' : 'not-allowed' }}
               >
                 <div style={{ transform: isOnMap ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
               </button>
             </div>
             {isOpen && (
               <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                {(entry.legend || []).map((cls, i) => (
+                {entry.legend.map((cls, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: cls.color }} />
                     <span className="text-[10px] font-semibold text-gray-500">{cls.label} ({cls.range?.[0]} to {cls.range?.[1]})</span>
                   </div>
                 ))}
+                {entry.legend.length === 0 && entry.ramp && (
+                  <span className="text-[10px] text-gray-400">Continuous colour ramp ({entry.ramp[0]} to {entry.ramp[1]})</span>
+                )}
                 {entry.notes && <p className="text-[10px] text-gray-400 leading-snug pt-1 border-t border-gray-50">{entry.notes}</p>}
               </div>
             )}
           </div>
         );
       })}
-      {cropProfileEntries.length === 0 && (
-        <p className="text-[10px] text-gray-400 px-1">Crop index profile unavailable — connect to the backend to load this crop's legends.</p>
+      {legendEntries.length === 0 && (
+        <p className="text-[10px] text-gray-400 px-1">{emptyLegendMessage}</p>
       )}
     </>
   );
@@ -3421,7 +3482,9 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
             </div>
             <div>
               <h1 className="text-base font-bold tracking-tight text-gray-900 leading-none">
-                {tenantDisplayName} {cropLabel} {brandingMode === 'AM' ? 'Monitoring' : 'Farm Tools'}
+                {tenantDisplayName} {isOrg
+                  ? (brandingMode === 'AM' ? 'Agro Monitoring' : 'Farm Tools')
+                  : `${cropLabel} ${brandingMode === 'AM' ? 'Monitoring' : 'Farm Tools'}`}
               </h1>
               <p className={`text-[11px] font-semibold uppercase tracking-widest mt-1 leading-none ${brandingMode === 'AM' ? 'text-green-600' : 'text-green-600'}`}>
                 {brandingMode === 'AM' ? 'Enterprise Satellite Node' : 'Agricultural Operations Hub'}
@@ -4358,11 +4421,11 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
                           onClick={() => setIntelBioExpanded(!intelBioExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {intelBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {cropLabel} Index Legends
+                          {intelBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {isOrg ? 'Satellite' : cropLabel} Index Legends
                         </div>
                         {intelBioExpanded && (
                           <div className="space-y-3">
-                            {renderCropLegendCards()}
+                            {renderLegendCards()}
                           </div>
                         )}
                       </div>
@@ -4553,11 +4616,11 @@ const CropDashboardLayout = ({ cropType, cropSummary, cropBlocks, cropIndices, c
                           onClick={() => setHealthBioExpanded(!healthBioExpanded)}
                           className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
                         >
-                          {healthBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {cropLabel} Index Legends
+                          {healthBioExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {isOrg ? 'Satellite' : cropLabel} Index Legends
                         </div>
                         {healthBioExpanded && (
                           <div className="space-y-3">
-                            {renderCropLegendCards()}
+                            {renderLegendCards()}
                           </div>
                         )}
                       </div>
