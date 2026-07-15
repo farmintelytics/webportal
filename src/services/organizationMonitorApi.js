@@ -158,6 +158,16 @@ export async function fetchPlotsYieldForecast({ date, plotId } = {}) {
   return apiFetch(`/plots/yield/forecast${qs}`);
 }
 
+// ─── Crop Water Demand (FAO-56) ─────────────────────────────────────────────
+
+export async function fetchPlotsWaterDemand({ date, plotId } = {}) {
+  const params = new URLSearchParams();
+  if (date)   params.set('date', date);
+  if (plotId) params.set('plot_id', plotId);
+  const qs = params.toString() ? `?${params}` : '';
+  return apiFetch(`/plots/water-demand${qs}`);
+}
+
 // ─── Climate & Sensor Telemetry ─────────────────────────────────────────────
 
 /**

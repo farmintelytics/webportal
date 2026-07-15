@@ -924,6 +924,9 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   const [activeSidebarItem, setActiveSidebarItem] = useState('analytics');
   const [activeTab, setActiveTab] = useState('monitor');
 
+  const [waterDemandData, setWaterDemandData] = useState(null);
+  const [waterDemandLoading, setWaterDemandLoading] = useState(false);
+
   const [stats, setStats] = useState(null);
   const [trends, setTrends] = useState(null);
   const [plots, setPlots] = useState([]);
@@ -1025,6 +1028,28 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     loadCompositeSlider();
     return () => { active = false; };
   }, [activeComposite, tenant]);
+
+  // ── Water Management (FAO-56 ETc + irrigation efficiency) ────────────────
+  // Fetched only while that sidebar section is open — same real-data-only
+  // contract as every other panel (nulls when the pipeline hasn't run yet).
+  useEffect(() => {
+    if (activeSidebarItem !== 'water-management') return;
+    let active = true;
+    async function loadWaterDemand() {
+      setWaterDemandLoading(true);
+      try {
+        const data = await api.fetchPlotsWaterDemand({});
+        if (active) setWaterDemandData(data);
+      } catch (err) {
+        console.error('Failed to fetch water demand:', err);
+        if (active) setWaterDemandData(null);
+      } finally {
+        if (active) setWaterDemandLoading(false);
+      }
+    }
+    loadWaterDemand();
+    return () => { active = false; };
+  }, [activeSidebarItem, tenant]);
 
   // ── Crop-specific index profile (from /crop-monitoring/indices) ──────────
   // Ordered by agronomic priority, each entry carries the crop-specific label,
@@ -3684,6 +3709,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   { id: 'moisture-content',    label: 'Moisture Content',    icon: <Droplets size={17} /> },
                   { id: 'climate',             label: 'Climate',             icon: <CloudRain size={17} /> },
                   { id: 'land-restoration',    label: 'Land Restoration',    icon: <Leaf size={17} /> },
+                  { id: 'water-management',    label: 'Water Management',    icon: <Waves size={17} /> },
                   { id: 'alerts',              label: 'Alerts',              icon: <AlertTriangle size={17} />, badge: alerts.filter(a => a.status === 'Active').length }
                 ].map(item => (
                   <button
@@ -5543,6 +5569,87 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
             </div>
           )}
 
+          {/* ══════════════════════════════════════════════════════════════
+              WATER MANAGEMENT (FAO-56 crop water demand + irrigation efficiency)
+          ══════════════════════════════════════════════════════════════ */}
+          {activeSidebarItem === 'water-management' && (
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {waterDemandLoading && (
+                <div className="flex items-center gap-2 text-sm text-gray-400 font-semibold">
+                  <RefreshCw size={14} className="animate-spin" /> Loading water demand data…
+                </div>
+              )}
+
+              {!waterDemandLoading && (!waterDemandData || waterDemandData.length === 0) && (
+                <div className="border border-gray-100 rounded-xl p-6 bg-white text-sm text-gray-400 text-center">
+                  No water demand data available yet — run the pipeline with ETc enabled to populate this panel.
+                </div>
+              )}
+
+              {!waterDemandLoading && waterDemandData && waterDemandData.length > 0 && (() => {
+                const withEtc = waterDemandData.filter(p => p.etc_mm_day != null);
+                const avgEtc = withEtc.length
+                  ? withEtc.reduce((sum, p) => sum + p.etc_mm_day, 0) / withEtc.length
+                  : null;
+                const farm = waterDemandData[0];
+                return (
+                  <>
+                    {/* KPI cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Avg. Crop Water Demand</div>
+                        <div className="text-2xl font-black text-gray-800">
+                          {avgEtc != null ? `${avgEtc.toFixed(2)}` : '—'} <span className="text-xs font-semibold text-gray-400">mm/day</span>
+                        </div>
+                      </div>
+                      <div className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Cumulative Rainfall</div>
+                        <div className="text-2xl font-black text-gray-800">
+                          {farm.cumulative_rainfall_mm != null ? farm.cumulative_rainfall_mm.toFixed(1) : '—'} <span className="text-xs font-semibold text-gray-400">mm</span>
+                        </div>
+                      </div>
+                      <div className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Irrigation Efficiency</div>
+                        <div className="text-2xl font-black text-gray-800">
+                          {farm.irrigation_efficiency != null ? `${(farm.irrigation_efficiency * 100).toFixed(0)}%` : '—'}
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-1">Rainfall received / crop water demand over the run period</div>
+                      </div>
+                    </div>
+
+                    {/* Per-plot ETc table */}
+                    <div className="border border-gray-100 rounded-xl bg-white shadow-sm overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-100 text-xs font-bold text-gray-700 uppercase tracking-widest">Per-Plot Crop Water Demand</div>
+                      <div className="max-h-80 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50 text-gray-400 uppercase tracking-widest text-[10px]">
+                            <tr>
+                              <th className="text-left px-4 py-2">Plot</th>
+                              <th className="text-left px-4 py-2">Area (ha)</th>
+                              <th className="text-left px-4 py-2">ETc (mm/day)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {waterDemandData.map(p => (
+                              <tr key={p.plot_id} className="border-t border-gray-50">
+                                <td className="px-4 py-2 font-semibold text-gray-700">{p.name}</td>
+                                <td className="px-4 py-2 text-gray-500">{p.area_ha != null ? p.area_ha.toFixed(2) : '—'}</td>
+                                <td className="px-4 py-2 text-gray-500">{p.etc_mm_day != null ? p.etc_mm_day.toFixed(2) : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] text-gray-400 px-1">
+                      ETc is also available as a map layer — select "ETc" from the index picker on Intelligence Layers to view it with the time slider.
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
 
           {/* ══════════════════════════════════════════════════════════════
               ALERTS COMMAND CENTER
