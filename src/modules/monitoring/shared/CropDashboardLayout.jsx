@@ -1195,8 +1195,9 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [compareTimelineIndex, setCompareTimelineIndex] = useState(3);
 
-  // activeTimelineIndex drives map tile rendering — debounced 10s after slider stops.
-  // selectedTimelineIndex updates instantly for slider position feedback.
+  // activeTimelineIndex drives map tile rendering — debounced briefly after
+  // slider/calendar stops moving, so dragging doesn't fire a tile request
+  // per frame. selectedTimelineIndex updates instantly for slider position feedback.
   const [activeTimelineIndex, setActiveTimelineIndex] = useState(2);
   const [activeCompareTimelineIndex, setActiveCompareTimelineIndex] = useState(3);
   const [sliderPending, setSliderPending] = useState(false);
@@ -1209,7 +1210,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     sliderTimerA.current = setTimeout(() => {
       setActiveTimelineIndex(selectedTimelineIndex);
       setSliderPending(false);
-    }, 10000);
+    }, 400);
     return () => clearTimeout(sliderTimerA.current);
   }, [selectedTimelineIndex]);
 
@@ -1217,7 +1218,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     clearTimeout(sliderTimerB.current);
     sliderTimerB.current = setTimeout(() => {
       setActiveCompareTimelineIndex(compareTimelineIndex);
-    }, 10000);
+    }, 400);
     return () => clearTimeout(sliderTimerB.current);
   }, [compareTimelineIndex]);
 
