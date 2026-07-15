@@ -80,7 +80,7 @@ const Login = ({ onLogin, moduleName, onBack, defaultEmail = '', defaultCode = '
           { icon: <Plane size={20} />, text: 'Drone Surveillance Telemetry' },
           { icon: <Radar size={20} />, text: 'SAR Cloud-Penetrating Radar' }
         ],
-        btn: 'Sign In'
+        btn: 'Login'
       };
     }
     if (isCooperative) {

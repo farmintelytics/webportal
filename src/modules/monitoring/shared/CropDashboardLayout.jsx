@@ -983,7 +983,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     loadBackendData();
     return () => { active = false; };
   }, [tenant]);
-  const [selectedBasemap, setSelectedBasemap] = useState('sentinel-2');
+  const [selectedBasemap, setSelectedBasemap] = useState('google-hybrid');
   // Basemap ids that are live composites rendered from the tenant's own
   // archive (as opposed to static external imagery like Google/ESRI) — these
   // change with the time slider, same as the NDVI/NDMI overlay.
@@ -1499,8 +1499,6 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
 
   const renderFloatingBasemapSelector = () => {
     const BASEMAPS = [
-      { id: 'sentinel-2',    label: 'Sentinel-2',      sub: '10m Optical · ESA',  emoji: '🛰️' },
-      { id: 'landsat-8',     label: 'Landsat-8',       sub: '30m Thermal · USGS', emoji: '🌍' },
       { id: 'google-hybrid', label: 'Google Satellite', sub: 'High-Res Basemap',   emoji: '🗺️' },
       // Live composites rendered from this tenant's own archive — move with
       // the time slider, unlike the static sources above.
