@@ -14,12 +14,13 @@ const ALL_SENSORS = ['sentinel-2', 'sentinel-1', 'landsat-9'];
 const ALL_INDICES = ['NDVI', 'EVI', 'NDMI', 'RECI', 'NDWI', 'LSWI', 'LAI', 'NDRE', 'CVI', 'SAVI', 'MSI', 'GNDVI', 'ETC', 'LST', 'SMI_LANDSAT', 'VCI'];
 
 const STEPS = [
-  { id: 'company', label: 'Company', icon: Building2 },
+  { id: 'organization', label: 'Organization Setup', icon: Building2 },
   { id: 'credentials', label: 'Login Credentials', icon: Key },
-  { id: 'farm', label: 'Farm Registry', icon: Layers },
-  { id: 'boundary', label: 'Boundary Upload', icon: Map },
   { id: 'pipeline', label: 'Pipeline Config', icon: Settings },
 ];
+
+const sectionHeaderStyle = { fontSize: '13px', fontWeight: 800, color: '#0f172a', margin: '4px 0 -4px', display: 'flex', alignItems: 'center', gap: '8px' };
+const sectionDividerStyle = { border: 'none', borderTop: '1px solid #e2e8f0', margin: '4px 0' };
 
 const inputStyle = {
   width: '100%', padding: '10px 12px', background: '#ffffff', border: '1px solid #cbd5e1',
@@ -70,7 +71,11 @@ const Onboarding = () => {
   };
 
   // ── Step actions ──
-  const submitCompany = () => run(async () => {
+  // Company + Farm Registry + Boundary Upload used to be three separate steps.
+  // A company almost always onboards with exactly one initial farm, so they're
+  // combined into a single "Organization Setup" step — one submit runs all
+  // three API calls in sequence rather than requiring three separate screens.
+  const submitOrganization = () => run(async () => {
     const allowed_modules = modulesForAccessModel(company.accessModel, company.allowed_crops, companySlug);
     const org = await createOrganization({
       company_name: company.company_name,
@@ -81,7 +86,25 @@ const Onboarding = () => {
       map_center_lat: company.map_center_lat,
       map_center_lon: company.map_center_lon,
     });
-    setDone(d => ({ ...d, org }));
+
+    const createdFarm = await createFarm({
+      company_name: company.company_name,
+      company_id: org.schema_name,
+      farm_name: farm.farm_name,
+      farm_id: farm.farm_id.trim(),
+      parent_farm_id: '',
+      parent_farm_name: '',
+      sensors: farm.sensors,
+      indices: farm.indices,
+      processing_level: farm.processing_level,
+      cloud_cover_threshold: farm.cloud_cover_threshold,
+      start_date: farm.start_date || null,
+      end_date: farm.end_date || null,
+    });
+
+    const boundary = await uploadBoundary(createdFarm.farm_id, boundaryFile);
+
+    setDone(d => ({ ...d, org, farm: createdFarm, boundary }));
     setStep(1);
   });
 
@@ -96,32 +119,6 @@ const Onboarding = () => {
     });
     setDone(d => ({ ...d, credential }));
     setStep(2);
-  });
-
-  const submitFarm = () => run(async () => {
-    const companyId = done.org?.schema_name || companySlug;
-    const created = await createFarm({
-      company_name: company.company_name,
-      company_id: companyId,
-      farm_name: farm.farm_name,
-      farm_id: farm.farm_id.trim(),
-      parent_farm_id: '',
-      parent_farm_name: '',
-      sensors: farm.sensors,
-      indices: farm.indices,
-      processing_level: farm.processing_level,
-      cloud_cover_threshold: farm.cloud_cover_threshold,
-      start_date: farm.start_date || null,
-      end_date: farm.end_date || null,
-    });
-    setDone(d => ({ ...d, farm: created }));
-    setStep(3);
-  });
-
-  const submitBoundary = () => run(async () => {
-    const res = await uploadBoundary(done.farm.farm_id, boundaryFile);
-    setDone(d => ({ ...d, boundary: res }));
-    setStep(4);
   });
 
   const submitConfig = () => run(async () => {
@@ -143,7 +140,7 @@ const Onboarding = () => {
       }
     }
     setDone(d => ({ ...d, config: res, scheduler }));
-    setStep(5);
+    setStep(3);
   });
 
   const copyText = (text) => navigator.clipboard?.writeText(text);
@@ -182,7 +179,7 @@ const Onboarding = () => {
           <Rocket size={20} color="#16a34a" /> Company Onboarding
         </h2>
         <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 600, margin: '4px 0 0' }}>
-          Register a company end-to-end: organization → login credentials → farm → boundary → pipeline config.
+          Register a company end-to-end: organization + farm + boundary → login credentials → pipeline config.
         </p>
       </div>
 
@@ -258,61 +255,9 @@ const Onboarding = () => {
               Only the selected indices show on this company's maps, dropdowns and legends. Leave all unselected to allow everything.
             </p>
           </div>
-          <button onClick={submitCompany} disabled={busy || !company.company_name.trim() || (company.accessModel !== 'organization' && company.allowed_crops.length === 0)} style={primaryBtn(busy || !company.company_name.trim())}>
-            {busy ? 'Creating…' : 'Create Organization'} <ChevronRight size={15} />
-          </button>
-        </div>
-      )}
 
-      {/* ── STEP 2: Credentials ── */}
-      {step === 1 && (
-        <div style={card}>
-          <p style={{ color: '#16a34a', fontSize: '12px', fontWeight: 700, margin: 0 }}>
-            ✓ Organization "{done.org?.display_name}" created ({done.org?.schema_name})
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={labelStyle}>Account Holder Name</label>
-              <input style={inputStyle} placeholder="Full name" value={cred.full_name} onChange={e => setCred(c => ({ ...c, full_name: e.target.value }))} />
-            </div>
-            <div>
-              <label style={labelStyle}>Account Role</label>
-              <select style={inputStyle} value={cred.role} onChange={e => setCred(c => ({ ...c, role: e.target.value }))}>
-                <option value="admin">Admin — full organization access</option>
-                <option value="analyst">Analyst — monitoring & reports</option>
-                <option value="viewer">Viewer — read-only</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label style={labelStyle}>Login Email *</label>
-            <input style={inputStyle} placeholder="Company login email" value={cred.email} onChange={e => setCred(c => ({ ...c, email: e.target.value }))} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={labelStyle}>Access Code (password)</label>
-              <input style={inputStyle} placeholder="Blank = auto-generate" value={cred.access_code} onChange={e => setCred(c => ({ ...c, access_code: e.target.value }))} />
-            </div>
-            <div>
-              <label style={labelStyle}>Label</label>
-              <input style={inputStyle} value={cred.label} onChange={e => setCred(c => ({ ...c, label: e.target.value }))} />
-            </div>
-          </div>
-          <button onClick={submitCredential} disabled={busy || !cred.email.trim()} style={primaryBtn(busy || !cred.email.trim())}>
-            {busy ? 'Creating…' : 'Create Credential'} <ChevronRight size={15} />
-          </button>
-        </div>
-      )}
-
-      {/* ── STEP 3: Farm ── */}
-      {step === 2 && (
-        <div style={card}>
-          {done.credential && (
-            <div style={{ padding: '10px 14px', background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '10px', fontSize: '12px', color: '#166534', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Check size={14} /> Credential created — <strong>{done.credential.email}</strong> / <code>{done.credential.access_code}</code>
-              <button onClick={() => copyText(`${done.credential.email} / ${done.credential.access_code}`)} title="Copy" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#166534', display: 'flex' }}><Copy size={13} /></button>
-            </div>
-          )}
+          <hr style={sectionDividerStyle} />
+          <div style={sectionHeaderStyle}><Layers size={15} color="#16a34a" /> Farm / Estate</div>
           <div>
             <label style={labelStyle}>Farm / Estate Name *</label>
             <input style={inputStyle} placeholder="Farm or estate name" value={farm.farm_name} onChange={e => setFarm(f => ({ ...f, farm_name: e.target.value }))} />
@@ -383,16 +328,9 @@ const Onboarding = () => {
             (e.g. via a preset above) to backfill historical imagery for every sensor and index enabled below —
             not just going forward from today.
           </p>
-          <button onClick={submitFarm} disabled={busy || !farm.farm_name.trim() || farm.sensors.length === 0 || farm.indices.length === 0} style={primaryBtn(busy || !farm.farm_name.trim())}>
-            {busy ? 'Registering…' : 'Register Farm'} <ChevronRight size={15} />
-          </button>
-        </div>
-      )}
 
-      {/* ── STEP 4: Boundary ── */}
-      {step === 3 && (
-        <div style={card}>
-          <p style={{ color: '#16a34a', fontSize: '12px', fontWeight: 700, margin: 0 }}>✓ Farm "{done.farm?.farm_name}" registered ({done.farm?.farm_id})</p>
+          <hr style={sectionDividerStyle} />
+          <div style={sectionHeaderStyle}><Map size={15} color="#16a34a" /> Farm Boundary</div>
           <div>
             <label style={labelStyle}>Boundary GeoJSON *</label>
             <label style={{
@@ -407,19 +345,64 @@ const Onboarding = () => {
               <input type="file" accept=".geojson,.json,application/geo+json" style={{ display: 'none' }} onChange={e => setBoundaryFile(e.target.files?.[0] || null)} />
             </label>
             <p style={{ color: '#64748b', fontSize: '11px', margin: '8px 0 0' }}>
-              Stored at <code style={{ color: '#16a34a' }}>farmintelytics-data/{done.org?.schema_name || companySlug}/staging/inputs/{done.farm?.farm_id}_farm.geojson</code> — exactly where the pipeline reads it.
+              Stored at <code style={{ color: '#16a34a' }}>farmintelytics-data/{companySlug}/staging/inputs/{farm.farm_id.trim() || (companySlug + '_' + (slugify(farm.farm_name) || '…'))}_farm.geojson</code> — exactly where the pipeline reads it.
             </p>
           </div>
-          <button onClick={submitBoundary} disabled={busy || !boundaryFile} style={primaryBtn(busy || !boundaryFile)}>
-            {busy ? 'Uploading…' : 'Upload Boundary'} <ChevronRight size={15} />
+
+          <button
+            onClick={submitOrganization}
+            disabled={busy || !company.company_name.trim() || (company.accessModel !== 'organization' && company.allowed_crops.length === 0) || !farm.farm_name.trim() || farm.sensors.length === 0 || farm.indices.length === 0 || !boundaryFile}
+            style={primaryBtn(busy || !company.company_name.trim())}
+          >
+            {busy ? 'Creating…' : 'Create Organization + Farm'} <ChevronRight size={15} />
           </button>
         </div>
       )}
 
-      {/* ── STEP 5: Pipeline config ── */}
-      {step === 4 && (
+      {/* ── STEP 2: Credentials ── */}
+      {step === 1 && (
         <div style={card}>
-          <p style={{ color: '#16a34a', fontSize: '12px', fontWeight: 700, margin: 0 }}>✓ Boundary uploaded to MinIO ({done.boundary?.minio_path})</p>
+          <p style={{ color: '#16a34a', fontSize: '12px', fontWeight: 700, margin: 0 }}>
+            ✓ Organization "{done.org?.display_name}" created ({done.org?.schema_name})
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={labelStyle}>Account Holder Name</label>
+              <input style={inputStyle} placeholder="Full name" value={cred.full_name} onChange={e => setCred(c => ({ ...c, full_name: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Account Role</label>
+              <select style={inputStyle} value={cred.role} onChange={e => setCred(c => ({ ...c, role: e.target.value }))}>
+                <option value="admin">Admin — full organization access</option>
+                <option value="analyst">Analyst — monitoring & reports</option>
+                <option value="viewer">Viewer — read-only</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Login Email *</label>
+            <input style={inputStyle} placeholder="Company login email" value={cred.email} onChange={e => setCred(c => ({ ...c, email: e.target.value }))} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={labelStyle}>Access Code (password)</label>
+              <input style={inputStyle} placeholder="Blank = auto-generate" value={cred.access_code} onChange={e => setCred(c => ({ ...c, access_code: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Label</label>
+              <input style={inputStyle} value={cred.label} onChange={e => setCred(c => ({ ...c, label: e.target.value }))} />
+            </div>
+          </div>
+          <button onClick={submitCredential} disabled={busy || !cred.email.trim()} style={primaryBtn(busy || !cred.email.trim())}>
+            {busy ? 'Creating…' : 'Create Credential'} <ChevronRight size={15} />
+          </button>
+        </div>
+      )}
+
+      {/* ── STEP 3: Pipeline config ── */}
+      {step === 2 && (
+        <div style={card}>
+          <p style={{ color: '#16a34a', fontSize: '12px', fontWeight: 700, margin: 0 }}>✓ Organization "{done.org?.display_name}" + farm "{done.farm?.farm_name}" + boundary all set up</p>
           <p style={{ color: '#475569', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
             Generate the pipeline batch config for this farm. It is written straight into the shared
             <code style={{ color: '#16a34a' }}> configs/</code> folder the data pipeline and scheduler read, using the sensors,
@@ -445,7 +428,7 @@ const Onboarding = () => {
       )}
 
       {/* ── DONE ── */}
-      {step === 5 && (
+      {step === 3 && (
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
