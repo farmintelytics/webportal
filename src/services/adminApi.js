@@ -211,6 +211,10 @@ export async function fetchMinioInventory(companyId, farmId) {
   return adminFetch(`/minio/inventory${qs}`);
 }
 
+export async function fetchMinioObjectContent(key) {
+  return adminFetch(`/minio/object-content?key=${encodeURIComponent(key)}`);
+}
+
 export async function syncDatabaseWithMinio() {
   return adminFetch('/minio/sync-database', { method: 'POST' });
 }

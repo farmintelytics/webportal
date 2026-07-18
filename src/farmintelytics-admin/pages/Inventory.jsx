@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Database, RefreshCw, Trash2, AlertCircle, CheckCircle, Search, FileJson, Layers, Building2, Server, HelpCircle, HardDrive, X } from 'lucide-react';
-import { fetchOrganizations, fetchFarms, fetchMinioInventory, syncDatabaseWithMinio, deleteMinioObject } from '../../services/adminApi';
+import { Database, RefreshCw, Trash2, AlertCircle, CheckCircle, Search, FileJson, Layers, Building2, Server, HelpCircle, HardDrive, X, Eye, Copy } from 'lucide-react';
+import { fetchOrganizations, fetchFarms, fetchMinioInventory, syncDatabaseWithMinio, deleteMinioObject, fetchMinioObjectContent } from '../../services/adminApi';
+
+const VIEWABLE_SUFFIXES = ['.json', '.geojson', '.yaml', '.yml', '.txt', '.csv'];
+const isViewable = (key) => VIEWABLE_SUFFIXES.some(sfx => key.toLowerCase().endsWith(sfx));
 
 const Inventory = () => {
   const [orgs, setOrgs] = useState([]);
@@ -17,6 +20,11 @@ const Inventory = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [syncStats, setSyncStats] = useState(null);
+
+  const [viewFile, setViewFile] = useState(null);
+  const [viewContent, setViewContent] = useState('');
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState('');
 
   // Load organizations, farms, and MinIO inventory
   const loadData = async () => {
@@ -63,6 +71,27 @@ const Inventory = () => {
       setError(e.message);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // Handle viewing a JSON/GeoJSON/text object's content
+  const handleViewObject = async (file) => {
+    setViewFile(file);
+    setViewContent('');
+    setViewError('');
+    setViewLoading(true);
+    try {
+      const res = await fetchMinioObjectContent(file.key);
+      // Pretty-print JSON/GeoJSON; other text types render as-is.
+      let content = res.content;
+      if (file.key.toLowerCase().endsWith('.json') || file.key.toLowerCase().endsWith('.geojson')) {
+        try { content = JSON.stringify(JSON.parse(res.content), null, 2); } catch (_) { /* not valid JSON — show raw */ }
+      }
+      setViewContent(content);
+    } catch (e) {
+      setViewError(e.message);
+    } finally {
+      setViewLoading(false);
     }
   };
 
@@ -464,13 +493,24 @@ const Inventory = () => {
                       <td style={{ padding: '12px 8px', fontSize: '11px', fontFamily: 'monospace', color: '#475569' }}>{formatSize(file.size_bytes)}</td>
                       <td style={{ padding: '12px 8px', fontSize: '11px', color: '#64748b' }}>{new Date(file.last_modified).toLocaleString()}</td>
                       <td style={{ padding: '12px 8px', textAlign: 'right' }}>
-                        <button 
-                          onClick={() => handleDeleteObject(file.key)}
-                          style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.1)', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#ef4444', display: 'inline-flex', alignItems: 'center' }}
-                          title="Delete Object from MinIO"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: '6px' }}>
+                          {isViewable(file.key) && (
+                            <button
+                              onClick={() => handleViewObject(file)}
+                              style={{ background: 'rgba(37,99,235,0.05)', border: '1px solid rgba(37,99,235,0.15)', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#2563eb', display: 'inline-flex', alignItems: 'center' }}
+                              title="View file content"
+                            >
+                              <Eye size={13} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteObject(file.key)}
+                            style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.1)', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#ef4444', display: 'inline-flex', alignItems: 'center' }}
+                            title="Delete Object from MinIO"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -480,6 +520,52 @@ const Inventory = () => {
           </div>
         )}
       </div>
+
+      {viewFile && (
+        <div
+          onClick={() => setViewFile(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '760px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e2e8f0' }}
+          >
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <FileJson size={16} color="#2563eb" />
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', wordBreak: 'break-all' }}>{viewFile.key}</div>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+                {viewContent && (
+                  <button
+                    onClick={() => navigator.clipboard?.writeText(viewContent)}
+                    title="Copy content"
+                    style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#475569', display: 'inline-flex' }}
+                  >
+                    <Copy size={13} />
+                  </button>
+                )}
+                <button
+                  onClick={() => setViewFile(null)}
+                  style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#475569', display: 'inline-flex' }}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+            <div style={{ padding: '16px 20px', overflow: 'auto', flex: 1 }}>
+              {viewLoading && <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', fontSize: '13px' }}>Loading…</div>}
+              {viewError && (
+                <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '13px' }}>
+                  {viewError}
+                </div>
+              )}
+              {!viewLoading && !viewError && (
+                <pre style={{ margin: 0, fontSize: '11.5px', lineHeight: 1.6, color: '#0f172a', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{viewContent}</pre>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .animate-spin { animation: spin 1s linear infinite; }
