@@ -11,7 +11,7 @@ const CROP_LABELS = {
   rubber: 'Rubber', cassava: 'Cassava', sugarcane: 'Sugarcane', cashew: 'Cashew',
 };
 const ALL_SENSORS = ['sentinel-2', 'sentinel-1', 'landsat-9'];
-const ALL_INDICES = ['NDVI', 'EVI', 'NDMI', 'RECI', 'NDWI', 'LSWI', 'LAI', 'NDRE', 'CVI', 'SAVI', 'MSI', 'GNDVI', 'ETC'];
+const ALL_INDICES = ['NDVI', 'EVI', 'NDMI', 'RECI', 'NDWI', 'LSWI', 'LAI', 'NDRE', 'CVI', 'SAVI', 'MSI', 'GNDVI', 'ETC', 'LST', 'SMI_LANDSAT'];
 
 const STEPS = [
   { id: 'company', label: 'Company', icon: Building2 },
