@@ -1789,6 +1789,18 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   //   org  mode — every index actually present in the tenant's archive, with
   //               the generic scientific classes.
   // Normalising here means one card implementation, not two.
+  // Org mode has no crop context, so indices are grouped from their
+  // crop-agnostic INDEX_REGISTRY tags rather than the crop-specific
+  // crop_group the backend computes for crop mode (see below).
+  const groupFromTags = (tags = []) => {
+    const t = tags.map(x => String(x).toLowerCase());
+    if (t.some(x => ['sar', 'radar'].includes(x))) return 'Radar (SAR)';
+    if (t.some(x => ['water', 'moisture', 'water-stress', 'canopy-water', 'flood', 'paddy',
+      'irrigation', 'drought', 'evapotranspiration', 'soil-water', 'soil-moisture'].includes(x))) return 'Water & Moisture';
+    if (t.some(x => ['chlorophyll', 'nitrogen', 'nutrient', 'phenology'].includes(x))) return 'Nutrient & Chlorophyll';
+    return 'Vegetation Health';
+  };
+
   const legendEntries = useMemo(() => {
     if (isOrg) {
       return availableIndices.map(ix => {
@@ -1803,6 +1815,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
           notes: '',
           hasData: true,
           ramp: [ix.lo, ix.hi],
+          group: groupFromTags(ix.tags),
         };
       });
     }
@@ -1815,18 +1828,38 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
       notes: entry.notes || '',
       hasData: availableIndices.some(i => String(i.index).toLowerCase() === entry.key),
       ramp: null,
+      group: entry.crop_group || 'General',
     }));
   }, [isOrg, availableIndices, cropProfileEntries]);
+
+  const legendGroups = useMemo(() => {
+    const groups = {};
+    legendEntries.forEach(entry => {
+      const g = entry.group || 'General';
+      (groups[g] = groups[g] || []).push(entry);
+    });
+    return groups;
+  }, [legendEntries]);
+
+  // Group headers collapsed by default except the first, so the panel
+  // isn't a wall of text on first open.
+  const [expandedLegendGroups, setExpandedLegendGroups] = useState(null);
+  const toggleLegendGroup = (name) => setExpandedLegendGroups(prev => {
+    const current = prev || Object.keys(legendGroups).slice(0, 1);
+    return current.includes(name) ? current.filter(g => g !== name) : [...current, name];
+  });
 
   const emptyLegendMessage = isOrg
     ? 'No satellite indices in the archive yet (No data).'
     : "Crop index profile unavailable — connect to the backend to load this crop's legends.";
 
   // Reused by every map section's Map Layers sidebar. The switch puts that
-  // index's raster ON the map — one raster at a time.
-  const renderLegendCards = () => (
-    <>
-      {legendEntries.map(entry => {
+  // index's raster ON the map — one raster at a time. Cards are grouped
+  // under a named category (Vegetation Health, Water & Moisture, Nutrient &
+  // Chlorophyll, Radar (SAR), ...) instead of one flat list — see
+  // legendGroups above, sourced from crop_group (crop mode) or INDEX_REGISTRY
+  // tags (org mode).
+  const renderLegendCard = (entry) => {
         const isSelected = (selectedIndex || '').toLowerCase() === entry.key;
         const isOnMap = isSelected && showRasterLayer;
         const isOpen = isOnMap || expandedLegendKeys.includes(entry.key);
@@ -1884,12 +1917,37 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
             )}
           </div>
         );
-      })}
-      {legendEntries.length === 0 && (
-        <p className="text-[10px] text-gray-400 px-1">{emptyLegendMessage}</p>
-      )}
-    </>
-  );
+  };
+
+  const renderLegendCards = () => {
+    const groupNames = Object.keys(legendGroups);
+    const openGroups = expandedLegendGroups || groupNames.slice(0, 1);
+    return (
+      <>
+        {groupNames.map(name => {
+          const entries = legendGroups[name];
+          const isOpen = openGroups.includes(name);
+          const onMapCount = entries.filter(e => (selectedIndex || '').toLowerCase() === e.key && showRasterLayer).length;
+          return (
+            <div key={name} className="space-y-2.5">
+              <div
+                onClick={() => toggleLegendGroup(name)}
+                className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest cursor-pointer select-none transition-colors"
+              >
+                {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {name}
+                <span className="font-semibold normal-case tracking-normal text-gray-300">({entries.length})</span>
+                {onMapCount > 0 && <span className="text-[8px] font-black uppercase tracking-wider text-green-700 bg-green-50 border border-green-200 rounded-full px-1.5 py-0.5">On Map</span>}
+              </div>
+              {isOpen && <div className="space-y-3">{entries.map(entry => renderLegendCard(entry))}</div>}
+            </div>
+          );
+        })}
+        {legendEntries.length === 0 && (
+          <p className="text-[10px] text-gray-400 px-1">{emptyLegendMessage}</p>
+        )}
+      </>
+    );
+  };
 
   const [healthOpExpanded, setHealthOpExpanded] = useState(false);
   const [healthBioExpanded, setHealthBioExpanded] = useState(true);
