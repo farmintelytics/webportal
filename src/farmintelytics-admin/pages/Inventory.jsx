@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Database, RefreshCw, Trash2, AlertCircle, CheckCircle, Search, FileJson, Layers, Building2, Server, HelpCircle, HardDrive, X, Eye, Copy } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Database, RefreshCw, Trash2, AlertCircle, CheckCircle, Search, FileJson, Layers, Building2, Server, HelpCircle, HardDrive, X, Eye, Copy, Activity } from 'lucide-react';
 import { fetchOrganizations, fetchFarms, fetchMinioInventory, syncDatabaseWithMinio, deleteMinioObject, fetchMinioObjectContent } from '../../services/adminApi';
 
 const VIEWABLE_SUFFIXES = ['.json', '.geojson', '.yaml', '.yml', '.txt', '.csv'];
 const isViewable = (key) => VIEWABLE_SUFFIXES.some(sfx => key.toLowerCase().endsWith(sfx));
+// execution_logs/ objects are the same data the Logs page parses into rows —
+// route there instead of duplicating a raw-JSON view of it here.
+const isExecutionLog = (key) => key.startsWith('execution_logs/');
 
 const Inventory = () => {
+  const navigate = useNavigate();
   const [orgs, setOrgs] = useState([]);
   const [farms, setFarms] = useState([]);
   const [minioFiles, setMinioFiles] = useState([]);
@@ -494,7 +499,15 @@ const Inventory = () => {
                       <td style={{ padding: '12px 8px', fontSize: '11px', color: '#64748b' }}>{new Date(file.last_modified).toLocaleString()}</td>
                       <td style={{ padding: '12px 8px', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: '6px' }}>
-                          {isViewable(file.key) && (
+                          {isExecutionLog(file.key) ? (
+                            <button
+                              onClick={() => navigate('/admin/logs', { state: { tab: 'pipeline', highlightKey: file.key } })}
+                              style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#7c3aed', display: 'inline-flex', alignItems: 'center' }}
+                              title="Open in Logs — parsed view of this execution log"
+                            >
+                              <Activity size={13} />
+                            </button>
+                          ) : isViewable(file.key) && (
                             <button
                               onClick={() => handleViewObject(file)}
                               style={{ background: 'rgba(37,99,235,0.05)', border: '1px solid rgba(37,99,235,0.15)', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#2563eb', display: 'inline-flex', alignItems: 'center' }}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Activity, RefreshCw, X, AlertCircle, CheckCircle2, Clock,
   Loader2, AlertTriangle, Terminal, ChevronRight,
@@ -64,7 +65,7 @@ const SummaryCard = ({ icon: Icon, label, value, color }) => (
 // detail (including the raw JSON that used to grow the row inline) opens
 // in a separate modal instead, so a long path or error message can never
 // crowd/overlap a neighbouring row.
-const PipelineLogRow = ({ log, idx, onOpen }) => {
+const PipelineLogRow = ({ log, idx, onOpen, highlighted }) => {
   const status = log.status || (log.error ? 'failed' : 'completed');
   const cfg = getStatus(status);
   const hasFailed = status === 'failed' || !!log.error;
@@ -76,9 +77,10 @@ const PipelineLogRow = ({ log, idx, onOpen }) => {
       onClick={() => onOpen(log, idx)}
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '14px 16px', background: '#ffffff', cursor: 'pointer',
-        textAlign: 'left', border: `1px solid ${hasFailed ? 'rgba(220,38,38,0.25)' : '#e2e8f0'}`,
+        padding: '14px 16px', background: highlighted ? 'rgba(37,99,235,0.05)' : '#ffffff', cursor: 'pointer',
+        textAlign: 'left', border: `1px solid ${highlighted ? 'rgba(37,99,235,0.4)' : hasFailed ? 'rgba(220,38,38,0.25)' : '#e2e8f0'}`,
         borderLeft: `4px solid ${cfg.color}`, borderRadius: '12px',
+        boxShadow: highlighted ? '0 0 0 1px rgba(37,99,235,0.15)' : 'none',
       }}
     >
       <StatusDot status={status} />
@@ -163,7 +165,11 @@ const PipelineLogModal = ({ log, idx, onClose }) => {
 };
 
 const Logs = () => {
-  const [activeTab, setActiveTab] = useState('jobs');
+  const location = useLocation();
+  // Arriving from the MinIO explorer's "Open in Logs" action lands directly
+  // on the structured pipeline tab instead of the raw JSON that file holds.
+  const [activeTab, setActiveTab] = useState(location.state?.tab === 'pipeline' ? 'pipeline' : 'jobs');
+  const [highlightKey] = useState(location.state?.highlightKey || '');
   const [jobs, setJobs] = useState([]);
   const [pipelineLogs, setPipelineLogs] = useState([]);
   const [total, setTotal] = useState(0);
@@ -385,7 +391,7 @@ const Logs = () => {
             </div>
           ) : (
             <>
-              {pipelineLogs.map((log, i) => <PipelineLogRow key={i} log={log} idx={i} onOpen={(l, idx) => setOpenLog({ log: l, idx })} />)}
+              {pipelineLogs.map((log, i) => <PipelineLogRow key={i} log={log} idx={i} onOpen={(l, idx) => setOpenLog({ log: l, idx })} highlighted={!!highlightKey && log._minio_path === highlightKey} />)}
               {pipelineLogs.length >= pipelineLimit && (
                 <button
                   onClick={loadMorePipeline}
