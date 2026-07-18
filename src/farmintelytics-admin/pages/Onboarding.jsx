@@ -360,7 +360,29 @@ const Onboarding = () => {
               <input type="date" style={inputStyle} value={farm.end_date} onChange={e => setFarm(f => ({ ...f, end_date: e.target.value }))} />
             </div>
           </div>
-          <p style={{ color: '#64748b', fontSize: '11px', margin: 0 }}>Leave dates blank — the scheduler computes the rolling window automatically.</p>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {[1, 2, 3, 6].map(months => (
+              <button
+                key={months}
+                type="button"
+                onClick={() => {
+                  const end = new Date();
+                  const start = new Date();
+                  start.setMonth(start.getMonth() - months);
+                  const iso = d => d.toISOString().slice(0, 10);
+                  setFarm(f => ({ ...f, start_date: iso(start), end_date: iso(end) }));
+                }}
+                style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '6px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#334155', cursor: 'pointer' }}
+              >
+                Backfill {months}mo
+              </button>
+            ))}
+          </div>
+          <p style={{ color: '#64748b', fontSize: '11px', margin: 0 }}>
+            Leave dates blank for the scheduler's automatic rolling window, or set a start date in the past
+            (e.g. via a preset above) to backfill historical imagery for every sensor and index enabled below —
+            not just going forward from today.
+          </p>
           <button onClick={submitFarm} disabled={busy || !farm.farm_name.trim() || farm.sensors.length === 0 || farm.indices.length === 0} style={primaryBtn(busy || !farm.farm_name.trim())}>
             {busy ? 'Registering…' : 'Register Farm'} <ChevronRight size={15} />
           </button>
