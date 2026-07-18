@@ -254,7 +254,7 @@ const OrgModal = ({ org, onSave, onClose }) => {
         <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
           <button onClick={onClose} style={{ flex: 1, padding: '12px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '12px', color: '#334155', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>Cancel</button>
           <button onClick={handleSave} disabled={saving || !form.company_name.trim()} style={{
-            flex: 2, padding: '12px', background: 'linear-gradient(135deg, #16a34a, #15803d)', border: 'none', borderRadius: '12px',
+            flex: 2, padding: '12px', background: '#15803d', border: 'none', borderRadius: '12px',
             color: 'white', cursor: 'pointer', fontWeight: 800, fontSize: '13px', opacity: saving ? 0.6 : 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
           }}>
@@ -312,7 +312,7 @@ const Organizations = () => {
         </div>
         <button onClick={() => setModal({ org: null })} style={{
           display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px',
-          background: 'linear-gradient(135deg, #16a34a, #15803d)', border: 'none', borderRadius: '10px',
+          background: '#15803d', border: 'none', borderRadius: '10px',
           color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
           boxShadow: '0 4px 16px rgba(22,163,74,0.2)',
         }}>

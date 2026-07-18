@@ -157,7 +157,7 @@ const Boundaries = () => {
             onClick={handleUpload}
             disabled={!file || !selectedFarm || uploading}
             style={{
-              padding: '14px', background: !file || !selectedFarm ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg, #16a34a, #15803d)',
+              padding: '14px', background: !file || !selectedFarm ? 'rgba(255,255,255,0.04)' : '#15803d',
               border: `1px solid ${!file || !selectedFarm ? 'rgba(255,255,255,0.07)' : 'transparent'}`,
               borderRadius: '12px', color: !file || !selectedFarm ? '#374151' : 'white',
               fontSize: '13px', fontWeight: 800, cursor: !file || !selectedFarm ? 'not-allowed' : 'pointer',

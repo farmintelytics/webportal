@@ -174,7 +174,7 @@ const PipelineConfig = () => {
         </div>
         <button onClick={handleCreateNew} style={{
           display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px',
-          background: 'linear-gradient(135deg, #16a34a, #15803d)', border: 'none', borderRadius: '10px',
+          background: '#15803d', border: 'none', borderRadius: '10px',
           color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
         }}>
           <Plus size={16} />Create New Config
@@ -290,7 +290,7 @@ const PipelineConfig = () => {
             )}
 
             <button onClick={handleSave} disabled={saving} style={{
-              marginTop: 'auto', padding: '12px', background: 'linear-gradient(135deg, #16a34a, #15803d)', border: 'none', borderRadius: '12px',
+              marginTop: 'auto', padding: '12px', background: '#15803d', border: 'none', borderRadius: '12px',
               color: 'white', cursor: 'pointer', fontWeight: 800, fontSize: '13px', opacity: saving ? 0.6 : 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexShrink: 0,
             }}>

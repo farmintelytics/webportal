@@ -174,7 +174,7 @@ const UsersPage = () => {
           <button onClick={load} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', color: '#475569', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
             <RefreshCw size={13} /> Refresh
           </button>
-          <button onClick={() => { setShowForm(true); setEditUser(null); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: 'linear-gradient(135deg,#0f172a,#1e293b)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={() => { setShowForm(true); setEditUser(null); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: '#0f172a', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
             <Plus size={15} /> New User
           </button>
         </div>
@@ -245,7 +245,7 @@ const UsersPage = () => {
             <input type="checkbox" id="is_staff" checked={form.is_staff} onChange={e => setForm(f => ({ ...f, is_staff: e.target.checked }))} style={{ accentColor: '#0f172a' }} />
             <label htmlFor="is_staff" style={{ fontSize: '12px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}>Django Staff access (Django Admin panel)</label>
           </div>
-          <button onClick={handleCreate} disabled={saving || !form.email} style={{ padding: '11px 24px', background: 'linear-gradient(135deg,#0f172a,#1e293b)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: saving ? 0.6 : 1 }}>
+          <button onClick={handleCreate} disabled={saving || !form.email} style={{ padding: '11px 24px', background: '#0f172a', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: saving ? 0.6 : 1 }}>
             {saving ? <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <><Shield size={14} />Create Account</>}
           </button>
         </div>
@@ -273,7 +273,7 @@ const UsersPage = () => {
             <input type="checkbox" id="edit_staff" checked={!!editUser.is_staff} onChange={e => setEditUser(u => ({ ...u, is_staff: e.target.checked }))} style={{ accentColor: '#0f172a' }} />
             <label htmlFor="edit_staff" style={{ fontSize: '12px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}>Django Staff access</label>
           </div>
-          <button onClick={handleUpdate} disabled={saving} style={{ padding: '11px 24px', background: 'linear-gradient(135deg,#0f172a,#1e293b)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: saving ? 0.6 : 1 }}>
+          <button onClick={handleUpdate} disabled={saving} style={{ padding: '11px 24px', background: '#0f172a', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: saving ? 0.6 : 1 }}>
             {saving ? <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <><Check size={14} />Save Changes</>}
           </button>
         </div>

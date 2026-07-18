@@ -36,7 +36,7 @@ const chip = (active, color = '#16a34a') => ({
 });
 const primaryBtn = (disabled) => ({
   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 24px',
-  background: 'linear-gradient(135deg, #16a34a, #15803d)', border: 'none', borderRadius: '12px',
+  background: '#15803d', border: 'none', borderRadius: '12px',
   color: 'white', cursor: disabled ? 'default' : 'pointer', fontWeight: 800, fontSize: '13px',
   opacity: disabled ? 0.5 : 1,
 });

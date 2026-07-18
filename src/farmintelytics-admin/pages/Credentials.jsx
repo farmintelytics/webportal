@@ -60,7 +60,7 @@ const Credentials = () => {
           <h2 style={{ color: '#0f172a', fontSize: '20px', fontWeight: 800, margin: 0 }}>Credentials</h2>
           <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 600, margin: '4px 0 0' }}>Manage tenant login email / access-code pairs</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', background: 'linear-gradient(135deg, #16a34a, #15803d)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(22,163,74,0.25)' }}>
+        <button onClick={() => setShowForm(!showForm)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', background: '#15803d', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(22,163,74,0.25)' }}>
           <Plus size={16} />{showForm ? 'Cancel' : 'New Credential'}
         </button>
       </div>
@@ -112,7 +112,7 @@ const Credentials = () => {
               <input style={inputStyle} placeholder="Auto-generated if blank" value={form.access_code} onChange={e => setForm(f => ({ ...f, access_code: e.target.value }))} />
             </div>
           </div>
-          <button onClick={handleCreate} disabled={saving || !form.company_id || !form.email} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #16a34a, #15803d)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: saving ? 0.6 : 1 }}>
+          <button onClick={handleCreate} disabled={saving || !form.company_id || !form.email} style={{ padding: '12px 24px', background: '#15803d', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: saving ? 0.6 : 1 }}>
             {saving ? <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <><Check size={15} />Generate Credential</>}
           </button>
         </div>

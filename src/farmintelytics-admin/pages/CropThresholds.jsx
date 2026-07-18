@@ -98,7 +98,7 @@ const IndexCard = ({ item, cropType, companyId, onSaved, onError }) => {
           )}
           <button onClick={handleSave} disabled={busy || !dirty}
             style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 12px', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: 800, cursor: dirty ? 'pointer' : 'default',
-              background: savedFlash ? '#16a34a' : dirty ? 'linear-gradient(135deg, #16a34a, #15803d)' : '#e2e8f0',
+              background: savedFlash ? '#16a34a' : dirty ? '#15803d' : '#e2e8f0',
               color: dirty || savedFlash ? 'white' : '#94a3b8' }}>
             <Check size={12} />{savedFlash ? 'Saved' : busy ? 'Saving…' : 'Save'}
           </button>

@@ -176,7 +176,7 @@ const AdminLogin = () => {
             {/* Submit */}
             <button type="submit" disabled={loading} style={{
               width: '100%', padding: '16px',
-              background: loading ? 'rgba(22,163,74,0.5)' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+              background: loading ? 'rgba(22,163,74,0.5)' : '#15803d',
               border: 'none', borderRadius: '14px',
               color: 'white', fontSize: '13px', fontWeight: 800,
               letterSpacing: '0.12em', textTransform: 'uppercase',
