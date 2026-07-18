@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Wheat, AlertCircle, Search, Layers, UploadCloud, RefreshCw } from 'lucide-react';
+import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Wheat, AlertCircle, Search, Layers, UploadCloud, RefreshCw, Settings, Save, Sparkles } from 'lucide-react';
 import {
   fetchOrganizations, createOrganization, updateOrganization, deleteOrganization,
   fetchFarms, createFarm, deleteFarm, uploadBoundary,
+  generateFarmConfig, fetchPipelineConfigContent, savePipelineConfig,
 } from '../../services/adminApi';
 
 const ALL_CROPS = ['ffb', 'maize', 'rice', 'cocoa', 'rubber', 'cassava', 'sugarcane', 'cashew'];
@@ -348,9 +349,126 @@ const QuickAddFarmForm = ({ org, onSave, onCancel }) => {
   );
 };
 
+// Per-farm pipeline config editor. Each farm's YAML lives at
+// "{farm_id}_config.yaml" in the shared configs folder (same one the
+// Scheduler's config dropdown reads from) — this is the one place an admin
+// edits it, no separate global "Configs Builder" page needed.
+const FarmConfigModal = ({ farm, onClose }) => {
+  const filename = `${farm.farm_id}_config.yaml`;
+  const [content, setContent] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [exists, setExists] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await fetchPipelineConfigContent(filename);
+      setContent(data.content);
+      setExists(true);
+    } catch (e) {
+      setExists(false);
+      setContent('');
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(); }, [farm.farm_id]);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setError('');
+    setMessage('');
+    try {
+      const data = await generateFarmConfig(farm.farm_id);
+      setContent(data.content);
+      setExists(true);
+      setMessage('Generated from this farm\'s current settings.');
+    } catch (e) { setError(e.message); }
+    finally { setGenerating(false); }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      await savePipelineConfig({ filename, content });
+      setExists(true);
+      setMessage('Config saved.');
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: '640px', maxHeight: '85vh', background: '#ffffff',
+        border: '1px solid #e2e8f0', borderRadius: '18px', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 60px rgba(15,23,42,0.2)', overflow: 'hidden',
+      }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Settings size={16} color="#16a34a" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ color: '#0f172a', fontSize: '13px', fontWeight: 800, margin: 0 }}>{farm.farm_name} — Pipeline Config</p>
+            <p style={{ color: '#64748b', fontSize: '11px', fontWeight: 600, margin: '2px 0 0', fontFamily: 'monospace' }}>{filename}</p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#475569', display: 'flex' }}><X size={14} /></button>
+        </div>
+
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1 }}>
+          {error && (
+            <div style={{ padding: '10px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '12px' }}>{error}</div>
+          )}
+          {message && (
+            <div style={{ padding: '10px 14px', background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '10px', color: '#16a34a', fontSize: '12px' }}>{message}</div>
+          )}
+
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '12px' }}>Loading…</div>
+          ) : !exists && !content ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+              <span>No config generated for this farm yet.</span>
+              <button onClick={handleGenerate} disabled={generating} style={{
+                display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px',
+                background: '#15803d', border: 'none', borderRadius: '10px', color: 'white',
+                fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: generating ? 0.6 : 1,
+              }}><Sparkles size={13} />{generating ? 'Generating…' : 'Generate from farm settings'}</button>
+            </div>
+          ) : (
+            <>
+              <textarea value={content} onChange={e => setContent(e.target.value)} style={{
+                width: '100%', minHeight: '320px', padding: '14px', background: '#f8fafc', border: '1px solid #cbd5e1',
+                borderRadius: '10px', color: '#15803d', fontFamily: 'monospace', fontSize: '12px', outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+              }} />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={handleGenerate} disabled={generating} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 14px',
+                  background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', color: '#334155',
+                  fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: generating ? 0.6 : 1,
+                }}><Sparkles size={13} />{generating ? 'Regenerating…' : 'Regenerate from farm settings'}</button>
+                <button onClick={handleSave} disabled={saving} style={{
+                  marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px',
+                  background: '#15803d', border: 'none', borderRadius: '10px', color: 'white',
+                  fontSize: '12px', fontWeight: 800, cursor: 'pointer', opacity: saving ? 0.6 : 1,
+                }}><Save size={13} />{saving ? 'Saving…' : 'Save Config'}</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FarmRow = ({ farm, onDelete, onReupload }) => {
   const fileRef = React.useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -375,6 +493,11 @@ const FarmRow = ({ farm, onDelete, onReupload }) => {
         }}>
           {farm.boundary_uploaded ? '✓ Boundary' : '✗ No Boundary'}
         </span>
+        <button onClick={() => setConfigOpen(true)}
+          title="Edit pipeline config"
+          style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '7px', padding: '5px', cursor: 'pointer', color: '#16a34a', display: 'flex' }}>
+          <Settings size={13} />
+        </button>
         <button onClick={() => fileRef.current?.click()} disabled={uploading}
           title={farm.boundary_uploaded ? 'Re-upload boundary' : 'Upload boundary'}
           style={{ background: '#eff6ff', border: '1px solid rgba(37,99,235,0.2)', borderRadius: '7px', padding: '5px', cursor: 'pointer', color: '#2563eb', display: 'flex' }}>
@@ -385,6 +508,7 @@ const FarmRow = ({ farm, onDelete, onReupload }) => {
           <Trash2 size={13} />
         </button>
       </div>
+      {configOpen && <FarmConfigModal farm={farm} onClose={() => setConfigOpen(false)} />}
     </div>
   );
 };

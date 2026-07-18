@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import {
   Building2, Key, Activity, LayoutDashboard, LogOut,
   ChevronRight, Shield, Menu, X,
-  Clock, Settings, Database, Users, Rocket, SlidersHorizontal,
+  Clock, Database, Users, Rocket, SlidersHorizontal,
 } from 'lucide-react';
 
 import Onboarding from './pages/Onboarding';
@@ -12,7 +12,6 @@ import Organizations from './pages/Organizations';
 import Credentials from './pages/Credentials';
 import Logs from './pages/Logs';
 import Scheduler from './pages/Scheduler';
-import PipelineConfig from './pages/PipelineConfig';
 import Inventory from './pages/Inventory';
 import UsersPage from './pages/Users';
 
@@ -24,7 +23,6 @@ const NAV_ITEMS = [
   { id: 'credentials',  label: 'Credentials',      icon: Key,       path: '/admin/credentials' },
   { id: 'scheduler',    label: 'Scheduler',        icon: Clock,     path: '/admin/scheduler' },
   { id: 'thresholds',   label: 'Crop Thresholds',  icon: SlidersHorizontal, path: '/admin/thresholds' },
-  { id: 'configs',      label: 'Configs Builder',  icon: Settings,  path: '/admin/configs' },
   { id: 'logs',         label: 'Logs',             icon: Activity,  path: '/admin/logs' },
 ];
 
@@ -200,7 +198,6 @@ const AdminPortal = () => {
             <Route path="credentials"   element={<Credentials />} />
             <Route path="scheduler"     element={<Scheduler />} />
             <Route path="thresholds"    element={<CropThresholds />} />
-            <Route path="configs"       element={<PipelineConfig />} />
             <Route path="logs"          element={<Logs />} />
           </Routes>
         </div>
