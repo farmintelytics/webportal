@@ -1869,6 +1869,17 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   <span className="text-[10px] text-gray-400">Continuous colour ramp ({entry.ramp[0]} to {entry.ramp[1]})</span>
                 )}
                 {entry.notes && <p className="text-[10px] text-gray-400 leading-snug pt-1 border-t border-gray-50">{entry.notes}</p>}
+                {isOnMap && (
+                  <div className="pt-1.5 border-t border-gray-50">
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                      <span>Layer Transparency</span>
+                      <span>{mapOpacity}%</span>
+                    </div>
+                    <input type="range" min="10" max="100" value={mapOpacity}
+                      onChange={e => setMapOpacity(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-green-600" />
+                  </div>
+                )}
               </div>
             )}
           </div>
