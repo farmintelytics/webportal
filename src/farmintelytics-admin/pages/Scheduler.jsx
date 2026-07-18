@@ -21,9 +21,21 @@ const JobModal = ({ job, configs, onSave, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Not a full cron parser — just catches the common mistakes (wrong number
+  // of fields, stray characters) before a bad expression round-trips to the
+  // server and comes back as a raw error message.
+  const isValidCron = (expr) => {
+    const parts = expr.trim().split(/\s+/);
+    return parts.length === 5 && parts.every(p => /^[0-9*/,\-]+$/.test(p));
+  };
+
   const handleSave = async () => {
     if (!form.name.trim() || !form.cron.trim() || !form.config_path.trim()) {
       setError('Please fill in all required fields.');
+      return;
+    }
+    if (!isValidCron(form.cron)) {
+      setError('Cron expression looks off — it needs 5 space-separated fields, e.g. "0 3 */5 * *".');
       return;
     }
     setSaving(true);

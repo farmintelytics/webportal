@@ -176,11 +176,6 @@ const AdminPortal = () => {
               );
             })()}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              System Online
-            </span>
-          </div>
         </div>
 
         {/* Page content */}

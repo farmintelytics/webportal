@@ -104,10 +104,6 @@ export async function uploadBoundary(farmId, file) {
   return adminUpload(`/boundaries/${farmId}`, form);
 }
 
-export async function getBoundaryInfo(farmId) {
-  return adminFetch(`/boundaries/${farmId}`);
-}
-
 // ─── Credentials ──────────────────────────────────────────────────────────────
 
 export async function fetchCredentials(companyId) {

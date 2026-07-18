@@ -6,7 +6,7 @@ import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Wheat, AlertCircle, S
 import {
   fetchOrganizations, createOrganization, updateOrganization, deleteOrganization,
   fetchFarms, createFarm, deleteFarm, uploadBoundary,
-  generateFarmConfig, fetchPipelineConfigContent, savePipelineConfig, fetchMinioObjectContent,
+  generateFarmConfig, fetchPipelineConfigContent, savePipelineConfig, deletePipelineConfig, fetchMinioObjectContent,
 } from '../../services/adminApi';
 
 const ALL_CROPS = ['ffb', 'maize', 'rice', 'cocoa', 'rubber', 'cassava', 'sugarcane', 'cashew'];
@@ -407,6 +407,21 @@ const FarmConfigModal = ({ farm, onClose }) => {
     finally { setSaving(false); }
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete the pipeline config for ${farm.farm_name}? The scheduler can't run it until it's regenerated.`)) return;
+    setDeleting(true);
+    setError('');
+    setMessage('');
+    try {
+      await deletePipelineConfig(filename);
+      setContent('');
+      setExists(false);
+      setMessage('Config deleted.');
+    } catch (e) { setError(e.message); }
+    finally { setDeleting(false); }
+  };
+
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div onClick={e => e.stopPropagation()} style={{
@@ -454,6 +469,11 @@ const FarmConfigModal = ({ farm, onClose }) => {
                   background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', color: '#334155',
                   fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: generating ? 0.6 : 1,
                 }}><Sparkles size={13} />{generating ? 'Regenerating…' : 'Regenerate from farm settings'}</button>
+                <button onClick={handleDelete} disabled={deleting} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 14px',
+                  background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#dc2626',
+                  fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: deleting ? 0.6 : 1,
+                }}><Trash2 size={13} />{deleting ? 'Deleting…' : 'Delete'}</button>
                 <button onClick={handleSave} disabled={saving} style={{
                   marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px',
                   background: '#15803d', border: 'none', borderRadius: '10px', color: 'white',

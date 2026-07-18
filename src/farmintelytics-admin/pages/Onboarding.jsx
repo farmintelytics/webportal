@@ -162,7 +162,7 @@ const Onboarding = () => {
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
       {STEPS.map((s, i) => {
         const Icon = s.icon;
-        const state = i < step ? 'done' : i === step ? 'active' : 'todo';
+        const state = i < step ? 'done' : i === step ? 'active' : 'pending';
         return (
           <React.Fragment key={s.id}>
             <div style={{
