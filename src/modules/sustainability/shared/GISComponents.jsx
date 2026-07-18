@@ -16,6 +16,23 @@ export const HUDPanel = ({ children, className = "" }) => (
   </div>
 );
 
+// Honest placeholder for a sidebar tab that isn't backed by real data yet —
+// used instead of silently reusing another tab's content (or showing
+// nothing) when a nav item is clicked.
+export const TabPlaceholder = ({ icon, label }) => (
+  <div className="w-full h-full flex items-center justify-center pointer-events-none">
+    <HUDPanel className="p-10 flex flex-col items-center gap-4 pointer-events-auto">
+      <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-500">
+        {icon}
+      </div>
+      <div className="text-center">
+        <p className="text-[13px] font-black text-white uppercase tracking-widest">{label}</p>
+        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mt-2">Not yet available</p>
+      </div>
+    </HUDPanel>
+  </div>
+);
+
 export const LayerSwitcher = ({ layers, activeLayer, onToggle }) => (
   <HUDPanel className="gis-layer-switcher">
     <div className="flex items-center gap-2 mb-4 px-2">

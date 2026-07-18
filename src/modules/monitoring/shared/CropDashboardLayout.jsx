@@ -942,11 +942,16 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     let active = true;
     async function loadBackendData() {
       try {
-        const statsRes = await api.fetchDashboardStats(tenant);
-        const trendsRes = await api.fetchDashboardTrends(tenant);
-        const plotsRes = await api.fetchPlotsIntelligence(tenant);
-        const zonesRes = await api.fetchRestorationZones(tenant);
-        const alertsRes = await api.fetchAlerts(tenant);
+        // Run independent requests concurrently — previously these awaited
+        // sequentially, so one slow endpoint delayed every other panel even
+        // though its data had already arrived.
+        const [statsRes, trendsRes, plotsRes, zonesRes, alertsRes] = await Promise.all([
+          api.fetchDashboardStats(tenant),
+          api.fetchDashboardTrends(tenant),
+          api.fetchPlotsIntelligence(tenant),
+          api.fetchRestorationZones(tenant),
+          api.fetchAlerts(tenant),
+        ]);
 
         if (active) {
           setStats(statsRes);
@@ -957,7 +962,9 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
           try {
             const boundary = await api.fetchFarmBoundary();
             if (active && boundary && boundary.geometry) setFarmBoundary(boundary);
-          } catch (_) {}
+          } catch (e) {
+            console.warn('Failed to fetch farm boundary:', e);
+          }
           // Map backend alert items to frontend structure
           const mappedAlerts = (alertsRes.feed || []).map(a => ({
             id: a.alert_id,
@@ -1107,11 +1114,17 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
       try {
         const indexName = (selectedIndex || 'ndvi').toLowerCase();
         const sensorParam = isSarIndex ? 'sentinel-1' : selectedSensor;
+        // Rolling 6-month window ending today — a fixed Jan–Mar 2026 range
+        // stopped showing any new imagery the moment that quarter passed.
+        const windowEnd = new Date();
+        const windowStart = new Date();
+        windowStart.setMonth(windowStart.getMonth() - 6);
+        const isoDate = (d) => d.toISOString().slice(0, 10);
         const data = await api.fetchTimeseriesSlider({
           farm: tenant || 'farm_1',
           index: indexName,
-          start: '2026-01-01',
-          end: '2026-03-31',
+          start: isoDate(windowStart),
+          end: isoDate(windowEnd),
           sensor: sensorParam,
           // Crop mode: tiles are coloured with this crop's legend classes.
           // Org mode: cropType is undefined, so no crop_type is sent and the
@@ -2471,11 +2484,22 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   };
 
   const handleAcknowledgeAlert = (alertId) => {
+    // Optimistic update, reverted if the backend call fails — previously
+    // this only mutated local state, so acknowledgements never persisted
+    // and reappeared as "Active" after a refresh.
     setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: 'Acknowledged' } : a));
+    api.acknowledgeAlert(alertId).catch(err => {
+      console.error('Failed to acknowledge alert:', err);
+      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: 'Active' } : a));
+    });
   };
 
   const handleAcknowledgeAllPlotAlerts = (plotId) => {
+    const idsToAck = alerts.filter(a => a.plot === plotId && a.status !== 'Acknowledged').map(a => a.id);
     setAlerts(prev => prev.map(a => a.plot === plotId ? { ...a, status: 'Acknowledged' } : a));
+    Promise.all(idsToAck.map(id => api.acknowledgeAlert(id))).catch(err => {
+      console.error('Failed to acknowledge one or more alerts:', err);
+    });
   };
 
   const handleProfileSave = (e) => {
@@ -2486,18 +2510,20 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
 
   const handleFlushCache = () => {
     setIsFlushingCache(true);
-    setTelemetryLogs(prev => [...prev, '[WARN] Flushing local GIS cache tiles...', '[SUCCESS] GIS cache flushed. 0 bytes remaining.']);
-    setTimeout(() => {
-      setIsFlushingCache(false);
-    }, 1500);
+    setTelemetryLogs(prev => [...prev, '[WARN] Flushing backend zarr cache...']);
+    api.clearCache()
+      .then(() => setTelemetryLogs(prev => [...prev, '[SUCCESS] Backend cache flushed.']))
+      .catch(err => setTelemetryLogs(prev => [...prev, `[ERROR] Cache flush failed: ${err.message}`]))
+      .finally(() => setIsFlushingCache(false));
   };
 
   const handleSystemCheck = () => {
     setIsCheckingSystem(true);
-    setTelemetryLogs(prev => [...prev, '[INFO] Initiating telemetry ping to Sentinel-2...', '[INFO] Querying Planet Labs APIs...', '[SUCCESS] Connection secure. All services operational.']);
-    setTimeout(() => {
-      setIsCheckingSystem(false);
-    }, 2000);
+    setTelemetryLogs(prev => [...prev, '[INFO] Rebuilding backend cache for this tenant...']);
+    api.rebuildCache()
+      .then(() => setTelemetryLogs(prev => [...prev, '[SUCCESS] Connection verified. Cache rebuilt.']))
+      .catch(err => setTelemetryLogs(prev => [...prev, `[ERROR] System check failed: ${err.message}`]))
+      .finally(() => setIsCheckingSystem(false));
   };
 
   const handleExportData = () => {
@@ -5987,9 +6013,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                             </button>
                             {activePlotAlerts.length > 0 && (
                               <button
-                                onClick={() => {
-                                  setAlerts(prev => prev.map(a => a.plot === selectedAlertPlot ? { ...a, status: 'Acknowledged' } : a));
-                                }}
+                                onClick={() => handleAcknowledgeAllPlotAlerts(selectedAlertPlot)}
                                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-xs font-bold text-white transition-all shadow-md shadow-green-600/10 active:scale-95"
                               >
                                 <CheckCircle2 size={13} /> Acknowledge All Issues
@@ -6045,7 +6069,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                                       {isActive && (
                                         <div className="mt-3 flex justify-end">
                                           <button
-                                            onClick={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, status: 'Acknowledged' } : a))}
+                                            onClick={() => handleAcknowledgeAlert(alert.id)}
                                             className="text-[10px] font-bold text-green-600 hover:text-green-700 border border-green-200 hover:bg-green-50 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all"
                                           >
                                             <Check size={11} /> Mark Acknowledged

@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
 import SustainabilityPortal from '../SustainabilityPortal';
-import { 
-  Trees, 
+import {
+  Trees,
   Maximize2,
   AlertCircle,
   CloudLightning,
   Activity,
   Database,
-  TrendingUp
+  TrendingUp,
+  LayoutDashboard,
+  BarChart4
 } from 'lucide-react';
-import { 
-  LayerSwitcher, 
-  LegendPanel, 
-  TimelineSlider, 
+import {
+  LayerSwitcher,
+  LegendPanel,
+  TimelineSlider,
   FloatingMetric,
-  GISSidebar
+  GISSidebar,
+  TabPlaceholder
 } from '../shared/GISComponents';
 
 const ForestryPortal = (props) => {
@@ -41,7 +44,11 @@ const ForestryPortal = (props) => {
       title="Forestry Intel" 
       type="High Density"
     >
-      {(activeTab) => (
+      {(activeTab) => activeTab === 'overview' ? (
+        <TabPlaceholder icon={<LayoutDashboard size={22} />} label="Dashboard Hub" />
+      ) : activeTab === 'plots' ? (
+        <TabPlaceholder icon={<BarChart4 size={22} />} label="Plots Analytics" />
+      ) : (
         <div className="w-full h-full relative pointer-events-none">
           {/* Floating HUD Elements */}
           <LayerSwitcher layers={layers} activeLayer={activeLayer} onToggle={setActiveLayer} />

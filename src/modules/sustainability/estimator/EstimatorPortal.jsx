@@ -10,12 +10,13 @@ import {
   Database
 } from 'lucide-react';
 import { calculateStockIPCC, estimateSequestrationRate, CARBON_FRACTION } from '../utils/carbonModels';
-import { 
+import {
   HUDPanel,
   LayerSwitcher,
   TimelineSlider,
   FloatingMetric,
-  GISSidebar
+  GISSidebar,
+  TabPlaceholder
 } from '../shared/GISComponents';
 
 const EstimatorPortal = (props) => {
@@ -64,7 +65,9 @@ const EstimatorPortal = (props) => {
       type="Simulation"
       sidebarItems={sidebarItems}
     >
-      {(activeTab) => (
+      {(activeTab) => activeTab === 'scenarios' ? (
+        <TabPlaceholder icon={<History size={22} />} label="Saved Scenarios" />
+      ) : (
         <div className="w-full h-full relative pointer-events-none">
           {/* Floating HUD Elements */}
           <TimelineSlider currentYear={currentYear} onChange={setCurrentYear} />
@@ -140,7 +143,7 @@ const EstimatorPortal = (props) => {
                       </div>
                       <div className="flex justify-between">
                          <span className="text-[10px] font-bold text-gray-400 uppercase">Carbon Fraction</span>
-                         <span className="text-[12px] font-black text-white">0.47</span>
+                         <span className="text-[12px] font-black text-white">{CARBON_FRACTION}</span>
                       </div>
                    </div>
                 </div>

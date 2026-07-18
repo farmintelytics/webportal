@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import SustainabilityPortal from '../SustainabilityPortal';
-import { 
-  ShieldCheck, 
+import {
+  ShieldCheck,
   Map as MapIcon,
   BarChart4,
   AlertTriangle,
   Zap,
-  TrendingUp
+  TrendingUp,
+  LayoutDashboard
 } from 'lucide-react';
-import { 
-  LayerSwitcher, 
-  LegendPanel, 
-  TimelineSlider, 
+import {
+  LayerSwitcher,
+  LegendPanel,
+  TimelineSlider,
   FloatingMetric,
-  GISSidebar
+  GISSidebar,
+  TabPlaceholder
 } from '../shared/GISComponents';
 
 const EstatePortal = (props) => {
@@ -39,7 +41,11 @@ const EstatePortal = (props) => {
       title="Industrial Estate" 
       type="Carbon"
     >
-      {(activeTab) => (
+      {(activeTab) => activeTab === 'overview' ? (
+        <TabPlaceholder icon={<LayoutDashboard size={22} />} label="Dashboard Hub" />
+      ) : activeTab === 'plots' ? (
+        <TabPlaceholder icon={<BarChart4 size={22} />} label="Plots Analytics" />
+      ) : (
         <div className="w-full h-full relative pointer-events-none">
           {/* Floating HUD Elements */}
           <LayerSwitcher layers={layers} activeLayer={activeLayer} onToggle={setActiveLayer} />
