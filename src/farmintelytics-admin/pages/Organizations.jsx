@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Wheat, AlertCircle, Search } from 'lucide-react';
-import { fetchOrganizations, createOrganization, updateOrganization, deleteOrganization } from '../../services/adminApi';
+import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Wheat, AlertCircle, Search, Layers, UploadCloud, RefreshCw } from 'lucide-react';
+import {
+  fetchOrganizations, createOrganization, updateOrganization, deleteOrganization,
+  fetchFarms, createFarm, deleteFarm, uploadBoundary,
+} from '../../services/adminApi';
 
 const ALL_CROPS = ['ffb', 'maize', 'rice', 'cocoa', 'rubber', 'cassava', 'sugarcane', 'cashew'];
 
@@ -267,12 +270,220 @@ const OrgModal = ({ org, onSave, onClose }) => {
   );
 };
 
+// A tiny inline "add farm" form — deliberately not the full onboarding wizard
+// (org, sensors, indices, dates, boundary all in one). This is for adding a
+// *second* (or third...) farm/estate to an org that already exists, so it
+// only asks for what's actually new: name, sensors, indices, boundary.
+const QuickAddFarmForm = ({ org, onSave, onCancel }) => {
+  const [farmName, setFarmName] = useState('');
+  const [sensors, setSensors] = useState(['sentinel-2', 'sentinel-1']);
+  const [indices, setIndices] = useState(['NDVI', 'NDMI']);
+  const [boundaryFile, setBoundaryFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const SENSORS = ['sentinel-2', 'sentinel-1', 'landsat-9'];
+  const INDICES = ['NDVI', 'EVI', 'NDMI', 'RECI', 'NDWI', 'LSWI'];
+  const toggle = (list, setList, v) => setList(list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
+
+  const handleSave = async () => {
+    if (!farmName.trim() || !boundaryFile) return;
+    setSaving(true);
+    setError('');
+    try {
+      const created = await createFarm({
+        company_name: org.display_name,
+        company_id: org.schema_name,
+        farm_name: farmName,
+        farm_id: '',
+        parent_farm_id: '',
+        parent_farm_name: '',
+        sensors, indices,
+        processing_level: 'plot_level',
+        cloud_cover_threshold: 10,
+        start_date: null, end_date: null,
+      });
+      await uploadBoundary(created.farm_id, boundaryFile);
+      onSave();
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const chipSm = (active) => ({
+    padding: '5px 11px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: 700,
+    background: active ? 'rgba(22,163,74,0.1)' : '#ffffff',
+    border: active ? '1px solid rgba(22,163,74,0.4)' : '1px solid #cbd5e1',
+    color: active ? '#16a34a' : '#6b7280',
+  });
+
+  return (
+    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {error && <div style={{ fontSize: '11px', color: '#dc2626' }}>{error}</div>}
+      <input
+        placeholder="Farm / estate name"
+        value={farmName}
+        onChange={e => setFarmName(e.target.value)}
+        style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '12px', fontWeight: 600, outline: 'none' }}
+      />
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {SENSORS.map(s => <button key={s} onClick={() => toggle(sensors, setSensors, s)} style={chipSm(sensors.includes(s))}>{s}</button>)}
+      </div>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {INDICES.map(i => <button key={i} onClick={() => toggle(indices, setIndices, i)} style={chipSm(indices.includes(i))}>{i}</button>)}
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', border: '1.5px dashed #cbd5e1', borderRadius: '8px', cursor: 'pointer', background: '#ffffff' }}>
+        <UploadCloud size={14} color={boundaryFile ? '#16a34a' : '#94a3b8'} />
+        <span style={{ fontSize: '11px', fontWeight: 700, color: boundaryFile ? '#16a34a' : '#64748b' }}>
+          {boundaryFile ? boundaryFile.name : 'Choose boundary .geojson *'}
+        </span>
+        <input type="file" accept=".geojson,.json,application/geo+json" style={{ display: 'none' }} onChange={e => setBoundaryFile(e.target.files?.[0] || null)} />
+      </label>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button onClick={onCancel} style={{ flex: 1, padding: '9px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#334155', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>Cancel</button>
+        <button onClick={handleSave} disabled={saving || !farmName.trim() || !boundaryFile} style={{ flex: 2, padding: '9px', background: '#15803d', border: 'none', borderRadius: '8px', color: 'white', cursor: 'pointer', fontWeight: 800, fontSize: '12px', opacity: (saving || !farmName.trim() || !boundaryFile) ? 0.5 : 1 }}>
+          {saving ? 'Adding…' : 'Add Farm'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const FarmRow = ({ farm, onDelete, onReupload }) => {
+  const fileRef = React.useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try { await onReupload(farm.farm_id, file); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+      <div>
+        <p style={{ color: '#0f172a', fontSize: '13px', fontWeight: 700, margin: 0 }}>{farm.farm_name}</p>
+        <p style={{ color: '#64748b', fontSize: '11px', fontWeight: 600, margin: '2px 0 0', fontFamily: 'monospace' }}>{farm.farm_id}</p>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{
+          fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px',
+          background: farm.boundary_uploaded ? 'rgba(22,163,74,0.1)' : 'rgba(239,68,68,0.08)',
+          color: farm.boundary_uploaded ? '#16a34a' : '#ef4444',
+          border: `1px solid ${farm.boundary_uploaded ? 'rgba(22,163,74,0.2)' : 'rgba(239,68,68,0.15)'}`,
+        }}>
+          {farm.boundary_uploaded ? '✓ Boundary' : '✗ No Boundary'}
+        </span>
+        <button onClick={() => fileRef.current?.click()} disabled={uploading}
+          title={farm.boundary_uploaded ? 'Re-upload boundary' : 'Upload boundary'}
+          style={{ background: '#eff6ff', border: '1px solid rgba(37,99,235,0.2)', borderRadius: '7px', padding: '5px', cursor: 'pointer', color: '#2563eb', display: 'flex' }}>
+          {uploading ? <RefreshCw size={13} className="animate-spin" /> : <UploadCloud size={13} />}
+        </button>
+        <input ref={fileRef} type="file" accept=".geojson,.json,application/geo+json" style={{ display: 'none' }} onChange={handleFile} />
+        <button onClick={() => onDelete(farm.farm_id)} style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.1)', borderRadius: '7px', padding: '5px', cursor: 'pointer', color: '#ef4444', display: 'flex' }}>
+          <Trash2 size={13} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const OrgDetailPanel = ({ org, onClose, onOrgChanged }) => {
+  const [farms, setFarms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try { setFarms(await fetchFarms(org.schema_name)); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, [org.schema_name]);
+
+  const handleDeleteFarm = async (farmId) => {
+    if (!window.confirm('Delete this farm and all its data?')) return;
+    try { await deleteFarm(farmId); await load(); }
+    catch (e) { setError(e.message); }
+  };
+
+  const handleReupload = async (farmId, file) => {
+    try { await uploadBoundary(farmId, file); await load(); }
+    catch (e) { setError(e.message); }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '440px', maxWidth: '92vw', height: '100%', background: '#ffffff',
+        borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column',
+        boxShadow: '-8px 0 24px rgba(15,23,42,0.08)',
+        animation: 'slideIn 0.2s cubic-bezier(0.4,0,0.2,1)',
+      }}>
+        <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Building2 size={18} color="#16a34a" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ color: '#0f172a', fontSize: '15px', fontWeight: 800, margin: 0 }}>{org.display_name}</p>
+            <p style={{ color: '#64748b', fontSize: '11px', fontWeight: 600, margin: '2px 0 0', fontFamily: 'monospace' }}>{org.schema_name}</p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#475569', display: 'flex' }}>
+            <X size={14} />
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {error && (
+            <div style={{ padding: '10px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <AlertCircle size={13} />{error}
+              <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}><X size={12} /></button>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Layers size={14} color="#16a34a" />
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Farms & Boundaries</span>
+            </div>
+            <button onClick={() => setAddOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '11px', fontWeight: 700 }}>
+              <Plus size={13} />{addOpen ? 'Cancel' : 'Add Farm'}
+            </button>
+          </div>
+
+          {addOpen && <QuickAddFarmForm org={org} onCancel={() => setAddOpen(false)} onSave={() => { setAddOpen(false); load(); }} />}
+
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '12px' }}>Loading…</div>
+          ) : farms.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8', fontSize: '12px' }}>No farms yet — add one above.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {farms.map(farm => (
+                <FarmRow key={farm.farm_id} farm={farm} onDelete={handleDeleteFarm} onReupload={handleReupload} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <style>{`
+        @keyframes slideIn { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+      `}</style>
+    </div>
+  );
+};
+
 const Organizations = () => {
   const [orgs, setOrgs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
+  const [detailOrg, setDetailOrg] = useState(null);
 
   const load = async () => {
     try {
@@ -346,9 +557,9 @@ const Organizations = () => {
             </div>
           )}
           {filtered.map(org => (
-            <div key={org.id} style={{
+            <div key={org.id} onClick={() => setDetailOrg(org)} style={{
               background: '#ffffff', border: '1px solid #cbd5e1',
-              borderRadius: '16px', padding: '20px', transition: 'all 0.15s',
+              borderRadius: '16px', padding: '20px', transition: 'all 0.15s', cursor: 'pointer',
             }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = '#16a34a'; e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.03)'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.boxShadow = 'none'; }}
@@ -363,7 +574,7 @@ const Organizations = () => {
                     <p style={{ color: '#64748b', fontSize: '11px', fontWeight: 600, margin: '2px 0 0', fontFamily: 'monospace' }}>{org.schema_name}</p>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => setModal({ org })} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#475569', display: 'flex' }}
                     onMouseEnter={e => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.background = '#f1f5f9'; }} onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = '#f8fafc'; }}>
                     <Edit3 size={14} />
@@ -394,12 +605,16 @@ const Organizations = () => {
                   <span style={{ color: '#475569', fontSize: '11px', fontStyle: 'italic' }}>No crops configured</span>
                 )}
               </div>
+              <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px', color: '#16a34a', fontSize: '11px', fontWeight: 700 }}>
+                <Layers size={12} /> View farms & boundaries →
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {modal && <OrgModal org={modal.org} onSave={handleSave} onClose={() => setModal(null)} />}
+      {detailOrg && <OrgDetailPanel org={detailOrg} onClose={() => setDetailOrg(null)} onOrgChanged={load} />}
     </div>
   );
 };

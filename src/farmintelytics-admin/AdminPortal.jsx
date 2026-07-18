@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Building2, Map, Key, Activity, LayoutDashboard, LogOut,
-  ChevronRight, Shield, Menu, X, Layers,
+  Building2, Key, Activity, LayoutDashboard, LogOut,
+  ChevronRight, Shield, Menu, X,
   Clock, Settings, Database, Users, Rocket, SlidersHorizontal,
 } from 'lucide-react';
 
 import Onboarding from './pages/Onboarding';
 import CropThresholds from './pages/CropThresholds';
 import Organizations from './pages/Organizations';
-import Farms from './pages/Farms';
-import Boundaries from './pages/Boundaries';
 import Credentials from './pages/Credentials';
 import Logs from './pages/Logs';
 import Scheduler from './pages/Scheduler';
@@ -19,11 +17,9 @@ import Inventory from './pages/Inventory';
 import UsersPage from './pages/Users';
 
 const NAV_ITEMS = [
-  { id: 'onboarding',    label: 'Onboard Company', icon: Rocket,    path: '/admin/onboarding' },
+  { id: 'onboarding',    label: 'Onboard Organization', icon: Rocket, path: '/admin/onboarding' },
   { id: 'users',         label: 'User Accounts',   icon: Users,     path: '/admin/users' },
   { id: 'organizations', label: 'Organizations',   icon: Building2, path: '/admin/organizations' },
-  { id: 'farms',         label: 'Farm Registry',   icon: Layers,    path: '/admin/farms' },
-  { id: 'boundaries',   label: 'Boundaries',       icon: Map,       path: '/admin/boundaries' },
   { id: 'inventory',    label: 'Data Sync & MinIO', icon: Database, path: '/admin/inventory' },
   { id: 'credentials',  label: 'Credentials',      icon: Key,       path: '/admin/credentials' },
   { id: 'scheduler',    label: 'Scheduler',        icon: Clock,     path: '/admin/scheduler' },
@@ -200,8 +196,6 @@ const AdminPortal = () => {
             <Route path="onboarding"    element={<Onboarding />} />
             <Route path="users"         element={<UsersPage />} />
             <Route path="organizations" element={<Organizations />} />
-            <Route path="farms"         element={<Farms />} />
-            <Route path="boundaries"    element={<Boundaries />} />
             <Route path="inventory"     element={<Inventory />} />
             <Route path="credentials"   element={<Credentials />} />
             <Route path="scheduler"     element={<Scheduler />} />
