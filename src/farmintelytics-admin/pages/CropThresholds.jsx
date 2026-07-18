@@ -41,6 +41,11 @@ const IndexCard = ({ item, cropType, companyId, onSaved, onError }) => {
     setDirty(true);
   };
 
+  const updateColor = (i, value) => {
+    setClasses(prev => prev.map((c, idx) => idx === i ? { ...c, color: value } : c));
+    setDirty(true);
+  };
+
   const handleSave = async () => {
     const clean = classes.map(c => ({
       label: c.label,
@@ -119,7 +124,16 @@ const IndexCard = ({ item, cropType, companyId, onSaved, onError }) => {
         <span style={labelStyle}>To</span>
         {classes.map((c, i) => (
           <React.Fragment key={i}>
-            <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: c.color, border: '1px solid rgba(0,0,0,0.08)' }} />
+            <input
+              type="color"
+              value={c.color}
+              onChange={e => updateColor(i, e.target.value)}
+              title="Change class colour"
+              style={{
+                width: '18px', height: '18px', padding: 0, border: '1px solid rgba(0,0,0,0.15)',
+                borderRadius: '4px', cursor: 'pointer', background: 'none',
+              }}
+            />
             <input style={inputStyle} value={c.label} onChange={e => updateLabel(i, e.target.value)} />
             <input style={{ ...inputStyle, fontFamily: 'monospace' }} type="number" step="any" value={c.range[0]} onChange={e => updateBound(i, 'lo', e.target.value)} />
             <input style={{ ...inputStyle, fontFamily: 'monospace' }} type="number" step="any" value={c.range[1]} onChange={e => updateBound(i, 'hi', e.target.value)} />
