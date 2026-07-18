@@ -183,16 +183,32 @@ const Logs = () => {
     } catch (e) { setError(e.message); }
   };
 
-  const loadPipeline = async () => {
+  // Each execution_logs file can unwrap into several rows (daily digests are
+  // arrays), so a "limit" of even 20 files can render ~100 rows in one go.
+  // Start small and let the admin explicitly ask for more instead of always
+  // fetching+rendering everything.
+  const PIPELINE_LOGS_PAGE_SIZE = 10;
+  const [pipelineLimit, setPipelineLimit] = useState(PIPELINE_LOGS_PAGE_SIZE);
+  const [pipelineLoadingMore, setPipelineLoadingMore] = useState(false);
+
+  const loadPipeline = async (limit = pipelineLimit) => {
     try {
-      const data = await fetchPipelineLogs();
+      const data = await fetchPipelineLogs(undefined, limit);
       setPipelineLogs(data.logs || []);
     } catch (e) { setError(e.message); }
   };
 
+  const loadMorePipeline = async () => {
+    setPipelineLoadingMore(true);
+    const next = pipelineLimit + PIPELINE_LOGS_PAGE_SIZE;
+    await loadPipeline(next);
+    setPipelineLimit(next);
+    setPipelineLoadingMore(false);
+  };
+
   const loadAll = async () => {
     setLoading(true);
-    await Promise.all([loadJobs(), loadPipeline()]);
+    await Promise.all([loadJobs(), loadPipeline(pipelineLimit)]);
     setLoading(false);
   };
 
@@ -368,7 +384,25 @@ const Logs = () => {
               <p style={{ margin: '4px 0 0', fontSize: '11px' }}>Logs appear under <code>execution_logs/</code> after a pipeline run</p>
             </div>
           ) : (
-            pipelineLogs.map((log, i) => <PipelineLogRow key={i} log={log} idx={i} onOpen={(l, idx) => setOpenLog({ log: l, idx })} />)
+            <>
+              {pipelineLogs.map((log, i) => <PipelineLogRow key={i} log={log} idx={i} onOpen={(l, idx) => setOpenLog({ log: l, idx })} />)}
+              {pipelineLogs.length >= pipelineLimit && (
+                <button
+                  onClick={loadMorePipeline}
+                  disabled={pipelineLoadingMore}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    padding: '10px', marginTop: '4px',
+                    borderRadius: '10px', border: '1px solid #e2e8f0',
+                    background: '#ffffff', color: '#334155',
+                    fontSize: '12px', fontWeight: 700, cursor: pipelineLoadingMore ? 'default' : 'pointer',
+                  }}
+                >
+                  {pipelineLoadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {pipelineLoadingMore ? 'Loading…' : 'Load More'}
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
