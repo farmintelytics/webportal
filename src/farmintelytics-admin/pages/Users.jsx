@@ -35,15 +35,6 @@ const TypeBadge = ({ type }) => {
   );
 };
 
-const StatusDot = ({ active }) => (
-  <span style={{
-    display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
-    background: active ? '#16a34a' : '#dc2626',
-    boxShadow: active ? '0 0 0 3px rgba(22,163,74,0.12)' : '0 0 0 3px rgba(220,38,38,0.1)',
-    flexShrink: 0,
-  }} />
-);
-
 const EMPTY_FORM = {
   email: '', first_name: '', last_name: '', phone_number: '',
   account_type: 'personal', password: '', is_staff: false,
@@ -317,10 +308,7 @@ const UsersPage = () => {
                 </div>
                 <TypeBadge type={user.account_type} />
                 <span style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', textTransform: 'capitalize' }}>{user.auth_provider || 'email'}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <StatusDot active={user.is_active} />
-                  <span style={{ fontSize: '11px', color: user.is_active ? '#16a34a' : '#dc2626', fontWeight: 700 }}>{user.is_active ? 'Active' : 'Disabled'}</span>
-                </div>
+                <span style={{ fontSize: '11px', color: user.is_active ? '#16a34a' : '#dc2626', fontWeight: 700 }}>{user.is_active ? 'Active' : 'Disabled'}</span>
                 <span style={{ fontSize: '11px', color: '#64748b' }}>{user.date_joined ? new Date(user.date_joined).toLocaleDateString() : user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}</span>
                 <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                   <button onClick={() => { setEditUser({ ...user }); setShowForm(false); }} title="Edit" style={{ padding: '6px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '7px', cursor: 'pointer', color: '#475569', display: 'flex' }}>

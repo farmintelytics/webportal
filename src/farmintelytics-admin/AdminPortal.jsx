@@ -177,10 +177,6 @@ const AdminPortal = () => {
             })()}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '8px', height: '8px', borderRadius: '50%',
-              background: '#16a34a', boxShadow: '0 0 8px rgba(22,163,74,0.4)',
-            }} />
             <span style={{ fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               System Online
             </span>

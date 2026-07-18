@@ -31,17 +31,6 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const StatusDot = ({ status }) => {
-  const cfg = getStatus(status);
-  return (
-    <span style={{
-      display: 'inline-block', width: '8px', height: '8px',
-      borderRadius: '50%', background: cfg.color, flexShrink: 0,
-      boxShadow: `0 0 0 3px ${cfg.bg}`,
-    }} />
-  );
-};
-
 const SummaryCard = ({ icon: Icon, label, value, color }) => (
   <div style={{
     display: 'flex', alignItems: 'center', gap: '12px',
@@ -67,7 +56,6 @@ const SummaryCard = ({ icon: Icon, label, value, color }) => (
 // crowd/overlap a neighbouring row.
 const PipelineLogRow = ({ log, idx, onOpen, highlighted }) => {
   const status = log.status || (log.error ? 'failed' : 'completed');
-  const cfg = getStatus(status);
   const hasFailed = status === 'failed' || !!log.error;
   const path = log._minio_path || `Log #${idx + 1}`;
   const pathParts = path.split('/');
@@ -77,13 +65,10 @@ const PipelineLogRow = ({ log, idx, onOpen, highlighted }) => {
       onClick={() => onOpen(log, idx)}
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '14px 16px', background: highlighted ? 'rgba(37,99,235,0.05)' : '#ffffff', cursor: 'pointer',
-        textAlign: 'left', border: `1px solid ${highlighted ? 'rgba(37,99,235,0.4)' : hasFailed ? 'rgba(220,38,38,0.25)' : '#e2e8f0'}`,
-        borderLeft: `4px solid ${cfg.color}`, borderRadius: '12px',
-        boxShadow: highlighted ? '0 0 0 1px rgba(37,99,235,0.15)' : 'none',
+        padding: '14px 16px', background: highlighted ? '#f1f5f9' : '#ffffff', cursor: 'pointer',
+        textAlign: 'left', border: `1px solid ${hasFailed ? '#fca5a5' : '#e2e8f0'}`, borderRadius: '10px',
       }}
     >
-      <StatusDot status={status} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px' }}>
@@ -176,6 +161,7 @@ const Logs = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [pipelineStatusFilter, setPipelineStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [expandedJob, setExpandedJob] = useState(null);
   const [openLog, setOpenLog] = useState(null);
@@ -228,6 +214,10 @@ const Logs = () => {
   const completedJobs = jobs.filter(j => j.status === 'completed').length;
   const processingJobs = jobs.filter(j => j.status === 'processing').length;
   const failedPipeline = pipelineLogs.filter(l => (l.status || '').toLowerCase() === 'failed' || !!l.error).length;
+  const pipelineLogStatus = (l) => (l.status || (l.error ? 'failed' : 'completed')).toLowerCase();
+  const filteredPipelineLogs = pipelineStatusFilter
+    ? pipelineLogs.filter(l => pipelineLogStatus(l) === pipelineStatusFilter)
+    : pipelineLogs;
 
   return (
     <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', boxSizing: 'border-box' }}>
@@ -378,7 +368,25 @@ const Logs = () => {
 
       {/* Pipeline Execution Logs Tab */}
       {activeTab === 'pipeline' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {['', 'pending', 'processing', 'completed', 'failed'].map(s => (
+              <button key={s} onClick={() => setPipelineStatusFilter(s)} style={{
+                padding: '6px 16px', borderRadius: '20px', border: '1px solid',
+                fontSize: '11px', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase',
+                letterSpacing: '0.05em', transition: 'all 0.15s',
+                background: pipelineStatusFilter === s ? (s ? getStatus(s || 'pending').color : '#0f172a') : '#ffffff',
+                color: pipelineStatusFilter === s ? '#ffffff' : (s ? getStatus(s).color : '#475569'),
+                borderColor: s ? getStatus(s).border : (pipelineStatusFilter === s ? '#0f172a' : '#e2e8f0'),
+              }}>
+                {s || 'All'}
+              </button>
+            ))}
+            <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600, marginLeft: 'auto' }}>
+              {filteredPipelineLogs.length.toLocaleString()} of {pipelineLogs.length.toLocaleString()} loaded
+            </span>
+          </div>
+
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
               <Loader2 size={16} /> Loading execution logs…
@@ -389,9 +397,14 @@ const Logs = () => {
               <p style={{ margin: 0, fontSize: '13px', fontWeight: 600 }}>No execution logs found in MinIO</p>
               <p style={{ margin: '4px 0 0', fontSize: '11px' }}>Logs appear under <code>execution_logs/</code> after a pipeline run</p>
             </div>
+          ) : filteredPipelineLogs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 600 }}>No {pipelineStatusFilter} logs in the loaded set</p>
+              <p style={{ margin: '4px 0 0', fontSize: '11px' }}>Try "Load More" or clear the filter</p>
+            </div>
           ) : (
             <>
-              {pipelineLogs.map((log, i) => <PipelineLogRow key={i} log={log} idx={i} onOpen={(l, idx) => setOpenLog({ log: l, idx })} highlighted={!!highlightKey && log._minio_path === highlightKey} />)}
+              {filteredPipelineLogs.map((log, i) => <PipelineLogRow key={i} log={log} idx={i} onOpen={(l, idx) => setOpenLog({ log: l, idx })} highlighted={!!highlightKey && log._minio_path === highlightKey} />)}
               {pipelineLogs.length >= pipelineLimit && (
                 <button
                   onClick={loadMorePipeline}
