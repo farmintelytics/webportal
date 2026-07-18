@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Users, Plus, Trash2, RefreshCw, AlertCircle, X, Check,
+  Users, Plus, Trash2, RefreshCw, X, Check,
   Search, Shield, KeyRound, UserCheck, UserX, Copy,
   ChevronDown, Eye, EyeOff, Edit2, Lock
 } from 'lucide-react';
@@ -8,6 +8,8 @@ import {
   fetchUsers, createUser, updateUser,
   toggleUserActive, resetUserPassword, deleteUser
 } from '../../services/adminApi';
+import { useConfirm } from '../components/ConfirmProvider';
+import ErrorBanner from '../components/ErrorBanner';
 
 const ACCOUNT_TYPES = [
   { value: '',                     label: 'All Types' },
@@ -41,6 +43,7 @@ const EMPTY_FORM = {
 };
 
 const UsersPage = () => {
+  const confirm = useConfirm();
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -132,7 +135,7 @@ const UsersPage = () => {
   };
 
   const handleDelete = async (user) => {
-    if (!window.confirm(`Permanently delete ${user.email}? This cannot be undone.`)) return;
+    if (!(await confirm(`Permanently delete ${user.email}? This cannot be undone.`))) return;
     try {
       await deleteUser(user.id);
       showSuccess(`${user.email} deleted.`);
@@ -172,12 +175,7 @@ const UsersPage = () => {
       </div>
 
       {/* Alerts */}
-      {error && (
-        <div style={{ padding: '12px 16px', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <AlertCircle size={14} />{error}
-          <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}><X size={14} /></button>
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError('')} onRetry={load} />
       {success && (
         <div style={{ padding: '12px 16px', background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '10px', color: '#16a34a', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
           <Check size={14} />{success}

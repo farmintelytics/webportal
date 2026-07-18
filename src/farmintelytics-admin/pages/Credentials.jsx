@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Key, Plus, Trash2, Copy, Check, X, RefreshCw, AlertCircle, Shield } from 'lucide-react';
 import { fetchCredentials, createCredential, deleteCredential, fetchOrganizations } from '../../services/adminApi';
+import { useConfirm } from '../components/ConfirmProvider';
+import ErrorBanner from '../components/ErrorBanner';
 
 const Credentials = () => {
+  const confirm = useConfirm();
   const [creds, setCreds] = useState([]);
   const [orgs, setOrgs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +41,7 @@ const Credentials = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this credential?')) return;
+    if (!(await confirm('Delete this credential?'))) return;
     try { await deleteCredential(id); await load(); }
     catch (e) { setError(e.message); }
   };
@@ -65,11 +68,7 @@ const Credentials = () => {
         </button>
       </div>
 
-      {error && (
-        <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#f87171', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <AlertCircle size={15} />{error}<button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#f87171' }}><X size={14} /></button>
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError('')} onRetry={load} />
 
       {/* Create form */}
       {showForm && (

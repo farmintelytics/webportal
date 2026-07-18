@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Database, RefreshCw, Trash2, AlertCircle, CheckCircle, Search, FileJson, Layers, Building2, Server, HelpCircle, HardDrive, X, Eye, Copy, Activity } from 'lucide-react';
 import { fetchOrganizations, fetchFarms, fetchMinioInventory, syncDatabaseWithMinio, deleteMinioObject, fetchMinioObjectContent } from '../../services/adminApi';
+import { useConfirm } from '../components/ConfirmProvider';
+import ErrorBanner from '../components/ErrorBanner';
 
 const VIEWABLE_SUFFIXES = ['.json', '.geojson', '.yaml', '.yml', '.txt', '.csv'];
 const isViewable = (key) => VIEWABLE_SUFFIXES.some(sfx => key.toLowerCase().endsWith(sfx));
@@ -11,6 +13,7 @@ const isExecutionLog = (key) => key.startsWith('execution_logs/');
 
 const Inventory = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [orgs, setOrgs] = useState([]);
   const [farms, setFarms] = useState([]);
   const [minioFiles, setMinioFiles] = useState([]);
@@ -102,7 +105,7 @@ const Inventory = () => {
 
   // Handle object deletion
   const handleDeleteObject = async (key) => {
-    if (!window.confirm(`Are you sure you want to permanently delete this object from MinIO?\n\nPath: ${key}\n\nWARNING: If this is a farm boundary file, the farm registry will be updated automatically.`)) {
+    if (!(await confirm(`Permanently delete this object from MinIO?\n\nPath: ${key}\n\nIf this is a farm boundary file, the farm registry will be updated automatically.`))) {
       return;
     }
     setError('');
@@ -254,12 +257,7 @@ const Inventory = () => {
       </div>
 
       {/* Notifications */}
-      {error && (
-        <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#f87171', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <AlertCircle size={15} />{error}
-          <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#f87171' }}><X size={14} /></button>
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError('')} onRetry={loadData} />
 
       {success && (
         <div style={{ padding: '12px 16px', background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '10px', color: '#16a34a', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>

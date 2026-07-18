@@ -6,6 +6,7 @@ import {
   FileText, Database, Server
 } from 'lucide-react';
 import { fetchLogs, fetchPipelineLogs } from '../../services/adminApi';
+import ErrorBanner from '../components/ErrorBanner';
 
 const STATUS_CFG = {
   pending:    { color: '#d97706', bg: 'rgba(217,119,6,0.08)',  border: 'rgba(217,119,6,0.2)',  icon: Clock },
@@ -265,12 +266,7 @@ const Logs = () => {
         ))}
       </div>
 
-      {error && (
-        <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <AlertCircle size={14} />{error}
-          <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}><X size={14} /></button>
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError('')} onRetry={loadAll} />
 
       {/* Jobs Tab */}
       {activeTab === 'jobs' && (

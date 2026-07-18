@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Plus, Trash2, Edit3, X, Check, AlertCircle, Play, CheckCircle } from 'lucide-react';
+import { Clock, Plus, Trash2, Edit3, X, Check } from 'lucide-react';
 import {
   fetchSchedulerJobs, createSchedulerJob, updateSchedulerJob, deleteSchedulerJob, fetchPipelineConfigs
 } from '../../services/adminApi';
+import { useConfirm } from '../components/ConfirmProvider';
+import ErrorBanner from '../components/ErrorBanner';
 
 const COMMON_Schedules = [
   { label: 'Every 5 days (Harmattan standard)', cron: '0 3 */5 * *' },
@@ -26,7 +28,7 @@ const JobModal = ({ job, configs, onSave, onClose }) => {
   // server and comes back as a raw error message.
   const isValidCron = (expr) => {
     const parts = expr.trim().split(/\s+/);
-    return parts.length === 5 && parts.every(p => /^[0-9*/,\-]+$/.test(p));
+    return parts.length === 5 && parts.every(p => /^[0-9*/,-]+$/.test(p));
   };
 
   const handleSave = async () => {
@@ -66,11 +68,7 @@ const JobModal = ({ job, configs, onSave, onClose }) => {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><X size={20} /></button>
         </div>
 
-        {error && (
-          <div style={{ marginBottom: '16px', padding: '10px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#f87171', fontSize: '12px' }}>
-            {error}
-          </div>
-        )}
+        <div style={{ marginBottom: error ? '16px' : 0 }}><ErrorBanner message={error} onDismiss={() => setError('')} /></div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
@@ -124,6 +122,7 @@ const JobModal = ({ job, configs, onSave, onClose }) => {
 };
 
 const Scheduler = () => {
+  const confirm = useConfirm();
   const [jobs, setJobs] = useState([]);
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -171,7 +170,7 @@ const Scheduler = () => {
   };
 
   const handleDelete = async (name) => {
-    if (!window.confirm(`Delete scheduled job "${name}"?`)) return;
+    if (!(await confirm(`Delete scheduled job "${name}"?`))) return;
     try {
       await deleteSchedulerJob(name);
       await load();
@@ -197,12 +196,7 @@ const Scheduler = () => {
         </button>
       </div>
 
-      {error && (
-        <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#f87171', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <AlertCircle size={15} />{error}
-          <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#f87171' }}><X size={14} /></button>
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError('')} onRetry={load} />
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>Loading scheduler configurations…</div>

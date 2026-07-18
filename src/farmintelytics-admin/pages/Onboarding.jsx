@@ -4,13 +4,14 @@ import {
   createOrganization, createCredential, createFarm, uploadBoundary, generateFarmConfig, createSchedulerJob,
 } from '../../services/adminApi';
 import { slugify, modulesForAccessModel, ACCESS_MODELS, ALL_RS_INDICES } from './Organizations';
+import ErrorBanner from '../components/ErrorBanner';
+import { SENSOR_OPTIONS, toggleInList, chipStyle } from '../components/formHelpers';
 
 const ALL_CROPS = ['ffb', 'maize', 'rice', 'cocoa', 'rubber', 'cassava', 'sugarcane', 'cashew'];
 const CROP_LABELS = {
   ffb: 'Oil Palm (FFB)', maize: 'Maize', rice: 'Rice', cocoa: 'Cocoa',
   rubber: 'Rubber', cassava: 'Cassava', sugarcane: 'Sugarcane', cashew: 'Cashew',
 };
-const ALL_SENSORS = ['sentinel-2', 'sentinel-1', 'landsat-9'];
 const ALL_INDICES = ['NDVI', 'EVI', 'NDMI', 'RECI', 'NDWI', 'LSWI', 'LAI', 'NDRE', 'CVI', 'SAVI', 'MSI', 'GNDVI', 'ETC', 'LST', 'SMI_LANDSAT', 'VCI'];
 
 const STEPS = [
@@ -26,12 +27,7 @@ const inputStyle = {
 };
 const labelStyle = { display: 'block', fontSize: '12px', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'Roboto', sans-serif" };
 const helpTextStyle = { color: '#64748b', fontSize: '13px', margin: '6px 0 0', lineHeight: 1.5, fontFamily: "'Roboto', sans-serif" };
-const chip = (active, color = '#16a34a') => ({
-  padding: '7px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700,
-  background: active ? `${color}18` : '#ffffff',
-  border: active ? `1px solid ${color}55` : '1px solid #cbd5e1',
-  color: active ? color : '#6b7280', transition: 'all 0.15s', fontFamily: "'Roboto', sans-serif",
-});
+const chip = chipStyle;
 const primaryBtn = (disabled) => ({
   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '13px 26px',
   background: '#15803d', border: 'none', borderRadius: '12px',
@@ -58,7 +54,7 @@ const Onboarding = () => {
   const [done, setDone] = useState({ org: null, credential: null, farm: null, boundary: null, config: null });
 
   // ── Step forms ──
-  const [company, setCompany] = useState({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'both', allowed_crops: [], allowed_indices: [] });
+  const [company, setCompany] = useState({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'organization', allowed_crops: [], allowed_indices: [] });
   const [cred, setCred] = useState({ email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' });
   const [farm, setFarm] = useState({
     farm_name: '', farm_id: '', sensors: ['sentinel-2', 'sentinel-1'],
@@ -70,7 +66,7 @@ const Onboarding = () => {
   const [scheduleCron, setScheduleCron] = useState('0 3 */5 * *');
 
   const companySlug = company.schema_name.trim() || slugify(company.company_name);
-  const toggleIn = (list, v) => list.includes(v) ? list.filter(x => x !== v) : [...list, v];
+  const toggleIn = toggleInList;
 
   const canLeaveCompanyStep = company.company_name.trim() && (company.accessModel === 'organization' || company.allowed_crops.length > 0);
   const canLeaveFarmStep = farm.farm_name.trim() && farm.sensors.length > 0 && farm.indices.length > 0;
@@ -182,7 +178,7 @@ const Onboarding = () => {
     </div>
   );
 
-  const card = { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '640px', fontFamily: "'Roboto', sans-serif" };
+  const card = { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', boxSizing: 'border-box', fontFamily: "'Roboto', sans-serif" };
 
   // Small "Step 1 of 3" indicator for the Company → Farm → Boundary mini flow.
   const OrgSubStepHeader = () => (
@@ -207,7 +203,8 @@ const Onboarding = () => {
   );
 
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto', height: '100%', boxSizing: 'border-box', fontFamily: "'Roboto', sans-serif" }}>
+    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', overflowY: 'auto', height: '100%', boxSizing: 'border-box', fontFamily: "'Roboto', sans-serif" }}>
+    <div style={{ width: '100%', maxWidth: '760px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
         <h2 style={{ color: '#0f172a', fontSize: '22px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Rocket size={20} color="#16a34a" /> Company Onboarding
@@ -219,12 +216,7 @@ const Onboarding = () => {
 
       <StepHeader />
 
-      {error && (
-        <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center', maxWidth: '640px' }}>
-          <AlertCircle size={15} />{error}
-          <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}><X size={14} /></button>
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       {/* ── STEP 1: Company + Farm + Boundary, as its own mini Next-button flow ── */}
       {step === 0 && (
@@ -255,7 +247,7 @@ const Onboarding = () => {
               </div>
               <div>
                 <label style={labelStyle}>Access Model</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   {ACCESS_MODELS.map(m => {
                     const active = company.accessModel === m.id;
                     return (
@@ -270,17 +262,20 @@ const Onboarding = () => {
                     );
                   })}
                 </div>
+                <p style={helpTextStyle}>Want both an org-wide dashboard and per-crop portals? Onboard this company twice — one organization per access model — so each is managed separately.</p>
               </div>
-              <div>
-                <label style={labelStyle}>Allowed Crops</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {ALL_CROPS.map(c => (
-                    <button key={c} onClick={() => setCompany(co => ({ ...co, allowed_crops: toggleIn(co.allowed_crops, c) }))} style={chip(company.allowed_crops.includes(c))}>
-                      {CROP_LABELS[c]}
-                    </button>
-                  ))}
+              {company.accessModel === 'crop' && (
+                <div>
+                  <label style={labelStyle}>Allowed Crops</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {ALL_CROPS.map(c => (
+                      <button key={c} onClick={() => setCompany(co => ({ ...co, allowed_crops: toggleIn(co.allowed_crops, c) }))} style={chip(company.allowed_crops.includes(c))}>
+                        {CROP_LABELS[c]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
               <div>
                 <label style={labelStyle}>Allowed Satellite Indices</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '140px', overflowY: 'auto', padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
@@ -312,7 +307,7 @@ const Onboarding = () => {
               <div>
                 <label style={labelStyle}>Sensors</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {ALL_SENSORS.map(s => (
+                  {SENSOR_OPTIONS.map(s => (
                     <button key={s} onClick={() => setFarm(f => ({ ...f, sensors: toggleIn(f.sensors, s) }))} style={chip(farm.sensors.includes(s), '#3b82f6')}>{s}</button>
                   ))}
                 </div>
@@ -505,11 +500,12 @@ const Onboarding = () => {
           {done.config?.content && (
             <pre style={{ margin: 0, padding: '14px', background: '#0f172a', color: '#86efac', borderRadius: '12px', fontSize: '11px', overflowX: 'auto', maxHeight: '240px' }}>{done.config.content}</pre>
           )}
-          <button onClick={() => { setStep(0); setOrgSubStep(0); setDone({ org: null, credential: null, farm: null, boundary: null, config: null }); setCompany({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'both', allowed_crops: [], allowed_indices: [] }); setCred({ email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' }); setFarm(f => ({ ...f, farm_name: '', farm_id: '' })); setBoundaryFile(null); }} style={primaryBtn(false)}>
+          <button onClick={() => { setStep(0); setOrgSubStep(0); setDone({ org: null, credential: null, farm: null, boundary: null, config: null }); setCompany({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'organization', allowed_crops: [], allowed_indices: [] }); setCred({ email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' }); setFarm(f => ({ ...f, farm_name: '', farm_id: '' })); setBoundaryFile(null); }} style={primaryBtn(false)}>
             <Rocket size={15} /> Onboard Another Company
           </button>
         </div>
       )}
+    </div>
     </div>
   );
 };

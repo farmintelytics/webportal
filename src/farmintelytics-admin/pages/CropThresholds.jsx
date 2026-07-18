@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SlidersHorizontal, RotateCcw, Check, AlertCircle, X, Info, FlaskConical } from 'lucide-react';
 import { fetchCropThresholds, saveCropThreshold, resetCropThreshold, fetchOrganizations } from '../../services/adminApi';
+import { useConfirm } from '../components/ConfirmProvider';
+import ErrorBanner from '../components/ErrorBanner';
 
 const CROPS = [
   { id: 'ffb', label: 'Oil Palm (FFB)' },
@@ -21,6 +23,7 @@ const inputStyle = {
 const labelStyle = { display: 'block', fontSize: '10px', fontWeight: 800, color: '#475569', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '6px' };
 
 const IndexCard = ({ item, cropType, companyId, onSaved, onError }) => {
+  const confirm = useConfirm();
   const [classes, setClasses] = useState(item.classes || []);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -68,7 +71,7 @@ const IndexCard = ({ item, cropType, companyId, onSaved, onError }) => {
   };
 
   const handleReset = async () => {
-    if (!window.confirm(`Reset ${item.label} back to the platform default for ${cropType}?`)) return;
+    if (!(await confirm(`Reset ${item.label} back to the platform default for ${cropType}?`))) return;
     setBusy(true);
     try {
       await resetCropThreshold(cropType, item.index_key, companyId);
@@ -239,12 +242,7 @@ const CropThresholds = () => {
         </div>
       )}
 
-      {error && (
-        <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center', maxWidth: '900px' }}>
-          <AlertCircle size={15} />{error}
-          <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}><X size={14} /></button>
-        </div>
-      )}
+      <div style={{ maxWidth: '900px' }}><ErrorBanner message={error} onDismiss={() => setError('')} onRetry={load} /></div>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>Loading…</div>

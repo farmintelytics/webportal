@@ -14,6 +14,7 @@ import Logs from './pages/Logs';
 import Scheduler from './pages/Scheduler';
 import Inventory from './pages/Inventory';
 import UsersPage from './pages/Users';
+import { ConfirmProvider } from './components/ConfirmProvider';
 
 const NAV_ITEMS = [
   { id: 'onboarding',    label: 'Onboard Organization', icon: Rocket, path: '/admin/onboarding' },
@@ -47,6 +48,7 @@ const AdminPortal = () => {
   const activeId = NAV_ITEMS.find(n => location.pathname.startsWith(n.path))?.id || 'organizations';
 
   return (
+    <ConfirmProvider>
     <div style={{ display: 'flex', height: '100vh', background: '#f8fafc', fontFamily: "'Roboto', sans-serif", overflow: 'hidden' }}>
 
       {/* ── Sidebar ── */}
@@ -194,6 +196,7 @@ const AdminPortal = () => {
         </div>
       </div>
     </div>
+    </ConfirmProvider>
   );
 };
 
