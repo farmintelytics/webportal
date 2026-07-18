@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Wheat, AlertCircle, Search, Layers, UploadCloud, RefreshCw, Settings, Save, Sparkles } from 'lucide-react';
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Wheat, AlertCircle, Search, Layers, UploadCloud, RefreshCw, Settings, Save, Sparkles, Eye, Map } from 'lucide-react';
 import {
   fetchOrganizations, createOrganization, updateOrganization, deleteOrganization,
   fetchFarms, createFarm, deleteFarm, uploadBoundary,
-  generateFarmConfig, fetchPipelineConfigContent, savePipelineConfig,
+  generateFarmConfig, fetchPipelineConfigContent, savePipelineConfig, fetchMinioObjectContent,
 } from '../../services/adminApi';
 
 const ALL_CROPS = ['ffb', 'maize', 'rice', 'cocoa', 'rubber', 'cassava', 'sugarcane', 'cashew'];
@@ -465,10 +468,87 @@ const FarmConfigModal = ({ farm, onClose }) => {
   );
 };
 
+// Fits the map view to the boundary once it loads — MapContainer needs a
+// center/zoom up front, this corrects it as soon as real geometry is in.
+const FitToBounds = ({ data }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!data) return;
+    try {
+      const bounds = L.geoJSON(data).getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] });
+    } catch (_) { /* malformed geometry — leave default view */ }
+  }, [data, map]);
+  return null;
+};
+
+// Shows the boundary a farm is actually using right now, read straight from
+// MinIO — not a re-upload form, just a look at what the pipeline reads.
+const BoundaryViewModal = ({ farm, onClose }) => {
+  const [geo, setGeo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await fetchMinioObjectContent(farm.boundary_minio_path);
+        const parsed = JSON.parse(res.content);
+        if (!cancelled) setGeo(parsed);
+      } catch (e) {
+        if (!cancelled) setError(e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [farm.boundary_minio_path]);
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: '640px', height: '520px', background: '#ffffff',
+        border: '1px solid #e2e8f0', borderRadius: '18px', display: 'flex', flexDirection: 'column',
+        overflow: 'hidden', boxShadow: '0 24px 60px rgba(15,23,42,0.2)',
+      }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Map size={16} color="#16a34a" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 800, margin: 0 }}>{farm.farm_name} — Current Boundary</p>
+            <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 600, margin: '2px 0 0', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{farm.boundary_minio_path}</p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#475569', display: 'flex', flexShrink: 0 }}><X size={14} /></button>
+        </div>
+        <div style={{ flex: 1, position: 'relative', background: '#f1f5f9' }}>
+          {loading && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '13px', fontWeight: 600 }}>Loading boundary…</div>
+          )}
+          {error && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+              <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '13px', textAlign: 'center' }}>{error}</div>
+            </div>
+          )}
+          {!loading && !error && geo && (
+            <MapContainer center={[6.43, 5.27]} zoom={4} style={{ height: '100%', width: '100%' }}>
+              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+              <GeoJSON data={geo} style={{ color: '#22d3ee', weight: 2, fillOpacity: 0.15 }} />
+              <FitToBounds data={geo} />
+            </MapContainer>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FarmRow = ({ farm, onDelete, onReupload }) => {
   const fileRef = React.useRef(null);
   const [uploading, setUploading] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const [boundaryViewOpen, setBoundaryViewOpen] = useState(false);
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -493,6 +573,13 @@ const FarmRow = ({ farm, onDelete, onReupload }) => {
         }}>
           {farm.boundary_uploaded ? '✓ Boundary' : '✗ No Boundary'}
         </span>
+        {farm.boundary_uploaded && (
+          <button onClick={() => setBoundaryViewOpen(true)}
+            title="View current boundary"
+            style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '7px', padding: '5px', cursor: 'pointer', color: '#16a34a', display: 'flex' }}>
+            <Eye size={13} />
+          </button>
+        )}
         <button onClick={() => setConfigOpen(true)}
           title="Edit pipeline config"
           style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '7px', padding: '5px', cursor: 'pointer', color: '#16a34a', display: 'flex' }}>
@@ -509,6 +596,7 @@ const FarmRow = ({ farm, onDelete, onReupload }) => {
         </button>
       </div>
       {configOpen && <FarmConfigModal farm={farm} onClose={() => setConfigOpen(false)} />}
+      {boundaryViewOpen && <BoundaryViewModal farm={farm} onClose={() => setBoundaryViewOpen(false)} />}
     </div>
   );
 };
