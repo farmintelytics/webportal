@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Activity, RefreshCw, X, AlertCircle, CheckCircle2, Clock,
-  Loader2, AlertTriangle, Terminal, ChevronDown, ChevronRight,
+  Loader2, AlertTriangle, Terminal, ChevronRight,
   FileText, Database, Server
 } from 'lucide-react';
 import { fetchLogs, fetchPipelineLogs } from '../../services/adminApi';
@@ -60,8 +60,11 @@ const SummaryCard = ({ icon: Icon, label, value, color }) => (
   </div>
 );
 
-const PipelineLogCard = ({ log, idx }) => {
-  const [expanded, setExpanded] = useState(false);
+// Rows stay a fixed, compact height regardless of content length — full
+// detail (including the raw JSON that used to grow the row inline) opens
+// in a separate modal instead, so a long path or error message can never
+// crowd/overlap a neighbouring row.
+const PipelineLogRow = ({ log, idx, onOpen }) => {
   const status = log.status || (log.error ? 'failed' : 'completed');
   const cfg = getStatus(status);
   const hasFailed = status === 'failed' || !!log.error;
@@ -69,86 +72,84 @@ const PipelineLogCard = ({ log, idx }) => {
   const pathParts = path.split('/');
 
   return (
-    <div style={{
-      background: '#ffffff',
-      border: `1px solid ${hasFailed ? 'rgba(220,38,38,0.25)' : '#e2e8f0'}`,
-      borderLeft: `4px solid ${cfg.color}`,
-      borderRadius: '12px', overflow: 'hidden',
-      transition: 'box-shadow 0.15s',
-    }}>
-      <button
-        onClick={() => setExpanded(e => !e)}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-          padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer',
-          textAlign: 'left',
-        }}
-      >
-        <StatusDot status={status} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b' }}>
-              {pathParts.slice(0, -1).join('/')}
+    <button
+      onClick={() => onOpen(log, idx)}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
+        padding: '14px 16px', background: '#ffffff', cursor: 'pointer',
+        textAlign: 'left', border: `1px solid ${hasFailed ? 'rgba(220,38,38,0.25)' : '#e2e8f0'}`,
+        borderLeft: `4px solid ${cfg.color}`, borderRadius: '12px',
+      }}
+    >
+      <StatusDot status={status} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px' }}>
+            {pathParts.slice(0, -1).join('/')}
+          </span>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {pathParts[pathParts.length - 1]}
+          </span>
+          <StatusBadge status={status} />
+          {log.job_name && (
+            <span style={{ fontSize: '10px', fontWeight: 700, color: '#7c3aed',
+              background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)',
+              padding: '2px 8px', borderRadius: '8px', flexShrink: 0 }}>
+              {log.job_name}
             </span>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>
-              {pathParts[pathParts.length - 1]}
-            </span>
-            <StatusBadge status={status} />
-            {log.job_name && (
-              <span style={{ fontSize: '10px', fontWeight: 700, color: '#7c3aed',
-                background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)',
-                padding: '2px 8px', borderRadius: '8px' }}>
-                {log.job_name}
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: '16px', marginTop: '4px', flexWrap: 'wrap' }}>
-            {log.duration != null && (
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>⏱ {log.duration}s</span>
-            )}
-            {log.timestamp && (
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                🕐 {new Date(log.timestamp).toLocaleString()}
-              </span>
-            )}
-            {log.plots_processed != null && (
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>📍 {log.plots_processed} plots</span>
-            )}
-          </div>
-          {hasFailed && log.error && !expanded && (
-            <div style={{
-              marginTop: '6px', fontSize: '11px', color: '#ef4444', fontFamily: 'monospace',
-              background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
-              borderRadius: '6px', padding: '6px 10px', maxWidth: '600px',
-              textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap',
-            }}>
+          )}
+          {hasFailed && log.error && (
+            <span style={{ fontSize: '11px', color: '#ef4444', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
               ✗ {log.error}
-            </div>
+            </span>
           )}
         </div>
-        {expanded ? <ChevronDown size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />
-          : <ChevronRight size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />}
-      </button>
-      {expanded && (
-        <div style={{ borderTop: '1px solid #f1f5f9', padding: '0 16px 14px' }}>
+        <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
+          {log.duration != null && (
+            <span style={{ fontSize: '11px', color: '#94a3b8' }}>⏱ {log.duration}s</span>
+          )}
+          {log.timestamp && (
+            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+              🕐 {new Date(log.timestamp).toLocaleString()}
+            </span>
+          )}
+          {log.plots_processed != null && (
+            <span style={{ fontSize: '11px', color: '#94a3b8' }}>📍 {log.plots_processed} plots</span>
+          )}
+        </div>
+      </div>
+      <ChevronRight size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />
+    </button>
+  );
+};
+
+const PipelineLogModal = ({ log, idx, onClose }) => {
+  if (!log) return null;
+  const status = log.status || (log.error ? 'failed' : 'completed');
+  const hasFailed = status === 'failed' || !!log.error;
+  const path = log._minio_path || `Log #${idx + 1}`;
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '760px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Terminal size={16} color="#0f172a" />
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', wordBreak: 'break-all', flex: 1 }}>{path}</div>
+          <StatusBadge status={status} />
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#475569', display: 'inline-flex' }}>
+            <X size={13} />
+          </button>
+        </div>
+        <div style={{ padding: '16px 20px', overflow: 'auto', flex: 1 }}>
           {hasFailed && log.error && (
-            <div style={{
-              margin: '12px 0 8px', padding: '10px 14px',
-              background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
-              borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'flex-start',
-            }}>
+            <div style={{ margin: '0 0 12px', padding: '10px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
               <AlertTriangle size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: '1px' }} />
-              <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#ef4444', wordBreak: 'break-all' }}>
-                {log.error}
-              </span>
+              <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#ef4444', wordBreak: 'break-all' }}>{log.error}</span>
             </div>
           )}
           <pre style={{
-            color: '#475569', fontSize: '11px', fontFamily: 'monospace', margin: '12px 0 0',
+            color: '#475569', fontSize: '11.5px', fontFamily: 'monospace', margin: 0,
             whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-            maxHeight: '280px', overflowY: 'auto',
-            background: '#f8fafc', border: '1px solid #e2e8f0',
-            borderRadius: '8px', padding: '12px',
+            background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px',
           }}>
             {JSON.stringify(
               Object.fromEntries(Object.entries(log).filter(([k]) => k !== '_minio_path')),
@@ -156,7 +157,7 @@ const PipelineLogCard = ({ log, idx }) => {
             )}
           </pre>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -171,6 +172,7 @@ const Logs = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [expandedJob, setExpandedJob] = useState(null);
+  const [openLog, setOpenLog] = useState(null);
   const autoRefreshRef = useRef(null);
 
   const loadJobs = async () => {
@@ -366,10 +368,12 @@ const Logs = () => {
               <p style={{ margin: '4px 0 0', fontSize: '11px' }}>Logs appear under <code>execution_logs/</code> after a pipeline run</p>
             </div>
           ) : (
-            pipelineLogs.map((log, i) => <PipelineLogCard key={i} log={log} idx={i} />)
+            pipelineLogs.map((log, i) => <PipelineLogRow key={i} log={log} idx={i} onOpen={(l, idx) => setOpenLog({ log: l, idx })} />)
           )}
         </div>
       )}
+
+      {openLog && <PipelineLogModal log={openLog.log} idx={openLog.idx} onClose={() => setOpenLog(null)} />}
     </div>
   );
 };
