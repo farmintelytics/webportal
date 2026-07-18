@@ -213,7 +213,7 @@ const PortalHub = ({ onSelectModule }) => {
 
         <div className="flex flex-wrap items-center gap-12 mb-10 border-b border-gray-100">
           {[
-            { id: 'monitoring', label: 'Monitoring' },
+            { id: 'monitoring', label: 'Crop Monitoring' },
             { id: 'custom', label: 'Organization' }
           ].map(tab => (
             <button 
