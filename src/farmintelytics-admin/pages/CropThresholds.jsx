@@ -135,6 +135,7 @@ const CropThresholds = () => {
   const [companyId, setCompanyId] = useState('');
   const [orgs, setOrgs] = useState([]);
   const [items, setItems] = useState([]);
+  const [selectedIndex, setSelectedIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -142,13 +143,19 @@ const CropThresholds = () => {
     setLoading(true);
     try {
       const data = await fetchCropThresholds(crop, companyId);
-      setItems(data.indices || []);
+      const loaded = data.indices || [];
+      setItems(loaded);
+      // Keep the current selection if it still exists in the new list
+      // (e.g. after a save/reset); otherwise default to the first index.
+      setSelectedIndex(prev => (loaded.some(i => i.index_key === prev) ? prev : loaded[0]?.index_key || null));
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, [crop, companyId]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { fetchOrganizations().then(setOrgs).catch(() => {}); }, []);
+
+  const selectedItem = items.find(i => i.index_key === selectedIndex) || null;
 
   return (
     <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px', overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}>
@@ -189,6 +196,35 @@ const CropThresholds = () => {
         </div>
       </div>
 
+      {!loading && items.length > 0 && (
+        <div>
+          <label style={labelStyle}>Index</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxWidth: '900px' }}>
+            {items.map(item => {
+              const active = item.index_key === selectedIndex;
+              return (
+                <button
+                  key={item.index_key}
+                  onClick={() => setSelectedIndex(item.index_key)}
+                  style={{
+                    padding: '7px 13px', borderRadius: '9px', cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+                    background: active ? '#15803d' : '#ffffff',
+                    border: active ? '1px solid #15803d' : '1px solid #cbd5e1',
+                    color: active ? '#ffffff' : '#334155',
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                  }}
+                >
+                  {item.label}
+                  {item.calibrated && (
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: active ? '#bbf7d0' : '#16a34a' }} title="Calibrated" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {error && (
         <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center', maxWidth: '900px' }}>
           <AlertCircle size={15} />{error}
@@ -199,20 +235,20 @@ const CropThresholds = () => {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>Loading…</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '900px' }}>
+        <div style={{ maxWidth: '900px' }}>
           {items.length === 0 && (
             <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>No indices in this crop's profile.</div>
           )}
-          {items.map(item => (
+          {selectedItem && (
             <IndexCard
-              key={item.index_key}
-              item={item}
+              key={selectedItem.index_key}
+              item={selectedItem}
               cropType={crop}
               companyId={companyId}
               onSaved={load}
               onError={setError}
             />
-          ))}
+          )}
         </div>
       )}
     </div>
