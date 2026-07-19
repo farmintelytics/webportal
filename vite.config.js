@@ -21,5 +21,20 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Vendor code changes far less often than app code — splitting it
+        // into its own chunk means a repeat visitor's browser can keep
+        // serving react/react-dom/router from cache across app deploys
+        // instead of re-downloading it every time app code changes.
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-router')) {
+            return 'vendor-react';
+          }
+        },
+      },
+    },
+  },
 })
  
