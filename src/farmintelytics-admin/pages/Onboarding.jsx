@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { Building2, Key, Settings, Check, ChevronRight, AlertCircle, X, Copy, Rocket, UploadCloud } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Building2, Key, Settings, Check, ChevronRight, AlertCircle, X, Copy, Rocket, UploadCloud, Filter, Plus } from 'lucide-react';
 import {
-  createOrganization, createCredential, createFarm, uploadBoundary, generateFarmConfig, createSchedulerJob,
-  uploadOrganizationLogo,
+  createOrganization, createCredential, createFarm, uploadBoundary, generateFarmConfig, generateParentConfig,
+  createSchedulerJob, uploadOrganizationLogo, getBoundaryProperties, updateOrganization,
 } from '../../services/adminApi';
 import { slugify, modulesForAccessModel, ACCESS_MODELS, ALL_RS_INDICES } from './Organizations';
 import ErrorBanner from '../components/ErrorBanner';
@@ -17,9 +17,17 @@ const ALL_INDICES = ['NDVI', 'EVI', 'NDMI', 'RECI', 'NDWI', 'LSWI', 'LAI', 'NDRE
 
 const STEPS = [
   { id: 'organization', label: 'Organization Setup', icon: Building2 },
+  { id: 'filters', label: 'Dashboard Filters', icon: Filter },
   { id: 'credentials', label: 'Login Credentials', icon: Key },
   { id: 'pipeline', label: 'Pipeline Config', icon: Settings },
 ];
+
+const DEFAULT_ALERT_THRESHOLDS = {
+  alert_ndvi_drop_pct: 0.25,
+  alert_smi_critical: 0.2,
+  alert_ndmi_water_stress_critical: 0.0,
+  alert_ndvi_health_critical: 0.35,
+};
 
 const inputStyle = {
   width: '100%', padding: '11px 13px', background: '#ffffff', border: '1px solid #cbd5e1',
@@ -52,7 +60,7 @@ const Onboarding = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   // Results carried forward between steps
-  const [done, setDone] = useState({ org: null, credential: null, farm: null, boundary: null, config: null });
+  const [done, setDone] = useState({ org: null, credential: null, farm: null, farms: [], boundary: null, boundaries: [], config: null });
 
   // ── Step forms ──
   const [company, setCompany] = useState({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'organization', allowed_crops: [], allowed_indices: [] });
@@ -63,12 +71,47 @@ const Onboarding = () => {
     processing_level: 'plot_level', cloud_cover_threshold: 10, start_date: '', end_date: '',
   });
   const [boundaryFile, setBoundaryFile] = useState(null);
+  // Okomu-style setups: several farms/estates run separately then merged by
+  // ParentSyncManager. When on, Farm+Boundary repeat for each sub-farm
+  // instead of advancing straight to Credentials.
+  const [isParent, setIsParent] = useState(false);
+  const [parentFarmId, setParentFarmId] = useState('');
+  const [parentFarmName, setParentFarmName] = useState('');
+  const [subFarms, setSubFarms] = useState([]); // completed sub-farms, each { ...farmFields, boundaryFile }
   const [autoSchedule, setAutoSchedule] = useState(true);
   const [scheduleCron, setScheduleCron] = useState('0 3 */5 * *');
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoError, setLogoError] = useState('');
   const logoInputRef = useRef(null);
+
+  // ── Dashboard filters + alert thresholds (step 1) ──
+  const [filterOptions, setFilterOptions] = useState([]); // [{key, sample_values}] unioned across sub-farm boundaries
+  const [loadingFilters, setLoadingFilters] = useState(false);
+  const [selectedFilterKeys, setSelectedFilterKeys] = useState([]);
+  const [alertThresholds, setAlertThresholds] = useState(DEFAULT_ALERT_THRESHOLDS);
+
+  useEffect(() => {
+    if (step !== 1 || !done.farms?.length) return;
+    setLoadingFilters(true);
+    (async () => {
+      try {
+        const results = await Promise.all(done.farms.map(f => getBoundaryProperties(f.farm_id).catch(() => ({ properties: [] }))));
+        const byKey = new Map();
+        for (const r of results) {
+          for (const p of (r.properties || [])) {
+            if (!byKey.has(p.key)) byKey.set(p.key, p);
+          }
+        }
+        setFilterOptions([...byKey.values()]);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoadingFilters(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const handleLogoFile = async (e) => {
     const file = e.target.files?.[0];
@@ -104,6 +147,9 @@ const Onboarding = () => {
   // A company almost always onboards with exactly one initial farm, so they're
   // combined into a single "Organization Setup" step — one submit runs all
   // three API calls in sequence rather than requiring three separate screens.
+  const effectiveParentFarmId = () => parentFarmId.trim() || `${companySlug}_farm`;
+  const effectiveParentFarmName = () => parentFarmName.trim() || `${company.company_name} (Combined)`;
+
   const submitOrganization = () => run(async () => {
     const allowed_modules = modulesForAccessModel(company.accessModel, company.allowed_crops, companySlug);
     const org = await createOrganization({
@@ -116,25 +162,46 @@ const Onboarding = () => {
       map_center_lon: company.map_center_lon,
     });
 
-    const createdFarm = await createFarm({
-      company_name: company.company_name,
-      company_id: org.schema_name,
-      farm_name: farm.farm_name,
-      farm_id: farm.farm_id.trim(),
-      parent_farm_id: '',
-      parent_farm_name: '',
-      sensors: farm.sensors,
-      indices: farm.indices,
-      processing_level: farm.processing_level,
-      cloud_cover_threshold: farm.cloud_cover_threshold,
-      start_date: farm.start_date || null,
-      end_date: farm.end_date || null,
-    });
+    // Standalone farm (the common case) is just [current form]; a parent
+    // setup is every previously-added sub-farm plus the one on screen now,
+    // all stamped with the same parent_farm_id/name so the pipeline's
+    // group_subfarms() merges them at run time exactly like Okomu's
+    // hand-authored batch config does today.
+    const farmsToCreate = isParent ? [...subFarms, { ...farm, boundaryFile }] : [{ ...farm, boundaryFile }];
+    const createdFarms = [];
+    const boundaries = [];
+    for (const f of farmsToCreate) {
+      const createdFarm = await createFarm({
+        company_name: company.company_name,
+        company_id: org.schema_name,
+        farm_name: f.farm_name,
+        farm_id: f.farm_id.trim(),
+        parent_farm_id: isParent ? effectiveParentFarmId() : '',
+        parent_farm_name: isParent ? effectiveParentFarmName() : '',
+        sensors: f.sensors,
+        indices: f.indices,
+        processing_level: f.processing_level,
+        cloud_cover_threshold: f.cloud_cover_threshold,
+        start_date: f.start_date || null,
+        end_date: f.end_date || null,
+      });
+      const boundary = await uploadBoundary(createdFarm.farm_id, f.boundaryFile);
+      createdFarms.push(createdFarm);
+      boundaries.push(boundary);
+    }
 
-    const boundary = await uploadBoundary(createdFarm.farm_id, boundaryFile);
-
-    setDone(d => ({ ...d, org, farm: createdFarm, boundary }));
+    setDone(d => ({ ...d, org, farm: createdFarms[0], farms: createdFarms, boundary: boundaries[0], boundaries }));
     setStep(1);
+  });
+
+  const submitFilters = () => run(async () => {
+    if (done.org) {
+      await updateOrganization(done.org.id, {
+        dashboard_filter_keys: selectedFilterKeys,
+        ...alertThresholds,
+      });
+    }
+    setStep(2);
   });
 
   const submitCredential = () => run(async () => {
@@ -147,17 +214,20 @@ const Onboarding = () => {
       role: cred.role,
     });
     setDone(d => ({ ...d, credential }));
-    setStep(2);
+    setStep(3);
   });
 
   const submitConfig = () => run(async () => {
-    const res = await generateFarmConfig(done.farm.farm_id);
+    const res = isParent
+      ? await generateParentConfig(effectiveParentFarmId())
+      : await generateFarmConfig(done.farm.farm_id);
+    const jobName = isParent ? effectiveParentFarmId() : done.farm.farm_id;
     let scheduler = null;
     if (autoSchedule) {
       try {
         scheduler = await createSchedulerJob({
-          name: `${done.farm.farm_id}_scheduled_monitoring`,
-          description: `Scheduled pipeline run for ${done.farm.farm_name} (created by onboarding wizard)`,
+          name: `${jobName}_scheduled_monitoring`,
+          description: `Scheduled pipeline run for ${isParent ? effectiveParentFarmName() : done.farm.farm_name} (created by onboarding wizard)`,
           cron: scheduleCron,
           config_path: `configs/${res.filename}`,
           is_batch: true,
@@ -169,7 +239,7 @@ const Onboarding = () => {
       }
     }
     setDone(d => ({ ...d, config: res, scheduler }));
-    setStep(3);
+    setStep(4);
   });
 
   const copyText = (text) => navigator.clipboard?.writeText(text);
@@ -231,7 +301,7 @@ const Onboarding = () => {
           <Rocket size={20} color="#16a34a" /> Company Onboarding
         </h2>
         <p style={{ color: '#64748b', fontSize: '13px', fontWeight: 600, margin: '4px 0 0' }}>
-          Set up a new company in three steps: company details, then login credentials, then pipeline config.
+          Set up a new company: organization + farm details, optional dashboard filters, login credentials, then pipeline config.
         </p>
       </div>
 
@@ -265,6 +335,25 @@ const Onboarding = () => {
                   <label style={labelStyle}>Map Center Lon</label>
                   <input type="number" step="any" style={inputStyle} value={company.map_center_lon} onChange={e => setCompany(c => ({ ...c, map_center_lon: parseFloat(e.target.value) }))} />
                 </div>
+              </div>
+              <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#334155' }}>
+                  <input type="checkbox" checked={isParent} onChange={e => setIsParent(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: '#16a34a' }} />
+                  This organization has multiple farms run separately and merged into one parent (e.g. several estates)
+                </label>
+                {isParent && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={labelStyle}>Parent Farm ID</label>
+                      <input style={inputStyle} placeholder={`${companySlug}_farm`} value={parentFarmId} onChange={e => setParentFarmId(e.target.value)} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Parent Farm Name</label>
+                      <input style={inputStyle} placeholder={`${company.company_name || 'Company'} (Combined)`} value={parentFarmName} onChange={e => setParentFarmName(e.target.value)} />
+                    </div>
+                  </div>
+                )}
+                {isParent && <p style={{ ...helpTextStyle, margin: 0 }}>You'll add each sub-farm and its own boundary file one at a time on the next steps — they'll all be tagged with this shared parent so the pipeline merges them automatically.</p>}
               </div>
               <div>
                 <label style={labelStyle}>Access Model</label>
@@ -316,7 +405,11 @@ const Onboarding = () => {
 
           {orgSubStep === 1 && (
             <>
-              <p style={{ color: '#64748b', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>Now add the first farm or estate for {company.company_name || 'this company'}.</p>
+              <p style={{ color: '#64748b', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
+                {isParent
+                  ? `Add sub-farm #${subFarms.length + 1} for ${company.company_name || 'this company'} (parent: ${effectiveParentFarmId()}).`
+                  : `Now add the first farm or estate for ${company.company_name || 'this company'}.`}
+              </p>
               <div>
                 <label style={labelStyle}>Farm / Estate Name *</label>
                 <input style={inputStyle} placeholder="Farm or estate name" value={farm.farm_name} onChange={e => setFarm(f => ({ ...f, farm_name: e.target.value }))} />
@@ -417,12 +510,27 @@ const Onboarding = () => {
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setOrgSubStep(1)} style={secondaryBtn}>Back</button>
+                {isParent && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubFarms(sf => [...sf, { ...farm, boundaryFile }]);
+                      setFarm(f => ({ ...f, farm_name: '', farm_id: '' }));
+                      setBoundaryFile(null);
+                      setOrgSubStep(1);
+                    }}
+                    disabled={!boundaryFile}
+                    style={{ ...secondaryBtn, opacity: !boundaryFile ? 0.5 : 1 }}
+                  >
+                    <Plus size={15} /> Add Another Sub-Farm
+                  </button>
+                )}
                 <button
                   onClick={submitOrganization}
                   disabled={busy || !boundaryFile}
                   style={{ ...primaryBtn(busy || !boundaryFile), flex: 1 }}
                 >
-                  {busy ? 'Creating…' : 'Create Organization + Farm'} <ChevronRight size={15} />
+                  {busy ? 'Creating…' : isParent ? `Finish — Create Organization (${subFarms.length + 1} sub-farms)` : 'Create Organization + Farm'} <ChevronRight size={15} />
                 </button>
               </div>
             </>
@@ -430,8 +538,80 @@ const Onboarding = () => {
         </div>
       )}
 
-      {/* ── STEP 2: Credentials ── */}
+      {/* ── STEP 1B (new): Dashboard Filters + Alert Thresholds ── */}
       {step === 1 && (
+        <div style={card}>
+          <p style={{ color: '#16a34a', fontSize: '13px', fontWeight: 700, margin: 0 }}>
+            ✓ {done.farms?.length > 1 ? `${done.farms.length} sub-farms` : 'Farm'} + boundary uploaded
+          </p>
+          <p style={{ color: '#64748b', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
+            Optional — pick up to 4 boundary-file columns (found in the GeoJSON you just uploaded) to show as
+            filter dropdowns on this org's dashboard. Leave none selected to skip filters entirely.
+          </p>
+          {loadingFilters && <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>Reading boundary properties…</p>}
+          {!loadingFilters && filterOptions.length === 0 && (
+            <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>No named columns found in the uploaded boundary file.</p>
+          )}
+          {!loadingFilters && filterOptions.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {filterOptions.map(opt => {
+                const active = selectedFilterKeys.includes(opt.key);
+                const disabled = !active && selectedFilterKeys.length >= 4;
+                return (
+                  <button
+                    key={opt.key}
+                    disabled={disabled}
+                    onClick={() => setSelectedFilterKeys(keys => active ? keys.filter(k => k !== opt.key) : [...keys, opt.key])}
+                    title={opt.sample_values?.length ? `e.g. ${opt.sample_values.slice(0, 3).join(', ')}` : ''}
+                    style={{ ...chip(active), opacity: disabled ? 0.4 : 1 }}
+                  >
+                    {opt.key}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <p style={helpTextStyle}>{selectedFilterKeys.length}/4 selected.</p>
+
+          <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#334155' }}>Alert Thresholds (optional)</p>
+            <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>Defaults match what every organization uses today — only change these if this org needs different sensitivity.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={labelStyle}>NDVI/SAVI/EVI Drop %</label>
+                <input type="number" step="0.01" min="0" max="1" style={inputStyle}
+                  value={alertThresholds.alert_ndvi_drop_pct}
+                  onChange={e => setAlertThresholds(t => ({ ...t, alert_ndvi_drop_pct: parseFloat(e.target.value || '0') }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>SMI Critical</label>
+                <input type="number" step="0.01" style={inputStyle}
+                  value={alertThresholds.alert_smi_critical}
+                  onChange={e => setAlertThresholds(t => ({ ...t, alert_smi_critical: parseFloat(e.target.value || '0') }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>NDMI Water Stress Critical</label>
+                <input type="number" step="0.01" style={inputStyle}
+                  value={alertThresholds.alert_ndmi_water_stress_critical}
+                  onChange={e => setAlertThresholds(t => ({ ...t, alert_ndmi_water_stress_critical: parseFloat(e.target.value || '0') }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>NDVI Health Critical</label>
+                <input type="number" step="0.01" style={inputStyle}
+                  value={alertThresholds.alert_ndvi_health_critical}
+                  onChange={e => setAlertThresholds(t => ({ ...t, alert_ndvi_health_critical: parseFloat(e.target.value || '0') }))} />
+              </div>
+            </div>
+          </div>
+
+          <button onClick={submitFilters} disabled={busy} style={primaryBtn(busy)}>
+            {busy ? 'Saving…' : 'Continue'} <ChevronRight size={15} />
+          </button>
+        </div>
+      )}
+
+      {/* ── STEP 2: Credentials ── */}
+      {step === 2 && (
         <div style={card}>
           <p style={{ color: '#16a34a', fontSize: '13px', fontWeight: 700, margin: 0 }}>
             ✓ Organization "{done.org?.display_name}" created
@@ -472,7 +652,7 @@ const Onboarding = () => {
       )}
 
       {/* ── STEP 3: Pipeline config ── */}
-      {step === 2 && (
+      {step === 3 && (
         <div style={card}>
           <p style={{ color: '#16a34a', fontSize: '13px', fontWeight: 700, margin: 0 }}>✓ Organization, farm and boundary are all set up</p>
           <p style={{ color: '#475569', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
@@ -498,7 +678,7 @@ const Onboarding = () => {
       )}
 
       {/* ── DONE ── */}
-      {step === 3 && (
+      {step === 4 && (
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -526,8 +706,11 @@ const Onboarding = () => {
           <ul style={{ margin: 0, padding: '0 0 0 18px', color: '#475569', fontSize: '12.5px', lineHeight: 2 }}>
             <li>Organization + access model saved — users see only their licensed modules.</li>
             <li>Login: <strong>{done.credential?.email}</strong> / <code>{done.credential?.access_code}</code></li>
-            <li>Boundary in MinIO at <code>{done.boundary?.minio_path}</code></li>
-            <li>Pipeline config <code>{done.config?.filename}</code> written to the shared configs folder.</li>
+            {done.boundaries?.length > 1
+              ? <li>{done.boundaries.length} sub-farm boundaries uploaded to MinIO (parent: <code>{effectiveParentFarmId()}</code>).</li>
+              : <li>Boundary in MinIO at <code>{done.boundary?.minio_path}</code></li>}
+            {selectedFilterKeys.length > 0 && <li>Dashboard filters: <code>{selectedFilterKeys.join(', ')}</code></li>}
+            <li>Pipeline config <code>{done.config?.filename}</code> written to the shared configs folder{done.config?.sub_farms ? ` (covers ${done.config.sub_farms.length} sub-farms)` : ''}.</li>
             {done.scheduler
               ? <li>Scheduler job <code>{done.scheduler.name}</code> active (<code>{done.scheduler.cron}</code>) — dashboards fill with real data after the first run.</li>
               : <li>No scheduler job created — add one under Scheduler pointing at the config, or run the pipeline manually.</li>}
@@ -535,7 +718,17 @@ const Onboarding = () => {
           {done.config?.content && (
             <pre style={{ margin: 0, padding: '14px', background: '#0f172a', color: '#86efac', borderRadius: '12px', fontSize: '11px', overflowX: 'auto', maxHeight: '240px' }}>{done.config.content}</pre>
           )}
-          <button onClick={() => { setStep(0); setOrgSubStep(0); setDone({ org: null, credential: null, farm: null, boundary: null, config: null }); setCompany({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'organization', allowed_crops: [], allowed_indices: [] }); setLogoUrl(''); setLogoError(''); setCred({ email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' }); setFarm(f => ({ ...f, farm_name: '', farm_id: '' })); setBoundaryFile(null); }} style={primaryBtn(false)}>
+          <button onClick={() => {
+            setStep(0); setOrgSubStep(0);
+            setDone({ org: null, credential: null, farm: null, farms: [], boundary: null, boundaries: [], config: null });
+            setCompany({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'organization', allowed_crops: [], allowed_indices: [] });
+            setLogoUrl(''); setLogoError('');
+            setCred({ email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' });
+            setFarm(f => ({ ...f, farm_name: '', farm_id: '' }));
+            setBoundaryFile(null);
+            setIsParent(false); setParentFarmId(''); setParentFarmName(''); setSubFarms([]);
+            setFilterOptions([]); setSelectedFilterKeys([]); setAlertThresholds(DEFAULT_ALERT_THRESHOLDS);
+          }} style={primaryBtn(false)}>
             <Rocket size={15} /> Onboard Another Company
           </button>
         </div>

@@ -102,12 +102,34 @@ export async function generateFarmConfig(farmId) {
   return adminFetch(`/farms/${farmId}/generate-config`, { method: 'POST' });
 }
 
+/**
+ * POST /farms/parent/{parent_farm_id}/generate-config
+ * Same as generateFarmConfig, but for a parent farm made of several
+ * sub-farms sharing one parent_farm_id (e.g. Okomu's mainestate/
+ * extension1/extension2) — emits ONE batch YAML with one job per sub-farm.
+ * Returns { status, filename, sub_farms, content }.
+ */
+export async function generateParentConfig(parentFarmId) {
+  return adminFetch(`/farms/parent/${parentFarmId}/generate-config`, { method: 'POST' });
+}
+
 // ─── Boundaries ───────────────────────────────────────────────────────────────
 
 export async function uploadBoundary(farmId, file) {
   const form = new FormData();
   form.append('file', file);
   return adminUpload(`/boundaries/${farmId}`, form);
+}
+
+/**
+ * GET /boundaries/{farm_id}/properties
+ * Introspects the just-uploaded boundary's real GeoJSON property keys (e.g.
+ * Estate, Crop, CodeBloc) so onboarding can offer them as dashboard filter
+ * choices without guessing column names ahead of upload.
+ * Returns { farm_id, properties: [{ key, sample_values }] }.
+ */
+export async function getBoundaryProperties(farmId) {
+  return adminFetch(`/boundaries/${farmId}/properties`);
 }
 
 // ─── Credentials ──────────────────────────────────────────────────────────────

@@ -1,4 +1,6 @@
 import { CROP_META } from '../../../services/cropMonitoringApi';
+import PlotDetailPanel from './PlotDetailPanel';
+import PlotSearchSelector from './PlotSearchSelector';
 import React, { useState, useMemo, useEffect, useRef, createPortal } from 'react';
 import { 
   Globe, 
@@ -1004,6 +1006,12 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   const [showRasterLayer, setShowRasterLayer] = useState(true);
   const [selectedPlot, setSelectedPlot] = useState(null);
   const [availableIndices, setAvailableIndices] = useState([]);
+  // Boundary-property keys the admin picked at onboarding to show as
+  // dashboard filter dropdowns (empty = no extra filters). Values are
+  // filtered client-side from plotsData's own .filters, already populated
+  // by get_plots_intelligence — no separate fetch per filter value.
+  const [dashboardFilterKeys, setDashboardFilterKeys] = useState([]);
+  const [dynamicFilterValues, setDynamicFilterValues] = useState({});
 
   // Enumerate available zarr indices for the active tenant
   useEffect(() => {
@@ -1016,6 +1024,18 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
       }
     }
     loadIndices();
+  }, [tenant]);
+
+  useEffect(() => {
+    async function loadFilterConfig() {
+      try {
+        const cfg = await api.fetchCropMonitoringConfig();
+        setDashboardFilterKeys(cfg?.dashboard_filter_keys || []);
+      } catch (err) {
+        console.error('Failed to fetch crop monitoring config:', err);
+      }
+    }
+    loadFilterConfig();
   }, [tenant]);
 
   // Fetch the composite's own timeline + tile URLs (same {date: url} shape as
@@ -1301,7 +1321,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
         const ndmiVal = p.indices?.ndmi ?? 0;
         const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
         const colorVal = healthVal === 'Optimal' ? '#15803d' : healthVal === 'Good' ? '#84cc16' : '#dc2626';
-        return { id: p.plot_id, name: p.name || p.plot_id, area: `${p.area_ha || 10.0} HA`, health: healthVal, ndvi: ndviVal, ndmi: ndmiVal, color: colorVal, coords, indices: p.indices, subfarm: p.subfarm || p.division || null, division: p.division || null, blocId: p.bloc_id || null };
+        return { id: p.plot_id, name: p.name || p.plot_id, area: `${p.area_ha || 10.0} HA`, health: healthVal, ndvi: ndviVal, ndmi: ndmiVal, color: colorVal, coords, indices: p.indices, subfarm: p.subfarm || p.division || null, division: p.division || null, blocId: p.bloc_id || null, filters: p.filters || {} };
       });
     }
     return [];
@@ -1320,13 +1340,22 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
         const ndmiVal = p.indices?.ndmi ?? 0;
         const healthVal = ndviVal > 0.7 ? 'Optimal' : ndviVal > 0.55 ? 'Good' : 'Stressed';
         const colorVal = healthVal === 'Optimal' ? '#15803d' : healthVal === 'Good' ? '#84cc16' : '#dc2626';
-        return { id: p.plot_id, name: p.name || p.plot_id, area: `${p.area_ha || 10.0} HA`, health: healthVal, ndvi: ndviVal, ndmi: ndmiVal, color: colorVal, coords, indices: p.indices, subfarm: p.subfarm || p.division || null, division: p.division || null, blocId: p.bloc_id || null };
+        return { id: p.plot_id, name: p.name || p.plot_id, area: `${p.area_ha || 10.0} HA`, health: healthVal, ndvi: ndviVal, ndmi: ndmiVal, color: colorVal, coords, indices: p.indices, subfarm: p.subfarm || p.division || null, division: p.division || null, blocId: p.bloc_id || null, filters: p.filters || {} };
       });
     }
     return [];
   }, [plots, currentTimelineB]);
 
   const plotsData = plotsDataA;
+
+  // Admin-configured dashboard filters (Super Admin onboarding) narrowed to
+  // just the intelligence-layers map view — other tabs/charts keep reading
+  // the full plotsData so this doesn't risk breaking aggregate stats.
+  const filteredPlotsData = useMemo(() => {
+    const activeFilters = Object.entries(dynamicFilterValues).filter(([, v]) => v && v !== 'All');
+    if (activeFilters.length === 0) return plotsData;
+    return plotsData.filter(p => activeFilters.every(([key, val]) => String(p.filters?.[key]) === val));
+  }, [plotsData, dynamicFilterValues]);
 
   const currentTileUrl = useMemo(() => {
     if (!currentTimeline) return null;
@@ -4483,14 +4512,48 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                         </Pane>
                       </>
                     ) : (
-                      renderIntelPolygons(plotsData)
+                      renderIntelPolygons(filteredPlotsData)
                     )}
                     {null}
-                    <FitBoundsToPlots plotsData={plotsData} farmBoundary={farmBoundary} />
+                    <FitBoundsToPlots plotsData={filteredPlotsData} farmBoundary={farmBoundary} />
                     <FitToZarrBounds zarrBounds={zarrBounds} />
                     <ZoomControl position="bottomright" />
                     <ResizeMap trigger={intelShowLayers} />
                   </MapContainer>
+
+                  {!isCompareMode && (
+                    <div className="absolute top-2 left-2 z-[1000] flex flex-col gap-2 items-start">
+                      <PlotSearchSelector plotsData={plotsData} onSelect={handlePlotClick} />
+                      {dashboardFilterKeys.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {dashboardFilterKeys.map(key => {
+                            const options = [...new Set(plotsData.map(p => p.filters?.[key]).filter(v => v != null && v !== ''))];
+                            if (options.length === 0) return null;
+                            return (
+                              <select
+                                key={key}
+                                value={dynamicFilterValues[key] || 'All'}
+                                onChange={e => setDynamicFilterValues(v => ({ ...v, [key]: e.target.value }))}
+                                className="text-[11px] font-bold text-slate-700 bg-white border border-slate-300 rounded-lg px-2 py-1.5 shadow-sm"
+                              >
+                                <option value="All">{key}: All</option>
+                                {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                              </select>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {!isCompareMode && selectedPlot && (
+                    <PlotDetailPanel
+                      plot={selectedPlot}
+                      series={pixelTimeseries}
+                      indexLabel={selectedIndex}
+                      dashboardFilterKeys={dashboardFilterKeys}
+                      onClose={() => setSelectedPlot(null)}
+                    />
+                  )}
 
                   <SwipeSliderOverlay
                     isCompareMode={isCompareMode}

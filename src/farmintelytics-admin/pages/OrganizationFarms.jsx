@@ -24,29 +24,38 @@ import { SENSOR_OPTIONS, toggleInList, chipStyle } from '../components/formHelpe
 // (org, sensors, indices, dates, boundary all in one). This is for adding a
 // *second* (or third...) farm/estate to an org that already exists, so it
 // only asks for what's actually new: name, sensors, indices, boundary.
-const QuickAddFarmForm = ({ org, onSave, onCancel }) => {
+const QuickAddFarmForm = ({ org, farms = [], onSave, onCancel }) => {
   const [farmName, setFarmName] = useState('');
   const [sensors, setSensors] = useState(['sentinel-2', 'sentinel-1']);
   const [indices, setIndices] = useState(['NDVI', 'NDMI']);
   const [boundaryFile, setBoundaryFile] = useState(null);
+  const [parentFarmId, setParentFarmId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const INDICES = ['NDVI', 'EVI', 'NDMI', 'RECI', 'NDWI', 'LSWI'];
   const toggle = (list, setList, v) => setList(toggleInList(list, v));
 
+  // Existing parent_farm_id values already used among this org's farms — lets
+  // an admin attach a new sub-farm to an Okomu-style merged group without
+  // hand-editing YAML/DB rows later.
+  const existingParents = [...new Set(
+    farms.map(f => f.parent_farm_id).filter(Boolean)
+  )];
+
   const handleSave = async () => {
     if (!farmName.trim() || !boundaryFile) return;
     setSaving(true);
     setError('');
     try {
+      const parent = farms.find(f => f.parent_farm_id === parentFarmId || f.farm_id === parentFarmId);
       const created = await createFarm({
         company_name: org.display_name,
         company_id: org.schema_name,
         farm_name: farmName,
         farm_id: '',
-        parent_farm_id: '',
-        parent_farm_name: '',
+        parent_farm_id: parentFarmId || '',
+        parent_farm_name: parentFarmId ? (parent?.parent_farm_name || parent?.farm_name || parentFarmId) : '',
         sensors, indices,
         processing_level: 'plot_level',
         cloud_cover_threshold: 10,
@@ -75,6 +84,16 @@ const QuickAddFarmForm = ({ org, onSave, onCancel }) => {
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
         {INDICES.map(i => <button key={i} onClick={() => toggle(indices, setIndices, i)} style={chipSm(indices.includes(i))}>{i}</button>)}
       </div>
+      {existingParents.length > 0 && (
+        <select
+          value={parentFarmId}
+          onChange={e => setParentFarmId(e.target.value)}
+          style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '12px', fontWeight: 600, outline: 'none' }}
+        >
+          <option value="">Standalone farm (no parent)</option>
+          {existingParents.map(pid => <option key={pid} value={pid}>Merge into: {pid}</option>)}
+        </select>
+      )}
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', border: '1.5px dashed #cbd5e1', borderRadius: '8px', cursor: 'pointer', background: '#ffffff' }}>
         <UploadCloud size={14} color={boundaryFile ? '#16a34a' : '#94a3b8'} />
         <span style={{ fontSize: '11px', fontWeight: 700, color: boundaryFile ? '#16a34a' : '#64748b' }}>
@@ -420,7 +439,7 @@ const OrgDetailPanel = ({ org, onClose }) => {
             </button>
           </div>
 
-          {addOpen && <QuickAddFarmForm org={org} onCancel={() => setAddOpen(false)} onSave={() => { setAddOpen(false); load(); }} />}
+          {addOpen && <QuickAddFarmForm org={org} farms={farms} onCancel={() => setAddOpen(false)} onSave={() => { setAddOpen(false); load(); }} />}
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '12px' }}>Loading…</div>
