@@ -22,19 +22,19 @@ import {
 import { fetchTenants, fetchCropMonitoringConfig } from '../services/organizationMonitorApi';
 
 
-const ModuleCard = ({ title, crop, id, icon, active, onSelect }) => (
-  <button 
+const ModuleCard = ({ title, crop, id, icon, active, onSelect, logoUrl }) => (
+  <button
     onClick={() => active && onSelect(id)}
     className={`group relative p-8 rounded-2xl transition-all duration-300 flex flex-col text-left border border-gray-100 ${
-      active 
-        ? 'bg-white hover:bg-gray-50 hover:shadow-md hover:-translate-y-0.5' 
+      active
+        ? 'bg-white hover:bg-gray-50 hover:shadow-md hover:-translate-y-0.5'
         : 'bg-white opacity-40 cursor-not-allowed'
     }`}
   >
-    <div className={`p-4 rounded-xl w-fit mb-6 bg-gray-50 transition-colors ${
+    <div className={`p-4 rounded-xl w-fit mb-6 bg-gray-50 transition-colors overflow-hidden ${
       active ? 'text-green-600 group-hover:bg-green-600 group-hover:text-white' : 'text-gray-400'
     }`}>
-      {React.cloneElement(icon, { size: 32 })}
+      {logoUrl ? <img src={logoUrl} alt="" className="w-8 h-8 object-contain" /> : React.cloneElement(icon, { size: 32 })}
     </div>
     
     <div className="flex-1">
@@ -94,7 +94,8 @@ const PortalHub = ({ onSelectModule }) => {
             title: t.title,
             crop: t.crop,
             icon: <Satellite />,
-            active: t.active
+            active: t.active,
+            logoUrl: t.logo_url || ''
           }));
           setCustomModules(mapped);
         }

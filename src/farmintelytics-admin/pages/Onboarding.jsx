@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Building2, Key, Settings, Check, ChevronRight, AlertCircle, X, Copy, Rocket, UploadCloud } from 'lucide-react';
 import {
   createOrganization, createCredential, createFarm, uploadBoundary, generateFarmConfig, createSchedulerJob,
+  uploadOrganizationLogo,
 } from '../../services/adminApi';
 import { slugify, modulesForAccessModel, ACCESS_MODELS, ALL_RS_INDICES } from './Organizations';
 import ErrorBanner from '../components/ErrorBanner';
@@ -64,6 +65,26 @@ const Onboarding = () => {
   const [boundaryFile, setBoundaryFile] = useState(null);
   const [autoSchedule, setAutoSchedule] = useState(true);
   const [scheduleCron, setScheduleCron] = useState('0 3 */5 * *');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const logoInputRef = useRef(null);
+
+  const handleLogoFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !done.org) return;
+    setUploadingLogo(true);
+    setLogoError('');
+    try {
+      const updated = await uploadOrganizationLogo(done.org.id, file);
+      setLogoUrl(updated.logo_url || '');
+    } catch (err) {
+      setLogoError(err.message);
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
 
   const companySlug = company.schema_name.trim() || slugify(company.company_name);
   const toggleIn = toggleInList;
@@ -488,6 +509,20 @@ const Onboarding = () => {
               <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>Config: <code>{done.config?.filename}</code></p>
             </div>
           </div>
+          <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+              {logoUrl ? <img src={logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Building2 size={20} color="#94a3b8" />}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Branding Logo</p>
+              <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#64748b' }}>Optional — shown on the portal hub and this org's login screen.</p>
+              {logoError && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#dc2626' }}>{logoError}</p>}
+            </div>
+            <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} style={{ padding: '9px 16px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', color: '#334155', cursor: 'pointer', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
+              {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace' : 'Upload'}
+            </button>
+            <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style={{ display: 'none' }} onChange={handleLogoFile} />
+          </div>
           <ul style={{ margin: 0, padding: '0 0 0 18px', color: '#475569', fontSize: '12.5px', lineHeight: 2 }}>
             <li>Organization + access model saved — users see only their licensed modules.</li>
             <li>Login: <strong>{done.credential?.email}</strong> / <code>{done.credential?.access_code}</code></li>
@@ -500,7 +535,7 @@ const Onboarding = () => {
           {done.config?.content && (
             <pre style={{ margin: 0, padding: '14px', background: '#0f172a', color: '#86efac', borderRadius: '12px', fontSize: '11px', overflowX: 'auto', maxHeight: '240px' }}>{done.config.content}</pre>
           )}
-          <button onClick={() => { setStep(0); setOrgSubStep(0); setDone({ org: null, credential: null, farm: null, boundary: null, config: null }); setCompany({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'organization', allowed_crops: [], allowed_indices: [] }); setCred({ email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' }); setFarm(f => ({ ...f, farm_name: '', farm_id: '' })); setBoundaryFile(null); }} style={primaryBtn(false)}>
+          <button onClick={() => { setStep(0); setOrgSubStep(0); setDone({ org: null, credential: null, farm: null, boundary: null, config: null }); setCompany({ company_name: '', schema_name: '', map_center_lat: 6.43, map_center_lon: 5.27, accessModel: 'organization', allowed_crops: [], allowed_indices: [] }); setLogoUrl(''); setLogoError(''); setCred({ email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' }); setFarm(f => ({ ...f, farm_name: '', farm_id: '' })); setBoundaryFile(null); }} style={primaryBtn(false)}>
             <Rocket size={15} /> Onboard Another Company
           </button>
         </div>

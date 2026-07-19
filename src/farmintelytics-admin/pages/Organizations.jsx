@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Search, Layers } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Search, Layers, ImagePlus } from 'lucide-react';
 import {
-  fetchOrganizations, createOrganization, updateOrganization, deleteOrganization,
+  fetchOrganizations, createOrganization, updateOrganization, deleteOrganization, uploadOrganizationLogo,
 } from '../../services/adminApi';
 import { useConfirm } from '../components/ConfirmProvider';
 import ErrorBanner from '../components/ErrorBanner';
@@ -145,6 +145,27 @@ const OrgModal = ({ org, onSave, onClose }) => {
     finally { setSaving(false); }
   };
 
+  const [logoUrl, setLogoUrl] = useState(org?.logo_url || '');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const logoInputRef = useRef(null);
+
+  const handleLogoFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !org) return;
+    setUploadingLogo(true);
+    setLogoError('');
+    try {
+      const updated = await uploadOrganizationLogo(org.id, file);
+      setLogoUrl(updated.logo_url || '');
+    } catch (err) {
+      setLogoError(err.message);
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
+
   const inputStyle = {
     width: '100%', padding: '10px 12px',
     background: '#ffffff', border: '1px solid #cbd5e1',
@@ -165,6 +186,23 @@ const OrgModal = ({ org, onSave, onClose }) => {
           <div>
             <label style={labelStyle}>Company Name *</label>
             <input style={inputStyle} placeholder="Company display name" value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))} />
+          </div>
+          <div>
+            <label style={labelStyle}>Branding Logo</label>
+            {org ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                  {logoUrl ? <img src={logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <ImagePlus size={18} color="#94a3b8" />}
+                </div>
+                <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} style={{ padding: '8px 14px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#334155', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
+                  {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace Logo' : 'Upload Logo'}
+                </button>
+                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style={{ display: 'none' }} onChange={handleLogoFile} />
+              </div>
+            ) : (
+              <p style={{ color: '#64748b', fontSize: '11px', margin: 0 }}>Save the organization first, then reopen it here to add a logo.</p>
+            )}
+            {logoError && <p style={{ color: '#dc2626', fontSize: '11px', margin: '4px 0 0' }}>{logoError}</p>}
           </div>
           <div>
             <label style={labelStyle}>Schema / Slug ID</label>
@@ -367,8 +405,8 @@ const Organizations = () => {
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Building2 size={18} color="#16a34a" />
+                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    {org.logo_url ? <img src={org.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Building2 size={18} color="#16a34a" />}
                   </div>
                   <div>
                     <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700, margin: 0 }}>{org.display_name}</p>

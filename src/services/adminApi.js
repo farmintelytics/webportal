@@ -63,6 +63,12 @@ export async function updateOrganization(id, data) {
   return adminFetch(`/organizations/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
+export async function uploadOrganizationLogo(id, file) {
+  const form = new FormData();
+  form.append('file', file);
+  return adminUpload(`/organizations/${id}/logo`, form);
+}
+
 export async function deleteOrganization(id) {
   return adminFetch(`/organizations/${id}`, { method: 'DELETE' });
 }
