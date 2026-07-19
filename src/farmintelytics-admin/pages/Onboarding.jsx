@@ -90,6 +90,9 @@ const Onboarding = () => {
   const [loadingFilters, setLoadingFilters] = useState(false);
   const [selectedFilterKeys, setSelectedFilterKeys] = useState([]);
   const [alertThresholds, setAlertThresholds] = useState(DEFAULT_ALERT_THRESHOLDS);
+  // Off by default — a forward-filled point is a carried-forward value, not
+  // a real measurement, so this is an explicit opt-in per org.
+  const [enableFfill, setEnableFfill] = useState(false);
 
   useEffect(() => {
     if (step !== 1 || !done.farms?.length) return;
@@ -199,6 +202,7 @@ const Onboarding = () => {
       await updateOrganization(done.org.id, {
         dashboard_filter_keys: selectedFilterKeys,
         ...alertThresholds,
+        enable_timeseries_ffill: enableFfill,
       });
     }
     setStep(2);
@@ -604,6 +608,16 @@ const Onboarding = () => {
             </div>
           </div>
 
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', padding: '12px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+            <input type="checkbox" checked={enableFfill} onChange={e => setEnableFfill(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: '#16a34a', marginTop: '1px' }} />
+            <span>
+              <span style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155' }}>Forward-fill gaps in time-series charts</span>
+              <span style={{ display: 'block', fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                When a date has no clean satellite scene (cloud cover, no pass), carry forward the last real reading instead of leaving a gap. Off by default — carried-forward points are flagged, not presented as new measurements.
+              </span>
+            </span>
+          </label>
+
           <button onClick={submitFilters} disabled={busy} style={primaryBtn(busy)}>
             {busy ? 'Saving…' : 'Continue'} <ChevronRight size={15} />
           </button>
@@ -727,7 +741,7 @@ const Onboarding = () => {
             setFarm(f => ({ ...f, farm_name: '', farm_id: '' }));
             setBoundaryFile(null);
             setIsParent(false); setParentFarmId(''); setParentFarmName(''); setSubFarms([]);
-            setFilterOptions([]); setSelectedFilterKeys([]); setAlertThresholds(DEFAULT_ALERT_THRESHOLDS);
+            setFilterOptions([]); setSelectedFilterKeys([]); setAlertThresholds(DEFAULT_ALERT_THRESHOLDS); setEnableFfill(false);
           }} style={primaryBtn(false)}>
             <Rocket size={15} /> Onboard Another Company
           </button>
