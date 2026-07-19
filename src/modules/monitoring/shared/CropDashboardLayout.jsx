@@ -933,6 +933,8 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   const [restorationZones, setRestorationZones] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [landUseChange, setLandUseChange] = useState(null);
+  const [landUseChangeLoading, setLandUseChangeLoading] = useState(false);
 
   // Same live backend data as the organization view — the crop pages must render
   // the identical experience (map, splits, calendar, charts, alerts, boundary).
@@ -1055,6 +1057,26 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
       }
     }
     loadWaterDemand();
+    return () => { active = false; };
+  }, [activeSidebarItem, tenant]);
+
+  // ── ESA WorldCover land-use-change (Land Restoration tab) ────────────────
+  useEffect(() => {
+    if (activeSidebarItem !== 'land-restoration') return;
+    let active = true;
+    async function loadLandUseChange() {
+      setLandUseChangeLoading(true);
+      try {
+        const data = await api.fetchLandUseChange();
+        if (active) setLandUseChange(data && Object.keys(data).length ? data : null);
+      } catch (err) {
+        console.error('Failed to fetch land-use-change:', err);
+        if (active) setLandUseChange(null);
+      } finally {
+        if (active) setLandUseChangeLoading(false);
+      }
+    }
+    loadLandUseChange();
     return () => { active = false; };
   }, [activeSidebarItem, tenant]);
 
@@ -5607,16 +5629,34 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                           )}
                         </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LULC Change {renderInfoTooltip("LULC Change")}</div><span className="text-[10px] text-gray-400">Land cover change detection</span></div>
+                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LULC Change {renderInfoTooltip("LULC Change")}</div><span className="text-[10px] text-gray-400">ESA WorldCover, real detected transitions</span></div>
                             <button onClick={() => setRestoreShowLulcChange(!restoreShowLulcChange)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowLulcChange ? '#16A34A' : '#E5E7EB' }}>
                               <div style={{ transform: restoreShowLulcChange ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
                             </button>
                           </div>
                           {restoreShowLulcChange && (
                             <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#15803d'}}/><span className="text-[10px] font-semibold text-gray-500">Vegetation Gain</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#6b7280'}}/><span className="text-[10px] font-semibold text-gray-500">No Change</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Vegetation Loss</span></div>
+                              {landUseChangeLoading ? (
+                                <span className="text-[10px] font-semibold text-gray-400">Loading…</span>
+                              ) : !landUseChange ? (
+                                <span className="text-[10px] font-semibold text-gray-400">No ESA WorldCover coverage available for this farm yet.</span>
+                              ) : (
+                                <>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-semibold text-gray-500">{landUseChange.compared_years?.[0]} → {landUseChange.compared_years?.[1]}</span>
+                                    <span className="text-[11px] font-bold text-gray-700">{landUseChange.changed_pct}% changed</span>
+                                  </div>
+                                  {(landUseChange.top_transitions || []).slice(0, 5).map((t, i) => (
+                                    <div key={i} className="flex items-center justify-between gap-2">
+                                      <span className="text-[10px] font-semibold text-gray-500 truncate">{t.transition}</span>
+                                      <span className="text-[10px] font-bold text-gray-600 shrink-0">{t.area_pct}%</span>
+                                    </div>
+                                  ))}
+                                  {(!landUseChange.top_transitions || landUseChange.top_transitions.length === 0) && (
+                                    <span className="text-[10px] font-semibold text-gray-400">No significant transitions detected.</span>
+                                  )}
+                                </>
+                              )}
                             </div>
                           )}
                         </div>

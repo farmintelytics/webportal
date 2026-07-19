@@ -214,6 +214,19 @@ export async function fetchRestorationZones(tenant) {
   return apiFetch(`/restoration/zones${params}`);
 }
 
+/**
+ * GET /restoration/land-use-change
+ * ESA WorldCover year-over-year land-cover classification change for this
+ * tenant (tenant resolved server-side from the Bearer token). Returns {}
+ * when WorldCover doesn't cover this farm or only one year is available —
+ * that's a valid "no data yet" state, not an error.
+ * { compared_years: [2020, 2021], land_cover_by_year: { [year]: { [className]: pct } },
+ *   changed_pct: number, top_transitions: [{ transition, area_pct }] }
+ */
+export async function fetchLandUseChange() {
+  return apiFetch('/restoration/land-use-change');
+}
+
 // ─── Alerts Command Center ──────────────────────────────────────────────────
 
 /**
