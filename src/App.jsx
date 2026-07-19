@@ -22,51 +22,63 @@ import Login from './pages/Login';
 import PortalHub from './pages/PortalHub';
 import PortalLayout from './layouts/PortalLayout';
 
+// Everything below is route-gated content — a user only ever needs ONE of
+// these per session, but they used to all be top-level imports, so every
+// visitor downloaded the entire app (every crop dashboard, every
+// sustainability portal, the whole admin console) just to see the login
+// screen. React.lazy() + the <Suspense> boundary in App below means each
+// chunk is only fetched when its route actually renders.
+
 // === FFB Management ===
-import FFBDashboard from './modules/management/ffb/Dashboard';
+const FFBDashboard = React.lazy(() => import('./modules/management/ffb/Dashboard'));
 
 // === Crop Management Portals ===
-import CashewDashboard from './modules/management/cashew/Dashboard';
-import SugarcaneDashboard from './modules/management/sugarcane/Dashboard';
-import RiceDashboard from './modules/management/rice/Dashboard';
-import CocoaDashboard from './modules/management/cocoa/Dashboard';
-import RubberDashboard from './modules/management/rubber/Dashboard';
-import CassavaDashboard from './modules/management/cassava/Dashboard';
-import MaizeDashboard from './modules/management/maize/Dashboard';
+const CashewDashboard = React.lazy(() => import('./modules/management/cashew/Dashboard'));
+const SugarcaneDashboard = React.lazy(() => import('./modules/management/sugarcane/Dashboard'));
+const RiceDashboard = React.lazy(() => import('./modules/management/rice/Dashboard'));
+const CocoaDashboard = React.lazy(() => import('./modules/management/cocoa/Dashboard'));
+const RubberDashboard = React.lazy(() => import('./modules/management/rubber/Dashboard'));
+const CassavaDashboard = React.lazy(() => import('./modules/management/cassava/Dashboard'));
+const MaizeDashboard = React.lazy(() => import('./modules/management/maize/Dashboard'));
 
 // === Field Advisory & Agronomy ===
-import ClimateIntelligence from './modules/advisor/ClimateIntelligence';
-import MonitoringPortal from './modules/monitoring/MonitoringPortal';
-import SustainabilityPortal from './modules/sustainability/SustainabilityPortal';
-import EstatePortal from './modules/sustainability/estate/EstatePortal';
-import GroupsPortal from './modules/sustainability/groups/GroupsPortal';
-import ForestryPortal from './modules/sustainability/forestry/ForestryPortal';
-import EstimatorPortal from './modules/sustainability/estimator/EstimatorPortal';
+const ClimateIntelligence = React.lazy(() => import('./modules/advisor/ClimateIntelligence'));
+const MonitoringPortal = React.lazy(() => import('./modules/monitoring/MonitoringPortal'));
+const EstatePortal = React.lazy(() => import('./modules/sustainability/estate/EstatePortal'));
+const GroupsPortal = React.lazy(() => import('./modules/sustainability/groups/GroupsPortal'));
+const ForestryPortal = React.lazy(() => import('./modules/sustainability/forestry/ForestryPortal'));
+const EstimatorPortal = React.lazy(() => import('./modules/sustainability/estimator/EstimatorPortal'));
 
 // === Specialized Monitoring Apps ===
-import RiceMonitoring from './modules/monitoring/rice/Monitoring';
-import MaizeMonitoring from './modules/monitoring/maize/Monitoring';
-import CocoaMonitoring from './modules/monitoring/cocoa/Monitoring';
-import OilPalmMonitoring from './modules/monitoring/oil_palm/Monitoring';
-import CassavaMonitoring from './modules/monitoring/cassava/Monitoring';
-import SugarcaneMonitoring from './modules/monitoring/sugarcane/Monitoring';
-import CashewMonitoring from './modules/monitoring/cashew/Monitoring';
-import RubberMonitoring from './modules/monitoring/rubber/Monitoring';
+const RiceMonitoring = React.lazy(() => import('./modules/monitoring/rice/Monitoring'));
+const MaizeMonitoring = React.lazy(() => import('./modules/monitoring/maize/Monitoring'));
+const CocoaMonitoring = React.lazy(() => import('./modules/monitoring/cocoa/Monitoring'));
+const OilPalmMonitoring = React.lazy(() => import('./modules/monitoring/oil_palm/Monitoring'));
+const CassavaMonitoring = React.lazy(() => import('./modules/monitoring/cassava/Monitoring'));
+const SugarcaneMonitoring = React.lazy(() => import('./modules/monitoring/sugarcane/Monitoring'));
+const CashewMonitoring = React.lazy(() => import('./modules/monitoring/cashew/Monitoring'));
+const RubberMonitoring = React.lazy(() => import('./modules/monitoring/rubber/Monitoring'));
 
 // === Cooperative & Group Management ===
-import GroupsDashboard from './modules/cooperative/Dashboard';
+const GroupsDashboard = React.lazy(() => import('./modules/cooperative/Dashboard'));
 
 // === Finance & Payments ===
-import FinanceDashboard from './modules/finance/Dashboard';
+const FinanceDashboard = React.lazy(() => import('./modules/finance/Dashboard'));
 
-import OrganizationMonitor from './modules/organization-monitor/OrganizationMonitor';
+const OrganizationMonitor = React.lazy(() => import('./modules/organization-monitor/OrganizationMonitor'));
 
 // === Super Admin Portal ===
 import AdminLogin from './farmintelytics-admin/AdminLogin';
-import AdminPortal from './farmintelytics-admin/AdminPortal';
+const AdminPortal = React.lazy(() => import('./farmintelytics-admin/AdminPortal'));
 
 import { crops } from './constants/crops.jsx';
 import { Zap } from 'lucide-react';
+
+const RouteLoading = () => (
+  <div className="flex items-center justify-center h-screen bg-white">
+    <div className="w-10 h-10 border-4 border-gray-100 border-t-green-600 rounded-full animate-spin" />
+  </div>
+);
 
 // Placeholder for modules in development
 const ComingSoon = ({ title, description }) => (
@@ -304,26 +316,30 @@ const App = () => {
   // In restricted mode, always start at /login regardless of entered URL
   if (RESTRICTED_MODULE) {
     return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path={AGROMONITOR_PATH} element={<OrganizationMonitorPage />} />
-        {/* Redirect everything else to /login */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <React.Suspense fallback={<RouteLoading />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path={AGROMONITOR_PATH} element={<OrganizationMonitorPage />} />
+          {/* Redirect everything else to /login */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </React.Suspense>
     );
   }
 
   return (
-    <Routes>
-      <Route path="/"                       element={<HubPage />} />
-      <Route path="/login"                  element={<LoginPage />} />
-      <Route path="/portal"                 element={<PortalPage />} />
-      <Route path={AGROMONITOR_PATH}        element={<OrganizationMonitorPage />} />
-      <Route path="/admin/login"            element={<AdminLogin />} />
-      <Route path="/admin/*"               element={<AdminPortal />} />
-      {/* Catch-all: back to hub */}
-      <Route path="*"                       element={<Navigate to="/" replace />} />
-    </Routes>
+    <React.Suspense fallback={<RouteLoading />}>
+      <Routes>
+        <Route path="/"                       element={<HubPage />} />
+        <Route path="/login"                  element={<LoginPage />} />
+        <Route path="/portal"                 element={<PortalPage />} />
+        <Route path={AGROMONITOR_PATH}        element={<OrganizationMonitorPage />} />
+        <Route path="/admin/login"            element={<AdminLogin />} />
+        <Route path="/admin/*"               element={<AdminPortal />} />
+        {/* Catch-all: back to hub */}
+        <Route path="*"                       element={<Navigate to="/" replace />} />
+      </Routes>
+    </React.Suspense>
   );
 };
 
