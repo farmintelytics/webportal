@@ -262,7 +262,8 @@ export async function acknowledgeAlert(alertId) {
  *
  * @param {string} [plotId]
  */
-export async function fetchVerificationAudit(plotId = 'PLOT-ALPHA') {
+export async function fetchVerificationAudit(plotId) {
+  if (!plotId) throw new Error('plotId is required');
   return apiFetch(`/verification/audit?plot_id=${plotId}`);
 }
 
