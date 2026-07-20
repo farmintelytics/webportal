@@ -1128,11 +1128,40 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
 
   const [refreshSlider, setRefreshSlider] = useState(0);
   const [selectedSensor, setSelectedSensor] = useState('sentinel-2'); // 'sentinel-2' | 'landsat'
+  // Set right before a sensor/index switch triggered by picking a specific
+  // calendar date (see selectDateWithSensor below) — consumed once the
+  // resulting TIMELINE_DATA reload lands, so the slider jumps to that exact
+  // date instead of always defaulting to the most recent acquisition.
+  const pendingCalendarDateRef = useRef(null);
+  // { date, sensors } while a calendar day with imagery from more than one
+  // satellite is awaiting the user's choice of which one to view.
+  const [satellitePicker, setSatellitePicker] = useState(null);
 
   const SAR_INDICES = new Set(['rvi', 'dprvi', 'smi', 'flood_mask', 'sar_rvi', 'sar_dprvi', 'sar_smi']);
   const isSarIndex = SAR_INDICES.has((selectedIndex || '').toLowerCase());
   // SAR indices are always Sentinel-1; optical defaults to user-chosen sensor
   const effectiveSensor = isSarIndex ? 'sentinel-1' : selectedSensor;
+
+  // Jumps the map to a specific calendar date on a specific satellite. If
+  // that satellite isn't already the active one, switches sensor/index first
+  // (via pendingCalendarDateRef, resolved once TIMELINE_DATA reloads);
+  // otherwise the date is already in the current timeline, so it applies
+  // immediately with no reload needed.
+  const selectDateWithSensor = (dateStr, sensor) => {
+    const alreadyActive = sensor === 'sentinel-1' ? isSarIndex : (!isSarIndex && sensor === selectedSensor);
+    if (alreadyActive) {
+      const idx = TIMELINE_DATA.findIndex(t => t.date === dateStr);
+      if (idx !== -1) setSelectedTimelineIndex(idx);
+      return;
+    }
+    pendingCalendarDateRef.current = dateStr;
+    if (sensor === 'sentinel-1') {
+      setSelectedIndex('rvi');
+    } else {
+      if (isSarIndex) setSelectedIndex('ndvi');
+      setSelectedSensor(sensor);
+    }
+  };
 
   // Fetch timeseries slider and pre-rendered raster overlays.
   // The previous tiles/timeline stay on screen while the new data loads —
@@ -1267,13 +1296,18 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     });
     setTIMELINE_DATA(entries);
     if (entries.length > 0) {
-      // Auto-navigate calendar and slider to the most recent available acquisition date
-      const lastIdx = entries.length - 1;
-      const last = entries[lastIdx].date;
-      const d = new Date(last);
+      // If the user just picked a specific date from the calendar (possibly
+      // triggering a sensor/index switch first), land on THAT date once this
+      // reload lands, instead of always jumping to the most recent one.
+      const pending = pendingCalendarDateRef.current;
+      pendingCalendarDateRef.current = null;
+      const pendingIdx = pending ? entries.findIndex(e => e.date === pending) : -1;
+      const targetIdx = pendingIdx !== -1 ? pendingIdx : entries.length - 1;
+      const target = entries[targetIdx].date;
+      const d = new Date(target);
       setCalendarMonth(d.getMonth());
       setCalendarYear(d.getFullYear());
-      setSelectedTimelineIndex(lastIdx);
+      setSelectedTimelineIndex(targetIdx);
     }
   }, [sliderData, plots]);
 
@@ -1460,7 +1494,9 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
 
   // Layout Resizing States
   const [sidebarWidth, setSidebarWidth] = useState(240);
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(175);
+  // Was 175 — too cramped for the calendar's satellite-coverage dots and the
+  // multi-satellite picker that can appear underneath it. Still user-resizable.
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(260);
   const [isBottomPanelMinimized, setIsBottomPanelMinimized] = useState(false);
   const [activeResizeType, setActiveResizeType] = useState(null); // 'sidebar', 'bottom', or null
 
@@ -3120,17 +3156,27 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                       btnClass = 'text-gray-300 cursor-default';
                     }
 
+                    const dayClickable = isCompareMode ? isHL : (isHL || !!dayCoverage);
+
                     return (
-                      <button key={i} disabled={!isHL}
+                      <button key={i} disabled={!dayClickable}
                         title={dayCoverage ? `Imagery from: ${dayCoverage.sensors.map(s => s === 'sentinel-2' ? 'Sentinel-2' : s === 'landsat' ? 'Landsat' : 'Sentinel-1').join(', ')}` : undefined}
                         onClick={() => {
-                          if (isHL) {
-                            if (isCompareMode) {
+                          if (isCompareMode) {
+                            // Compare mode keeps the simpler current-sensor-only
+                            // behavior — picking a satellite for slot A vs B
+                            // independently gets confusing fast.
+                            if (isHL) {
                               if (activeDateSlot === 'A') setSelectedTimelineIndex(matchIdx);
                               else setCompareTimelineIndex(matchIdx);
-                            } else {
-                              setSelectedTimelineIndex(matchIdx);
                             }
+                            return;
+                          }
+                          if (!dayCoverage) return;
+                          if (dayCoverage.sensors.length > 1) {
+                            setSatellitePicker({ date: dateStr, sensors: dayCoverage.sensors });
+                          } else {
+                            selectDateWithSensor(dateStr, dayCoverage.sensors[0]);
                           }
                         }}
                         className={`h-6 w-full rounded-md text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-all ${btnClass}`}
@@ -3150,6 +3196,30 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                     <span key={`trail-${i}`} className="h-5" />
                   ))}
                 </div>
+                {satellitePicker && (
+                  <div className="mt-2 p-2.5 rounded-lg border border-gray-200 bg-gray-50 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-600">
+                        {new Date(satellitePicker.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} — choose satellite
+                      </span>
+                      <button onClick={() => setSatellitePicker(null)} className="text-gray-400 hover:text-gray-600">
+                        <X size={11} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {satellitePicker.sensors.map(s => (
+                        <button
+                          key={s}
+                          onClick={() => { selectDateWithSensor(satellitePicker.date, s); setSatellitePicker(null); }}
+                          className="text-[10px] font-bold px-2.5 py-1 rounded-full text-white"
+                          style={{ backgroundColor: SENSOR_DOT_COLOR[s] }}
+                        >
+                          {s === 'sentinel-2' ? 'Sentinel-2' : s === 'landsat' ? 'Landsat' : 'Sentinel-1'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
 
@@ -3201,16 +3271,34 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                 )}
               </div>
 
-              {/* Right: Best imagery indicator */}
-              <div className="bg-green-50/50 border border-green-100 rounded-2xl p-3.5 flex items-start gap-3 max-w-sm shrink-0">
-                <CheckCircle2 size={16} className="text-green-600 shrink-0 mt-0.5" />
-                <div className="flex flex-col">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-green-700 leading-none mb-1">Best Imagery Active</span>
-                  <span className="text-[10px] text-green-600/80 font-medium leading-normal">
-                    Automatically filtering cloud-free passes. Pick any highlighted calendar date to audit.
-                  </span>
-                </div>
-              </div>
+              {/* Right: real coverage for the month currently open in the
+                  calendar — replaces a static "Best Imagery Active" caption
+                  that never changed and duplicated what the date pill and
+                  legend's satellite toggle already show. */}
+              {(() => {
+                const monthPrefix = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}`;
+                const monthCoverage = calendarDates.filter(d => d.date.startsWith(monthPrefix));
+                const bySensor = { 'sentinel-2': 0, 'landsat': 0, 'sentinel-1': 0 };
+                monthCoverage.forEach(d => d.sensors.forEach(s => { bySensor[s] = (bySensor[s] || 0) + 1; }));
+                const parts = [
+                  bySensor['sentinel-2'] > 0 && `${bySensor['sentinel-2']} Sentinel-2`,
+                  bySensor['landsat'] > 0 && `${bySensor['landsat']} Landsat`,
+                  bySensor['sentinel-1'] > 0 && `${bySensor['sentinel-1']} Sentinel-1`,
+                ].filter(Boolean);
+                return (
+                  <div className="bg-green-50/50 border border-green-100 rounded-2xl p-3.5 flex items-start gap-3 max-w-sm shrink-0">
+                    <CalendarIcon size={16} className="text-green-600 shrink-0 mt-0.5" />
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-green-700 leading-none mb-1">
+                        {monthCoverage.length} {monthCoverage.length === 1 ? 'Pass' : 'Passes'} This Month
+                      </span>
+                      <span className="text-[10px] text-green-600/80 font-medium leading-normal">
+                        {parts.length > 0 ? parts.join(' · ') : 'No acquisitions recorded for this month yet.'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
