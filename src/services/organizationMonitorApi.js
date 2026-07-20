@@ -331,9 +331,16 @@ export function transformCoordinate(coord, from = EPSG4326, to = EPSG3857) {
 }
 
 /**
- * Converts GeoJSON [lng, lat] pairs from the backend into
- * Leaflet-compatible [lat, lng] pairs used by the frontend Polygon component.
- * Uses proj4 to guarantee projection standards and avoid coordinate shift.
+ * Converts GeoJSON [lng, lat] pairs (already EPSG:4326, the GeoJSON
+ * standard) into Leaflet-compatible [lat, lng] pairs. This is purely an
+ * axis-order swap, not a reprojection — no proj4 transform is needed
+ * (or was actually happening: this used to call
+ * proj4(EPSG4326, EPSG4326, coord), a no-op identity transform whose
+ * comment claimed it "guarantees projection standards and avoids
+ * coordinate shift", which misdescribed what the code does and would
+ * mislead anyone debugging a real coordinate issue here). If a source
+ * ever supplies boundaries in a different CRS, reproject with
+ * transformCoordinate() before calling this, not inside it.
  *
  * Usage:
  *   const coords = geoJsonToLeaflet(plot.boundary.coordinates[0]);
@@ -342,10 +349,7 @@ export function transformCoordinate(coord, from = EPSG4326, to = EPSG3857) {
  * @returns {Array<[number, number]>}             Array of [lat, lng] for Leaflet
  */
 export function geoJsonToLeaflet(geoJsonRing) {
-  return geoJsonRing.map(coord => {
-    const [lng, lat] = proj4(EPSG4326, EPSG4326, coord);
-    return [lat, lng];
-  });
+  return geoJsonRing.map(([lng, lat]) => [lat, lng]);
 }
 
 /**

@@ -80,9 +80,13 @@ const UsersPage = () => {
   const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 4000); };
 
   const copy = async (text, key) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(''), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(''), 2000);
+    } catch (e) {
+      setError('Could not copy to clipboard — your browser may be blocking clipboard access.');
+    }
   };
 
   const handleCreate = async () => {
@@ -128,6 +132,7 @@ const UsersPage = () => {
   };
 
   const handleResetPw = async (user) => {
+    if (!(await confirm(`Reset the password for ${user.email}? Their current password will stop working immediately.`))) return;
     try {
       const res = await resetUserPassword(user.id);
       setResetResult(res);

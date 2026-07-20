@@ -59,6 +59,14 @@ const IndexCard = ({ item, cropType, companyId, onSaved, onError }) => {
       onError('Every class needs a numeric from/to value.');
       return;
     }
+    // These ranges drive live raster pixel classification on the map — an
+    // inverted range (from > to) saved here would silently break the
+    // legend and tile coloring for this index with no server-side check.
+    const inverted = clean.find(c => c.range[0] > c.range[1]);
+    if (inverted) {
+      onError(`"${inverted.label}" has a from value greater than its to value (${inverted.range[0]} > ${inverted.range[1]}).`);
+      return;
+    }
     setBusy(true);
     try {
       await saveCropThreshold({ crop_type: cropType, index_key: item.index_key, company_id: companyId, classes: clean });

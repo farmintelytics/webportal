@@ -206,11 +206,7 @@ const Login = ({ onLogin, moduleName, onBack, defaultEmail = '', defaultCode = '
             </div>
 
             <div className="flex items-center justify-between px-1">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input type="checkbox" className="w-4 h-4 rounded-md border border-gray-200 text-[var(--brand-primary)] focus:ring-[var(--brand-primary)] transition-all" />
-                <span className="text-[12px] font-bold text-gray-500 group-hover:text-gray-700 transition-colors">Remember device</span>
-              </label>
-              <button type="button" className="text-[12px] font-bold text-[var(--brand-primary)] hover:underline">Request access link</button>
+              <span className="text-[11px] font-bold text-gray-400">Lost your access code? Contact your organization administrator.</span>
             </div>
 
             <button type="submit" disabled={loading}

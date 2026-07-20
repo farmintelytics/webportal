@@ -2099,18 +2099,6 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   const [isFlushingCache, setIsFlushingCache] = useState(false);
   const [isCheckingSystem, setIsCheckingSystem] = useState(false);
 
-  const [exportFormat, setExportFormat] = useState('GeoJSON');
-  const [exportPlotTarget, setExportPlotTarget] = useState('ALL');
-  const [exportIncludeBoundaries, setExportIncludeBoundaries] = useState(true);
-  const [exportIncludeIndices, setExportIncludeIndices] = useState(true);
-  const [isExportingData, setIsExportingData] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-  const [exportProgressText, setExportProgressText] = useState('');
-  const [showExportSuccess, setShowExportSuccess] = useState(false);
-  const [exportHistory, setExportHistory] = useState([
-    { id: 'EXP-2026-104', format: 'GeoJSON', scope: 'All Plots & Zones', size: '2.4 MB', date: 'May 28, 2026', status: 'Completed' }
-  ]);
-
   const cardStyle = glassmorphismEnabled ? 'glass shadow-premium border border-white/20' : 'bg-white border border-gray-100 shadow-sm';
 
   const getHealthPlotStyleOutline = (plot) => {
@@ -2642,41 +2630,6 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
       .catch(err => setTelemetryLogs(prev => [...prev, `[ERROR] System check failed: ${err.message}`]))
       .finally(() => setIsCheckingSystem(false));
   };
-
-  const handleExportData = () => {
-    setIsExportingData(true);
-    setExportProgress(0);
-    setExportProgressText('Preparing vector coordinates...');
-    
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += 20;
-      setExportProgress(currentProgress);
-      if (currentProgress === 40) {
-        setExportProgressText('Retrieving historical indices...');
-      } else if (currentProgress === 80) {
-        setExportProgressText('Packaging into zip archive...');
-      } else if (currentProgress >= 100) {
-        clearInterval(interval);
-        setIsExportingData(false);
-        setShowExportSuccess(true);
-        const newExportId = `EXP-2026-${Math.floor(Math.random() * 900) + 100}`;
-        setExportHistory(prev => [
-          {
-            id: newExportId,
-            format: exportFormat,
-            scope: exportPlotTarget === 'ALL' ? 'All Plots & Zones' : exportPlotTarget,
-            size: `${(Math.random() * 2 + 0.5).toFixed(1)} MB`,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            status: 'Completed'
-          },
-          ...prev
-        ]);
-        setTimeout(() => setShowExportSuccess(false), 4000);
-      }
-    }, 600);
-  };
-
 
   const healthPlotsDataA = useMemo(() => {
     if (plots && plots.length > 0) {

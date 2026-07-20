@@ -154,16 +154,26 @@ const Onboarding = () => {
   const effectiveParentFarmName = () => parentFarmName.trim() || `${company.company_name} (Combined)`;
 
   const submitOrganization = () => run(async () => {
-    const allowed_modules = modulesForAccessModel(company.accessModel, company.allowed_crops, companySlug);
-    const org = await createOrganization({
-      company_name: company.company_name,
-      schema_name: companySlug,
-      allowed_crops: company.allowed_crops,
-      allowed_modules,
-      allowed_indices: company.allowed_indices,
-      map_center_lat: company.map_center_lat,
-      map_center_lon: company.map_center_lon,
-    });
+    // If a sub-farm partway through the loop below previously failed, org
+    // (and any earlier sub-farms) are already sitting in `done` from that
+    // attempt — retrying used to redo everything from scratch, hitting a
+    // "schema already exists" error on the org and leaving the admin with
+    // orphaned backend records and no path forward except starting over.
+    // Reuse what already succeeded instead of recreating it.
+    let org = done.org;
+    if (!org) {
+      const allowed_modules = modulesForAccessModel(company.accessModel, company.allowed_crops, companySlug);
+      org = await createOrganization({
+        company_name: company.company_name,
+        schema_name: companySlug,
+        allowed_crops: company.allowed_crops,
+        allowed_modules,
+        allowed_indices: company.allowed_indices,
+        map_center_lat: company.map_center_lat,
+        map_center_lon: company.map_center_lon,
+      });
+      setDone(d => ({ ...d, org }));
+    }
 
     // Standalone farm (the common case) is just [current form]; a parent
     // setup is every previously-added sub-farm plus the one on screen now,
@@ -171,14 +181,17 @@ const Onboarding = () => {
     // group_subfarms() merges them at run time exactly like Okomu's
     // hand-authored batch config does today.
     const farmsToCreate = isParent ? [...subFarms, { ...farm, boundaryFile }] : [{ ...farm, boundaryFile }];
-    const createdFarms = [];
-    const boundaries = [];
+    const alreadyCreatedIds = new Set((done.farms || []).map(f => f.farm_id));
+    const createdFarms = [...(done.farms || [])];
+    const boundaries = [...(done.boundaries || [])];
     for (const f of farmsToCreate) {
+      const farmId = f.farm_id.trim();
+      if (alreadyCreatedIds.has(farmId)) continue;
       const createdFarm = await createFarm({
         company_name: company.company_name,
         company_id: org.schema_name,
         farm_name: f.farm_name,
-        farm_id: f.farm_id.trim(),
+        farm_id: farmId,
         parent_farm_id: isParent ? effectiveParentFarmId() : '',
         parent_farm_name: isParent ? effectiveParentFarmName() : '',
         sensors: f.sensors,
@@ -191,9 +204,12 @@ const Onboarding = () => {
       const boundary = await uploadBoundary(createdFarm.farm_id, f.boundaryFile);
       createdFarms.push(createdFarm);
       boundaries.push(boundary);
+      // Persist progress after EACH farm, not just once the whole loop
+      // finishes — if farm N+1 fails, this run's already-created farms
+      // stay recorded so a retry only attempts what's actually missing.
+      setDone(d => ({ ...d, org, farm: createdFarms[0], farms: [...createdFarms], boundary: boundaries[0], boundaries: [...boundaries] }));
     }
 
-    setDone(d => ({ ...d, org, farm: createdFarms[0], farms: createdFarms, boundary: boundaries[0], boundaries }));
     setStep(1);
   });
 

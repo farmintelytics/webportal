@@ -185,7 +185,16 @@ const PortalPage = () => {
 
   const moduleId = sessionStorage.getItem('fi_module');
 
-  const handleSignOut   = () => { navigate('/login'); setActiveSection('dashboard'); };
+  const handleSignOut   = () => {
+    // These used to be left in localStorage — a signed-out session could
+    // resume via back-button or direct navigation, since nothing here
+    // actually cleared it (unlike the admin portal's logout).
+    ['fi_token', 'fi_email', 'fi_tenant', 'fi_role', 'fi_full_name',
+     'fi_display_name', 'fi_allowed_modules', 'fi_allowed_crops', 'fi_map_center']
+      .forEach(key => localStorage.removeItem(key));
+    navigate('/login');
+    setActiveSection('dashboard');
+  };
   const handleBackToHub = () => { navigate('/');     setActiveSection('dashboard'); };
 
   if (!moduleId) return <Navigate to="/" replace />;
@@ -277,24 +286,26 @@ const PortalPage = () => {
   if (isStandalone || moduleId === 'group-management') {
     // Pass back/signout handlers if the component accepts them (RS portals already have them)
     try {
-      return React.cloneElement(content, { onBack: handleBackToHub, onSignOut: handleSignOut });
+      return <ErrorBoundary>{React.cloneElement(content, { onBack: handleBackToHub, onSignOut: handleSignOut })}</ErrorBoundary>;
     } catch {
-      return content;
+      return <ErrorBoundary>{content}</ErrorBoundary>;
     }
   }
 
   return (
-    <PortalLayout
-      activeSection={activeSection}
-      setActiveSection={setActiveSection}
-      currentCrop={currentCrop}
-      setCurrentCrop={setCurrentCrop}
-      crops={crops}
-      onBackToHub={handleBackToHub}
-      onSignOut={handleSignOut}
-    >
-      {content}
-    </PortalLayout>
+    <ErrorBoundary>
+      <PortalLayout
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        currentCrop={currentCrop}
+        setCurrentCrop={setCurrentCrop}
+        crops={crops}
+        onBackToHub={handleBackToHub}
+        onSignOut={handleSignOut}
+      >
+        {content}
+      </PortalLayout>
+    </ErrorBoundary>
   );
 };
 

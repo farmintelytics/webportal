@@ -55,27 +55,6 @@ const ModuleCard = ({ title, crop, id, icon, active, onSelect, logoUrl }) => (
   </button>
 );
 
-const TENANT_ALLOWED_MODULES = {
-  okomu: [
-    'management-ffb', 'rs-ffb', 'carbon-ffb', 'activity-ffb',
-    'custom-agromonitor-okomu',
-    'group-management', 'group-monitoring', 'carbon-groups',
-    'forestry-intel', 'carbon-estimator', 'advisor', 'finance-hub'
-  ],
-  olam: [
-    'management-maize', 'rs-maize',
-    'management-rice', 'rs-rice',
-    'management-cassava', 'rs-cassava',
-    'management-cocoa', 'rs-cocoa',
-    'management-sugarcane', 'rs-sugarcane',
-    'management-cashew', 'rs-cashew',
-    'management-rubber', 'rs-rubber',
-    'custom-agromonitor-olam',
-    'group-management', 'group-monitoring', 'carbon-groups',
-    'forestry-intel', 'carbon-estimator', 'advisor', 'finance-hub'
-  ]
-};
-
 const PortalHub = ({ onSelectModule }) => {
   const [activeTab, setActiveTab] = React.useState('monitoring');
   const [customModules, setCustomModules] = React.useState([
@@ -214,7 +193,11 @@ const PortalHub = ({ onSelectModule }) => {
 
         <div className="flex flex-wrap items-center gap-12 mb-10 border-b border-gray-100">
           {[
+            { id: 'management', label: 'Management' },
             { id: 'monitoring', label: 'Crop Monitoring' },
+            { id: 'sustainability', label: 'Sustainability' },
+            { id: 'payments', label: 'Finance' },
+            { id: 'field-advisory', label: 'Field Advisory' },
             { id: 'custom', label: 'Organization' }
           ].map(tab => (
             <button 
