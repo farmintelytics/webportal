@@ -1852,7 +1852,6 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   const [moistureShowLayers, setMoistureShowLayers] = useState(true);
   const [moistureShowBoundaries, setMoistureShowBoundaries] = useState(true);
   const [moistureBoundariesOpacity, setMoistureBoundariesOpacity] = useState(100);
-  const [moistureShowSmi, setMoistureShowSmi] = useState(true);
   const [moistureSmiOpacity, setMoistureSmiOpacity] = useState(80);
   const [moistureOpExpanded, setMoistureOpExpanded] = useState(true);
   const [moistureBioExpanded, setMoistureBioExpanded] = useState(true);
@@ -5433,31 +5432,15 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                         </div>
                         {moistureBioExpanded && (
                           <div className="space-y-3">
-                            <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="text-xs font-bold text-gray-700 leading-tight">Soil Moisture Index (SMI)</div>
-                                  <span className="text-[10px] text-gray-400">SAR change detection index</span>
-                                </div>
-                                <button
-                                  onClick={() => setMoistureShowSmi(!moistureShowSmi)}
-                                  className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0"
-                                  style={{ backgroundColor: moistureShowSmi ? '#16A34A' : '#E5E7EB' }}
-                                >
-                                  <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${moistureShowSmi ? 'translate-x-4' : 'translate-x-0'}`} />
-                                </button>
-                              </div>
-                              {moistureShowSmi && (
-                                <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0 bg-[#1E3A8A]" /><span className="text-[10px] font-semibold text-gray-500">Saturated (&gt; 0.7)</span></div>
-                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0 bg-[#2563EB]" /><span className="text-[10px] font-semibold text-gray-500">Wet (0.5 - 0.7)</span></div>
-                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0 bg-[#60A5FA]" /><span className="text-[10px] font-semibold text-gray-500">Optimal (0.3 - 0.5)</span></div>
-                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0 bg-[#86EFAC]" /><span className="text-[10px] font-semibold text-gray-500">Mild Stress (0.1 - 0.3)</span></div>
-                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0 bg-[#EAB308]" /><span className="text-[10px] font-semibold text-gray-500">Moderate Stress (-0.1 - 0.1)</span></div>
-                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0 bg-[#DC2626]" /><span className="text-[10px] font-semibold text-gray-500">Severe Stress (&lt; -0.1)</span></div>
-                                </div>
-                              )}
-                            </div>
+                            {/* Was a hardcoded static legend (Saturated/Wet/
+                                Optimal/Stress, 0-1 scale) that never reflected
+                                the real backend classification and went stale
+                                the moment the SMI range was corrected (it's a
+                                VV(dB)-VV_reference(dB) delta, not [0,1] — see
+                                indices.py). Reusing the same live legend cards
+                                as every other page means this can't drift out
+                                of sync again. */}
+                            {renderLegendCards(isOrg ? ['Radar (SAR)'] : ['SAR'])}
                           </div>
                         )}
                       </div>
@@ -5768,22 +5751,15 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                         </div>
                         {restoreLulcExpanded && (
                           <div className="space-y-3">
+                        {/* Was a static hardcoded legend (High/Moderate/Low/Dry)
+                            independent of the real backend classification —
+                            same staleness risk as moisture-content's old SMI
+                            card. Reuses the real single-index card instead. */}
+                        {(() => {
+                          const ndwiEntry = legendEntries.find(e => e.key === 'ndwi');
+                          return ndwiEntry ? renderLegendCard(ndwiEntry) : null;
+                        })()}
                         <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">NDWI {renderInfoTooltip("NDWI")}</div><span className="text-[10px] text-gray-400">Normalized Difference Water Index</span></div>
-                            <button onClick={() => setRestoreShowNdwi(!restoreShowNdwi)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowNdwi ? '#16A34A' : '#E5E7EB' }}>
-                              <div style={{ transform: restoreShowNdwi ? 'translateX(16px)' : 'translateX(0)' }} className="w-4 h-4 rounded-full bg-white shadow transition-transform duration-200" />
-                            </button>
-                          </div>
-                          {restoreShowNdwi && (
-                            <div className="space-y-1.5 pt-1 border-t border-gray-50">
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#1d4ed8'}}/><span className="text-[10px] font-semibold text-gray-500">High (&gt;0.3)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#60a5fa'}}/><span className="text-[10px] font-semibold text-gray-500">Moderate (0.0-0.3)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#fbbf24'}}/><span className="text-[10px] font-semibold text-gray-500">Low (-0.2 to 0.0)</span></div>
-                              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:'#dc2626'}}/><span className="text-[10px] font-semibold text-gray-500">Dry (&lt;-0.2)</span></div>
-                            </div>
-                          )}
-                        </div>                        <div className="border border-gray-100 rounded-xl p-3.5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div><div className="text-xs font-bold text-gray-700 leading-tight flex items-center gap-1.5">LULC {renderInfoTooltip("LULC")}</div><span className="text-[10px] text-gray-400">Land Use / Land Cover</span></div>
                             <button onClick={() => setRestoreShowLulc(!restoreShowLulc)} className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 shrink-0" style={{ backgroundColor: restoreShowLulc ? '#16A34A' : '#E5E7EB' }}>
