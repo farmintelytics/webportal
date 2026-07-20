@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Key, Plus, Trash2, Copy, Check, X, RefreshCw, AlertCircle, Shield } from 'lucide-react';
-import { fetchCredentials, createCredential, deleteCredential, fetchOrganizations } from '../../services/adminApi';
+import { fetchCredentials, createCredential, deleteCredential, rotateCredential, fetchOrganizations } from '../../services/adminApi';
 import { useConfirm } from '../components/ConfirmProvider';
 import ErrorBanner from '../components/ErrorBanner';
 
@@ -14,6 +14,12 @@ const Credentials = () => {
   const [form, setForm] = useState({ company_id: '', email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' });
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [rotatingId, setRotatingId] = useState(null);
+  // Access codes are hashed at rest — the backend only ever returns the
+  // real code in the response right after it's created/rotated. Keep
+  // those here, keyed by credential id, so they stay visible for this
+  // session only; a reload (or another admin's view) shows them masked.
+  const [revealed, setRevealed] = useState({});
 
   const load = async () => {
     try {
@@ -33,11 +39,22 @@ const Credentials = () => {
     if (!form.company_id || !form.email) return;
     setSaving(true);
     try {
-      await createCredential({ ...form, access_code: form.access_code.trim() || '' });
+      const cred = await createCredential({ ...form, access_code: form.access_code.trim() || '' });
       setForm({ company_id: '', email: '', access_code: '', label: 'Primary', full_name: '', role: 'admin' });
       setShowForm(false);
       await load();
+      if (cred?.access_code) setRevealed(r => ({ ...r, [cred.id]: cred.access_code }));
     } catch (e) { setError(e.message); } finally { setSaving(false); }
+  };
+
+  const handleRotate = async (id) => {
+    if (!(await confirm('Issue a new access code? The current one stops working immediately.'))) return;
+    setRotatingId(id);
+    try {
+      const cred = await rotateCredential(id);
+      if (cred?.access_code) setRevealed(r => ({ ...r, [id]: cred.access_code }));
+      await load();
+    } catch (e) { setError(e.message); } finally { setRotatingId(null); }
   };
 
   const handleDelete = async (id) => {
@@ -143,7 +160,14 @@ const Credentials = () => {
                         <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 7px', borderRadius: '5px', background: 'rgba(22,163,74,0.08)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.15)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{cred.role || 'admin'}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <code style={{ fontSize: '12px', color: '#475569', fontFamily: 'monospace', background: '#ffffff', padding: '2px 8px', borderRadius: '6px' }}>{cred.access_code}</code>
+                        {revealed[cred.id] ? (
+                          <>
+                            <code style={{ fontSize: '12px', color: '#15803d', fontFamily: 'monospace', background: 'rgba(22,163,74,0.08)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>{revealed[cred.id]}</code>
+                            <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 600 }}>Copy now — won't be shown again</span>
+                          </>
+                        ) : (
+                          <code style={{ fontSize: '12px', color: '#94a3b8', fontFamily: 'monospace', background: '#ffffff', padding: '2px 8px', borderRadius: '6px', letterSpacing: '2px' }}>••••••••••</code>
+                        )}
                         <span style={{ fontSize: '10px', color: '#475569' }}>Created {new Date(cred.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
@@ -151,8 +175,13 @@ const Credentials = () => {
                       <button onClick={() => copy(cred.email, `email-${cred.id}`)} title="Copy email" style={{ padding: '7px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: copied === `email-${cred.id}` ? '#16a34a' : '#6b7280', display: 'flex' }}>
                         {copied === `email-${cred.id}` ? <Check size={13} /> : <Copy size={13} />}
                       </button>
-                      <button onClick={() => copy(cred.access_code, `code-${cred.id}`)} title="Copy code" style={{ padding: '7px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: copied === `code-${cred.id}` ? '#16a34a' : '#6b7280', display: 'flex' }}>
-                        {copied === `code-${cred.id}` ? <Check size={13} /> : <Key size={13} />}
+                      {revealed[cred.id] && (
+                        <button onClick={() => copy(revealed[cred.id], `code-${cred.id}`)} title="Copy code" style={{ padding: '7px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: copied === `code-${cred.id}` ? '#16a34a' : '#6b7280', display: 'flex' }}>
+                          {copied === `code-${cred.id}` ? <Check size={13} /> : <Key size={13} />}
+                        </button>
+                      )}
+                      <button onClick={() => handleRotate(cred.id)} disabled={rotatingId === cred.id} title="Issue a new access code" style={{ padding: '7px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: '#6b7280', display: 'flex', opacity: rotatingId === cred.id ? 0.5 : 1 }}>
+                        <RefreshCw size={13} />
                       </button>
                       <button onClick={() => handleDelete(cred.id)} style={{ padding: '7px', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.1)', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', display: 'flex' }}>
                         <Trash2 size={13} />

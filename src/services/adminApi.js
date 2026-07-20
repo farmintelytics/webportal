@@ -147,6 +147,10 @@ export async function deleteCredential(id) {
   return adminFetch(`/credentials/${id}`, { method: 'DELETE' });
 }
 
+export async function rotateCredential(id) {
+  return adminFetch(`/credentials/${id}/rotate`, { method: 'POST' });
+}
+
 // ─── Crop Index Thresholds (agronomist calibration) ──────────────────────────
 
 /**
