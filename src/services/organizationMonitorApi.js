@@ -404,6 +404,20 @@ export async function fetchCompositeSlider({ farm, composite, start, end, sensor
 }
 
 /**
+ * GET /timeseries/calendar?farm=&start=&end=
+ * Every real acquisition date across Sentinel-2, Landsat and Sentinel-1,
+ * each tagged with which satellite(s) captured it — for a calendar showing
+ * full imagery coverage, not just whichever sensor+index is selected.
+ * Returns { dates: [{ date, sensors: [...] }], farm }.
+ */
+export async function fetchTimeseriesCalendar({ farm, start, end } = {}) {
+  const params = new URLSearchParams({ farm: farm || 'farm_1' });
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+  return apiFetch(`/timeseries/calendar?${params}`);
+}
+
+/**
  * GET /timeseries/pixel/?farm={farm}&index={index}&lat={lat}&lon={lon}&load_delay={delay}
  * Returns pixel-level Zarr time series data.
  * @param {Object} options

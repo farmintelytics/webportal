@@ -1106,19 +1106,6 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   const cropProfileEntries = useMemo(() => cropIndices?.indices || [], [cropIndices]);
   const cropPrimaryIndex = cropIndices?.primary_index || null;
 
-  // Only what is relevant to this crop AND actually present in the tenant's
-  // zarr store is offered; if the intersection is empty (e.g. sparse archive)
-  // fall back to everything available so the map never goes blank.
-  const displayIndices = useMemo(() => {
-    if (!availableIndices.length) return [];
-    if (!cropProfileEntries.length) return availableIndices;
-    const avail = new Map(availableIndices.map(i => [String(i.index).toLowerCase(), i]));
-    const filtered = cropProfileEntries
-      .filter(e => avail.has(e.key))
-      .map(e => avail.get(e.key));
-    return filtered.length > 0 ? filtered : availableIndices;
-  }, [availableIndices, cropProfileEntries]);
-
   // Start on the crop's primary index once data is available (once only)
   const primaryAppliedRef = useRef(false);
   useEffect(() => {
@@ -1215,6 +1202,24 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   // Real timeline loaded from backend zarr/TIF data — no mock values
   const [TIMELINE_DATA, setTIMELINE_DATA] = useState([]);
   const [tileRefreshing, setTileRefreshing] = useState(false);
+  // Full imagery coverage across every sensor — independent of whichever
+  // single sensor+index is currently selected on the map, so the calendar
+  // shows everything the archive actually has, not just today's selection.
+  const [calendarDates, setCalendarDates] = useState([]);
+  useEffect(() => {
+    let active = true;
+    async function loadCalendarDates() {
+      try {
+        const data = await api.fetchTimeseriesCalendar({ farm: tenant || 'farm_1' });
+        if (active) setCalendarDates(data?.dates || []);
+      } catch (err) {
+        console.error('Failed to fetch imagery calendar:', err);
+      }
+    }
+    loadCalendarDates();
+    return () => { active = false; };
+  }, [tenant]);
+  const SENSOR_DOT_COLOR = { 'sentinel-2': '#16a34a', 'landsat': '#d97706', 'sentinel-1': '#2563eb' };
   // (timelineLoading, zarrBounds, calendarMonth, calendarYear, selectedTimelineIndex
   // are declared earlier — see note above the slider-fetching effect)
 
@@ -1988,6 +1993,26 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     const openGroups = expandedLegendGroups || groupNames.slice(0, 1);
     return (
       <>
+        {/* Sensor choice lives here now instead of a separate toolbar
+            dropdown — SAR indices always come from Sentinel-1 (handled by
+            isSarIndex/effectiveSensor), so this only matters for optical
+            indices, which can come from either Sentinel-2 or Landsat. */}
+        {!isSarIndex && (
+          <div className="flex items-center justify-between px-0.5 pb-1">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Satellite</span>
+            <div className="flex rounded-full border border-gray-200 overflow-hidden">
+              {['sentinel-2', 'landsat'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setSelectedSensor(s)}
+                  className={`text-[10px] font-bold px-2.5 py-1 transition-colors ${selectedSensor === s ? 'bg-green-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                >
+                  {s === 'sentinel-2' ? 'Sentinel-2' : 'Landsat'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {groupNames.map(name => {
           const entries = legendGroups[name];
           const isOpen = openGroups.includes(name);
@@ -3024,41 +3049,8 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   {sliderPending && <span className="ml-1 opacity-70">↻</span>}
                 </span>
               )}
-              {/* Satellite selector dropdown */}
-              <select
-                value={isSarIndex ? 'sentinel-1' : selectedSensor}
-                onChange={e => {
-                  const val = e.target.value;
-                  if (val === 'sentinel-1') {
-                    setSelectedIndex('rvi');
-                  } else {
-                    if (isSarIndex) setSelectedIndex('ndvi');
-                    setSelectedSensor(val);
-                  }
-                }}
-                className="text-xs font-bold px-2 py-1 rounded-full border border-green-200 bg-white text-green-700 cursor-pointer focus:outline-none focus:border-green-500"
-              >
-                <option value="sentinel-2">Sentinel-2</option>
-                <option value="sentinel-1">Sentinel-1</option>
-                <option value="landsat">Landsat</option>
-              </select>
-              {/* Index selector — simple names only (NDVI, not OPTICAL_SENTINEL_2_NDVI) */}
-              <select
-                value={selectedIndex}
-                onChange={e => setSelectedIndex(e.target.value)}
-                className="text-xs font-bold px-2 py-1 rounded-full border border-green-200 bg-white text-green-700 cursor-pointer focus:outline-none focus:border-green-500"
-              >
-                {displayIndices.length > 0
-                  ? displayIndices
-                      .filter(idx => isSarIndex
-                        ? SAR_INDICES.has(idx.index.toLowerCase())
-                        : !SAR_INDICES.has(idx.index.toLowerCase()))
-                      .map(idx => (
-                        <option key={idx.index} value={idx.index}>{idx.index.toUpperCase()}</option>
-                      ))
-                  : <option value={selectedIndex}>{selectedIndex.toUpperCase()}</option>
-                }
-              </select>
+              {/* Sensor + index are now chosen from the Map Layers legend
+                  (renderLegendCards) rather than duplicated here. */}
               <button
                 onClick={() => setRefreshSlider(n => n + 1)}
                 disabled={timelineLoading}
@@ -3109,10 +3101,11 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                     const isHL = matchIdx !== -1;
                     const isSelA = matchIdx === selectedTimelineIndex;
                     const isSelB = isCompareMode && (matchIdx === compareTimelineIndex);
-                    
+                    const dayCoverage = calendarDates.find(d => d.date === dateStr);
+
                     let btnStyle = {};
                     let btnClass = '';
-                    
+
                     if (isSelA && isSelB) {
                       btnStyle = { background: 'linear-gradient(135deg, #16A34A 50%, #2563EB 50%)', color: '#FFFFFF' };
                     } else if (isSelA) {
@@ -3121,12 +3114,15 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                       btnStyle = { backgroundColor: '#2563EB', color: '#FFFFFF' };
                     } else if (isHL) {
                       btnClass = 'text-green-700 bg-green-50 hover:bg-green-100 font-bold border border-green-100';
+                    } else if (dayCoverage) {
+                      btnClass = 'text-gray-500 hover:bg-gray-50 font-semibold';
                     } else {
                       btnClass = 'text-gray-300 cursor-default';
                     }
 
                     return (
                       <button key={i} disabled={!isHL}
+                        title={dayCoverage ? `Imagery from: ${dayCoverage.sensors.map(s => s === 'sentinel-2' ? 'Sentinel-2' : s === 'landsat' ? 'Landsat' : 'Sentinel-1').join(', ')}` : undefined}
                         onClick={() => {
                           if (isHL) {
                             if (isCompareMode) {
@@ -3137,9 +3133,16 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                             }
                           }
                         }}
-                        className={`h-5 w-full rounded-md text-[10px] font-bold flex items-center justify-center transition-all ${btnClass}`}
+                        className={`h-6 w-full rounded-md text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-all ${btnClass}`}
                         style={btnStyle}>
-                        {day}
+                        <span>{day}</span>
+                        {dayCoverage && (
+                          <span className="flex items-center gap-0.5 leading-none">
+                            {dayCoverage.sensors.map(s => (
+                              <span key={s} className="w-1 h-1 rounded-full" style={{ backgroundColor: (isSelA || isSelB) ? '#FFFFFF' : SENSOR_DOT_COLOR[s] }} />
+                            ))}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
