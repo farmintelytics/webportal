@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Edit3, Trash2, X, Check, Building2, MapPin, Search, Layers, ImagePlus } from 'lucide-react';
 import {
   fetchOrganizations, createOrganization, updateOrganization, deleteOrganization, uploadOrganizationLogo,
+  fetchFarms, getBoundaryProperties,
 } from '../../services/adminApi';
 import { useConfirm } from '../components/ConfirmProvider';
 import ErrorBanner from '../components/ErrorBanner';
@@ -74,6 +75,13 @@ const emptyForm = () => ({
   company_name: '', schema_name: '', allowed_crops: [], allowed_modules: [], allowed_indices: [], map_center_lat: 6.43, map_center_lon: 5.27,
 });
 
+const DEFAULT_ALERT_THRESHOLDS = {
+  alert_ndvi_drop_pct: 0.25,
+  alert_smi_critical: 0.2,
+  alert_ndmi_water_stress_critical: 0.0,
+  alert_ndvi_health_critical: 0.35,
+};
+
 // Mirrors the backend _slugify: lowercase, non-alphanumerics → underscores
 export const slugify = (text) => (text || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
@@ -103,8 +111,41 @@ const OrgModal = ({ org, onSave, onClose }) => {
     allowed_modules: org.allowed_modules || [],
     allowed_indices: org.allowed_indices || [],
     map_center_lat: org.map_center_lat, map_center_lon: org.map_center_lon,
+    dashboard_filter_keys: org.dashboard_filter_keys || [],
+    alert_ndvi_drop_pct: org.alert_ndvi_drop_pct ?? DEFAULT_ALERT_THRESHOLDS.alert_ndvi_drop_pct,
+    alert_smi_critical: org.alert_smi_critical ?? DEFAULT_ALERT_THRESHOLDS.alert_smi_critical,
+    alert_ndmi_water_stress_critical: org.alert_ndmi_water_stress_critical ?? DEFAULT_ALERT_THRESHOLDS.alert_ndmi_water_stress_critical,
+    alert_ndvi_health_critical: org.alert_ndvi_health_critical ?? DEFAULT_ALERT_THRESHOLDS.alert_ndvi_health_critical,
+    enable_timeseries_ffill: org.enable_timeseries_ffill || false,
   } : emptyForm());
   const [saving, setSaving] = useState(false);
+
+  // Boundary-file property keys available to pick as dashboard filters —
+  // same source the onboarding wizard reads from, just fetched here for an
+  // org that's already been set up instead of one being created right now.
+  const [filterOptions, setFilterOptions] = useState([]);
+  const [loadingFilters, setLoadingFilters] = useState(false);
+  useEffect(() => {
+    if (!org?.schema_name) return;
+    setLoadingFilters(true);
+    (async () => {
+      try {
+        const farms = await fetchFarms(org.schema_name);
+        const results = await Promise.all(farms.map(f => getBoundaryProperties(f.farm_id).catch(() => ({ properties: [] }))));
+        const byKey = new Map();
+        for (const r of results) {
+          for (const p of (r.properties || [])) {
+            if (!byKey.has(p.key)) byKey.set(p.key, p);
+          }
+        }
+        setFilterOptions([...byKey.values()]);
+      } catch {
+        setFilterOptions([]);
+      } finally {
+        setLoadingFilters(false);
+      }
+    })();
+  }, [org?.schema_name]);
   // Infer the starting model from existing data when editing (crops present
   // → 'crop') so the Allowed Crops section isn't hidden out from under an
   // org that already has crops configured. null = manual module selection.
@@ -284,6 +325,84 @@ const OrgModal = ({ org, onSave, onClose }) => {
               Only the selected indices appear on this organization's maps, dropdowns and legends. Leave all unselected to allow everything.
             </p>
           </div>
+          {org && (
+            <div>
+              <label style={labelStyle}>Dashboard Filters</label>
+              {loadingFilters && <p style={{ color: '#94a3b8', fontSize: '11px', margin: 0 }}>Reading boundary properties…</p>}
+              {!loadingFilters && filterOptions.length === 0 && (
+                <p style={{ color: '#94a3b8', fontSize: '11px', margin: 0 }}>No named boundary columns found for this org's farm(s) yet.</p>
+              )}
+              {!loadingFilters && filterOptions.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {filterOptions.map(opt => {
+                    const active = form.dashboard_filter_keys.includes(opt.key);
+                    const disabled = !active && form.dashboard_filter_keys.length >= 4;
+                    return (
+                      <button
+                        key={opt.key}
+                        disabled={disabled}
+                        title={opt.sample_values?.length ? `e.g. ${opt.sample_values.slice(0, 3).join(', ')}` : ''}
+                        onClick={() => setForm(f => ({
+                          ...f,
+                          dashboard_filter_keys: active ? f.dashboard_filter_keys.filter(k => k !== opt.key) : [...f.dashboard_filter_keys, opt.key],
+                        }))}
+                        style={{
+                          padding: '5px 10px', borderRadius: '8px', cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '11px', fontWeight: 700,
+                          background: active ? 'rgba(22,163,74,0.1)' : '#ffffff',
+                          border: active ? '1px solid rgba(22,163,74,0.3)' : '1px solid #cbd5e1',
+                          color: active ? '#16a34a' : '#475569', opacity: disabled ? 0.4 : 1,
+                        }}
+                      >
+                        {opt.key}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <p style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 0' }}>
+                Up to 4 — {form.dashboard_filter_keys.length}/4 selected. None selected = no extra filter dropdowns on this org's dashboard.
+              </p>
+            </div>
+          )}
+          {org && (
+            <div>
+              <label style={labelStyle}>Alert Thresholds</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <p style={{ color: '#64748b', fontSize: '10px', margin: '0 0 4px' }}>NDVI/SAVI/EVI Drop %</p>
+                  <input type="number" step="0.01" min="0" max="1" style={inputStyle}
+                    value={form.alert_ndvi_drop_pct}
+                    onChange={e => setForm(f => ({ ...f, alert_ndvi_drop_pct: parseFloat(e.target.value || '0') }))} />
+                </div>
+                <div>
+                  <p style={{ color: '#64748b', fontSize: '10px', margin: '0 0 4px' }}>SMI Critical</p>
+                  <input type="number" step="0.01" style={inputStyle}
+                    value={form.alert_smi_critical}
+                    onChange={e => setForm(f => ({ ...f, alert_smi_critical: parseFloat(e.target.value || '0') }))} />
+                </div>
+                <div>
+                  <p style={{ color: '#64748b', fontSize: '10px', margin: '0 0 4px' }}>NDMI Water Stress Critical</p>
+                  <input type="number" step="0.01" style={inputStyle}
+                    value={form.alert_ndmi_water_stress_critical}
+                    onChange={e => setForm(f => ({ ...f, alert_ndmi_water_stress_critical: parseFloat(e.target.value || '0') }))} />
+                </div>
+                <div>
+                  <p style={{ color: '#64748b', fontSize: '10px', margin: '0 0 4px' }}>NDVI Health Critical</p>
+                  <input type="number" step="0.01" style={inputStyle}
+                    value={form.alert_ndvi_health_critical}
+                    onChange={e => setForm(f => ({ ...f, alert_ndvi_health_critical: parseFloat(e.target.value || '0') }))} />
+                </div>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', marginTop: '10px' }}>
+                <input type="checkbox" checked={form.enable_timeseries_ffill}
+                  onChange={e => setForm(f => ({ ...f, enable_timeseries_ffill: e.target.checked }))}
+                  style={{ width: '15px', height: '15px', accentColor: '#16a34a', marginTop: '1px' }} />
+                <span style={{ fontSize: '11px', color: '#475569', lineHeight: 1.4 }}>
+                  Forward-fill gaps in time-series charts (carry the last real reading forward instead of leaving a gap on dates with no clean scene).
+                </span>
+              </label>
+            </div>
+          )}
           <div>
             <label style={labelStyle}>Allowed Modules</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '180px', overflowY: 'auto', padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
