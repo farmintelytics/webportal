@@ -2024,8 +2024,14 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
         );
   };
 
-  const renderLegendCards = () => {
-    const groupNames = Object.keys(legendGroups);
+  // groupFilter narrows which legend groups a page shows — e.g. Crop Health
+  // only needs vegetation-vigor indicators, not the whole catalog (SAR,
+  // water/moisture, etc). Omit it (as Map Analytics does) to show
+  // everything — that page is the one deliberate "see the full archive"
+  // view; every other page should show a distinct, non-overlapping slice
+  // rather than repeating the same full index list.
+  const renderLegendCards = (groupFilter = null) => {
+    const groupNames = Object.keys(legendGroups).filter(g => !groupFilter || groupFilter.includes(g));
     const openGroups = expandedLegendGroups || groupNames.slice(0, 1);
     return (
       <>
@@ -4968,7 +4974,19 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                         </div>
                         {healthBioExpanded && (
                           <div className="space-y-3">
-                            {renderLegendCards()}
+                            {/* Health-relevant indices only — SAR/water-moisture
+                                already have their own real estate on other
+                                pages (Map Analytics, Moisture Content), so
+                                repeating them here would just be the same
+                                index shown a second time under a different tab.
+                                Crop mode's crop_group values (Biophysical/
+                                Nutrient/Canopy/...) are a different vocabulary
+                                than org mode's tag-derived groups (Vegetation
+                                Health/Nutrient & Chlorophyll/...), so the
+                                filter has to match whichever scheme is active. */}
+                            {renderLegendCards(isOrg
+                              ? ['Vegetation Health', 'Nutrient & Chlorophyll']
+                              : ['Biophysical', 'Nutrient', 'Canopy'])}
                           </div>
                         )}
                       </div>
