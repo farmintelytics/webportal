@@ -1039,7 +1039,11 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     loadBackendData();
     return () => { active = false; };
   }, [tenant]);
-  const [selectedBasemap, setSelectedBasemap] = useState('google-hybrid');
+  const [selectedBasemap, setSelectedBasemap] = useState('terrain');
+  // Google's hybrid tile layer (lyrs=y) bakes place-name/road labels into the
+  // imagery; lyrs=s is the same satellite imagery with no labels. Only
+  // relevant when Google is the active basemap.
+  const [showGoogleLabels, setShowGoogleLabels] = useState(true);
   // Basemap ids that are live composites rendered from the tenant's own
   // archive (as opposed to static external imagery like Google/ESRI) — these
   // change with the time slider, same as the NDVI/NDMI overlay.
@@ -1699,6 +1703,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
 
   const renderFloatingBasemapSelector = () => {
     const BASEMAPS = [
+      { id: 'terrain',       label: 'Terrain',         sub: 'Default Basemap',    emoji: '⛰️' },
       { id: 'google-hybrid', label: 'Google Satellite', sub: 'High-Res Basemap',   emoji: '🗺️' },
       // Live composites rendered from this tenant's own archive — move with
       // the time slider, unlike the static sources above.
@@ -1740,6 +1745,20 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   {selectedBasemap === src.id && <CheckCircle2 size={10} className="text-green-600 shrink-0" />}
                 </button>
               ))}
+              {selectedBasemap === 'google-hybrid' && (
+                <button
+                  onClick={() => setShowGoogleLabels(v => !v)}
+                  className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-sm text-left border-t border-gray-100 mt-0.5 pt-1.5 hover:bg-gray-55"
+                >
+                  <span className="text-[10px] font-bold text-gray-700">Show Labels</span>
+                  <span
+                    className="w-7 h-4 rounded-full p-0.5 transition-colors duration-200 shrink-0"
+                    style={{ backgroundColor: showGoogleLabels ? '#16A34A' : '#E5E7EB' }}
+                  >
+                    <span className={`block w-3 h-3 rounded-full bg-white shadow transform transition-transform duration-200 ${showGoogleLabels ? 'translate-x-3' : 'translate-x-0'}`} />
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -3333,7 +3352,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
           )}
 
           {centerContent ? centerContent : (
-            <div className="flex-1 bg-white p-4 flex items-start overflow-hidden border-l border-gray-100">
+            <div className="flex-1 bg-white p-4 flex items-start overflow-hidden border-l border-r border-gray-100">
               {/* Everything about the current selection — which pass is
                   active, how many passes exist this month, and (if a day
                   with more than one sensor was just clicked) the satellite
@@ -3693,12 +3712,16 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   // Static fallback (ESRI World Imagery) shown while a composite's own tiles
   // are still loading, so the basemap never goes blank mid-fetch.
   const STATIC_BASEMAP_FALLBACK = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  const TERRAIN_BASEMAP_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}';
   const basemapUrl = useMemo(() => {
     if (activeComposite) return compositeTileUrl || STATIC_BASEMAP_FALLBACK;
-    if (selectedBasemap === 'google-hybrid') return 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
-    if (selectedBasemap === 'landsat-8') return 'https://server.arcgisonline.com/ArcGIS/rest/services/Specialty/DeLorme_World_Base_Map/MapServer/tile/{z}/{y}/{x}';
+    if (selectedBasemap === 'terrain') return TERRAIN_BASEMAP_URL;
+    if (selectedBasemap === 'google-hybrid') {
+      // lyrs=y = satellite + labels, lyrs=s = satellite only
+      return `https://mt1.google.com/vt/lyrs=${showGoogleLabels ? 'y' : 's'}&x={x}&y={y}&z={z}`;
+    }
     return STATIC_BASEMAP_FALLBACK;
-  }, [selectedBasemap, activeComposite, compositeTileUrl]);
+  }, [selectedBasemap, activeComposite, compositeTileUrl, showGoogleLabels]);
 
   const triggerReportGeneration = async (overridePlot, overrideIndex) => {
     const targetPlot = overridePlot !== undefined ? overridePlot : reportPlot;
