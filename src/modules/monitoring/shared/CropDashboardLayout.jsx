@@ -932,6 +932,48 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
 
   const [plotsTelemetry, setPlotsTelemetry] = useState(null);
 
+  // Real farm-average trend series for the Analytics Hub Overview charts —
+  // fetched independently of whichever index is on the map, since Overview
+  // shows NDVI/NDMI/EVI/LST all at once. Each entry's "mean" comes straight
+  // from /timeseries/slider (a true per-date average over the raster), not
+  // from /plots/intelligence's indices field — that field is a single
+  // latest-value scalar per plot, not a {date: value} map, so indexing it
+  // by date (as the old chart-building code did) was always undefined and
+  // every chart point silently rendered as 0.
+  const [overviewTrends, setOverviewTrends] = useState({ ndvi: [], ndmi: [], evi: [], lst: [], rvi: [] });
+  useEffect(() => {
+    const relevantSubpage = activeAnalyticsSubpage === 'overview' || activeAnalyticsSubpage === 'vigor-health' || activeAnalyticsSubpage === 'moisture-et';
+    if (!(activeSidebarItem === 'analytics' && activeTab === 'monitor' && relevantSubpage)) return;
+    let active = true;
+    const windowEnd = new Date();
+    const windowStart = new Date();
+    windowStart.setMonth(windowStart.getMonth() - 6);
+    const isoDate = (d) => d.toISOString().slice(0, 10);
+    async function loadOverviewTrends() {
+      const specs = [
+        { key: 'ndvi', sensor: undefined },
+        { key: 'ndmi', sensor: undefined },
+        { key: 'evi', sensor: undefined },
+        { key: 'lst', sensor: 'landsat' },
+        { key: 'rvi', sensor: 'sentinel-1' },
+      ];
+      const results = await Promise.all(specs.map(s =>
+        api.fetchTimeseriesSlider({
+          farm: tenant || 'farm_1', index: s.key, sensor: s.sensor,
+          start: isoDate(windowStart), end: isoDate(windowEnd), cropType,
+        }).catch(err => { console.error(`Failed to fetch ${s.key} trend:`, err); return null; })
+      ));
+      if (!active) return;
+      const next = {};
+      specs.forEach((s, i) => {
+        next[s.key] = (results[i]?.timeline || []).filter(t => t.mean != null);
+      });
+      setOverviewTrends(next);
+    }
+    loadOverviewTrends();
+    return () => { active = false; };
+  }, [activeSidebarItem, activeTab, activeAnalyticsSubpage, tenant, cropType]);
+
   const [stats, setStats] = useState(null);
   const [trends, setTrends] = useState(null);
   const [plots, setPlots] = useState([]);
@@ -3419,15 +3461,15 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   }, [stats, plots]);
 
   const yieldTrendsData = useMemo(() => {
-    // Real NDVI time series from zarr — one point per observation date
-    const labels = TIMELINE_DATA.map(t => t.label || t.date);
-    const values = TIMELINE_DATA.map(t => t.ndvi ?? 0);
-    if (labels.length === 0) return { labels: [], datasets: [] };
+    // Real NDVI farm-average time series, one point per observation date —
+    // see overviewTrends above for why this no longer reads off TIMELINE_DATA/plots.
+    const series = overviewTrends.ndvi;
+    if (!series || series.length === 0) return { labels: [], datasets: [] };
     return {
-      labels,
+      labels: series.map(t => t.label || t.date),
       datasets: [{
         label: 'NDVI (Farm Average)',
-        data: values,
+        data: series.map(t => t.mean),
         borderColor: '#16A34A',
         backgroundColor: 'rgba(22, 163, 74, 0.06)',
         tension: 0.4,
@@ -3436,18 +3478,16 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
         pointBackgroundColor: '#16A34A',
       }]
     };
-  }, [TIMELINE_DATA]);
+  }, [overviewTrends.ndvi]);
 
   const ndmiTrendsData = useMemo(() => {
-    // Real NDMI time series from zarr
-    const labels = TIMELINE_DATA.map(t => t.label || t.date);
-    const values = TIMELINE_DATA.map(t => t.ndmi ?? 0);
-    if (labels.length === 0) return { labels: [], datasets: [] };
+    const series = overviewTrends.ndmi;
+    if (!series || series.length === 0) return { labels: [], datasets: [] };
     return {
-      labels,
+      labels: series.map(t => t.label || t.date),
       datasets: [{
         label: 'NDMI (Farm Average)',
-        data: values,
+        data: series.map(t => t.mean),
         borderColor: '#0284C7',
         backgroundColor: 'rgba(2, 132, 199, 0.06)',
         tension: 0.4,
@@ -3456,18 +3496,16 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
         pointBackgroundColor: '#0284C7',
       }]
     };
-  }, [TIMELINE_DATA]);
+  }, [overviewTrends.ndmi]);
 
   const rviTrendsData = useMemo(() => {
-    // Real EVI time series from zarr
-    const labels = TIMELINE_DATA.map(t => t.label || t.date);
-    const values = TIMELINE_DATA.map(t => t.evi ?? 0);
-    if (labels.length === 0) return { labels: [], datasets: [] };
+    const series = overviewTrends.evi;
+    if (!series || series.length === 0) return { labels: [], datasets: [] };
     return {
-      labels,
+      labels: series.map(t => t.label || t.date),
       datasets: [{
         label: 'EVI (Farm Average)',
-        data: values,
+        data: series.map(t => t.mean),
         borderColor: '#8B5CF6',
         backgroundColor: 'rgba(139, 92, 246, 0.06)',
         tension: 0.4,
@@ -3476,12 +3514,50 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
         pointBackgroundColor: '#8B5CF6',
       }]
     };
-  }, [TIMELINE_DATA]);
+  }, [overviewTrends.evi]);
+
+  const sarRviTrendsData = useMemo(() => {
+    // Was previously the EVI series mislabeled as "SAR RVI" on the
+    // Vigor & Phenology page — this is the actual Sentinel-1 RVI trend.
+    const series = overviewTrends.rvi;
+    if (!series || series.length === 0) return { labels: [], datasets: [] };
+    return {
+      labels: series.map(t => t.label || t.date),
+      datasets: [{
+        label: 'RVI (Farm Average, Sentinel-1)',
+        data: series.map(t => t.mean),
+        borderColor: '#2563EB',
+        backgroundColor: 'rgba(37, 99, 235, 0.06)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: '#2563EB',
+      }]
+    };
+  }, [overviewTrends.rvi]);
 
   const soilTempTrendsData = useMemo(() => {
-    // Soil temperature sensor data not yet connected — chart shows no data
-    return { labels: [], datasets: [] };
-  }, []);
+    // True soil temperature has no real per-plot source anywhere in the
+    // pipeline (see get_plots_telemetry). LST (surface temperature, from
+    // the Landsat thermal band) is the closest real measurement actually
+    // available — the card below is relabeled to say so rather than
+    // implying a soil-specific reading that doesn't exist.
+    const series = overviewTrends.lst;
+    if (!series || series.length === 0) return { labels: [], datasets: [] };
+    return {
+      labels: series.map(t => t.label || t.date),
+      datasets: [{
+        label: 'LST (Farm Average)',
+        data: series.map(t => t.mean),
+        borderColor: '#EA580C',
+        backgroundColor: 'rgba(234, 88, 12, 0.06)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: '#EA580C',
+      }]
+    };
+  }, [overviewTrends.lst]);
 
   const vpdTrendsData = useMemo(() => {
     // VPD sensor data not yet connected — chart shows no data
@@ -4360,19 +4436,25 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                         </div>
                       </div>
 
-                      {/* Soil Temperature Trends */}
+                      {/* Land Surface Temperature Trends */}
                       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-5">
                         <div className="flex justify-between items-center">
                           <h3 className="text-base font-bold text-gray-900 flex items-center gap-2.5">
                             <Thermometer size={18} className="text-green-600" />
-                            Soil Temperature Trends {renderInfoTooltip("Soil Temperature Trends")}
+                            Land Surface Temperature Trends {renderInfoTooltip("Land Surface Temperature Trends")}
                           </h3>
                           <span className="text-xs bg-green-50 text-green-700 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             LST °C
                           </span>
                         </div>
-                        <div className="h-[280px]">
-                          <Line data={soilTempTrendsData} options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 15, max: 35 } } }} />
+                        <div className="h-[280px] relative">
+                          {soilTempTrendsData.labels.length === 0 ? (
+                            <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500 font-medium text-center px-6">
+                              No Landsat thermal-band imagery in the archive yet for this farm.
+                            </div>
+                          ) : (
+                            <Line data={soilTempTrendsData} options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 15, max: 45 } } }} />
+                          )}
                         </div>
                       </div>
 
@@ -4387,8 +4469,10 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                             VPD kPa
                           </span>
                         </div>
-                        <div className="h-[280px]">
-                          <Line data={vpdTrendsData} options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 3 } } }} />
+                        <div className="h-[280px] relative">
+                          <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500 font-medium text-center px-6">
+                            No VPD source connected yet — this needs a humidity feed the pipeline doesn't fetch today.
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -4446,8 +4530,8 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                         </div>
                         <div className="h-[300px]">
                           <Line
-                            data={rviTrendsData}
-                            options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0.0, max: 1.0 } } }}
+                            data={sarRviTrendsData}
+                            options={{ ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0.0, max: 2.0 } } }}
                           />
                         </div>
                       </div>
