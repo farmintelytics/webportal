@@ -50,6 +50,7 @@ const secondaryBtn = { display: 'flex', alignItems: 'center', justifyContent: 'c
 // Back/Next instead of dumping every field on screen at once.
 const ORG_SUBSTEPS = [
   { id: 'company', label: 'Company' },
+  { id: 'access', label: 'Access Model' },
   { id: 'farm', label: 'Farm' },
   { id: 'boundary', label: 'Boundary' },
 ];
@@ -135,7 +136,8 @@ const Onboarding = () => {
   const companySlug = company.schema_name.trim() || slugify(company.company_name);
   const toggleIn = toggleInList;
 
-  const canLeaveCompanyStep = company.company_name.trim() && (company.accessModel === 'organization' || company.allowed_crops.length > 0);
+  const canLeaveCompanyStep = company.company_name.trim();
+  const canLeaveAccessStep = company.accessModel === 'organization' || company.allowed_crops.length > 0;
   const canLeaveFarmStep = farm.farm_name.trim() && farm.sensors.length > 0 && farm.indices.length > 0;
 
   const run = async (fn) => {
@@ -356,25 +358,15 @@ const Onboarding = () => {
                   <input type="number" step="any" style={inputStyle} value={company.map_center_lon} onChange={e => setCompany(c => ({ ...c, map_center_lon: parseFloat(e.target.value) }))} />
                 </div>
               </div>
-              <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#334155' }}>
-                  <input type="checkbox" checked={isParent} onChange={e => setIsParent(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: '#16a34a' }} />
-                  This organization has multiple farms run separately and merged into one parent (e.g. several estates)
-                </label>
-                {isParent && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={labelStyle}>Parent Farm ID</label>
-                      <input style={inputStyle} placeholder={`${companySlug}_farm`} value={parentFarmId} onChange={e => setParentFarmId(e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Parent Farm Name</label>
-                      <input style={inputStyle} placeholder={`${company.company_name || 'Company'} (Combined)`} value={parentFarmName} onChange={e => setParentFarmName(e.target.value)} />
-                    </div>
-                  </div>
-                )}
-                {isParent && <p style={{ ...helpTextStyle, margin: 0 }}>You'll add each sub-farm and its own boundary file one at a time on the next steps — they'll all be tagged with this shared parent so the pipeline merges them automatically.</p>}
-              </div>
+              <button onClick={() => setOrgSubStep(1)} disabled={!canLeaveCompanyStep} style={primaryBtn(!canLeaveCompanyStep)}>
+                Next: Access Model <ChevronRight size={15} />
+              </button>
+            </>
+          )}
+
+          {orgSubStep === 1 && (
+            <>
+              <p style={{ color: '#64748b', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>Choose how {company.company_name || 'this company'}'s users will see the platform, and what they're licensed to view.</p>
               <div>
                 <label style={labelStyle}>Access Model</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -417,19 +409,56 @@ const Onboarding = () => {
                 </div>
                 <p style={helpTextStyle}>These are the only layers this company will see. Leave all unchecked to show everything.</p>
               </div>
-              <button onClick={() => setOrgSubStep(1)} disabled={!canLeaveCompanyStep} style={primaryBtn(!canLeaveCompanyStep)}>
-                Next: Farm <ChevronRight size={15} />
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setOrgSubStep(0)} style={secondaryBtn}>Back</button>
+                <button
+                  onClick={() => {
+                    // Farm's "Indices to Compute" used to always start empty,
+                    // forcing the same indices to be re-picked right after
+                    // choosing them here as "Allowed Satellite Indices" —
+                    // pre-fill from that selection (only where the two lists
+                    // overlap) so it's an edit, not a from-scratch redo.
+                    if (company.allowed_indices.length > 0) {
+                      const carried = ALL_INDICES.filter(i => company.allowed_indices.includes(i.toLowerCase()));
+                      if (carried.length > 0) setFarm(f => ({ ...f, indices: carried }));
+                    }
+                    setOrgSubStep(2);
+                  }}
+                  disabled={!canLeaveAccessStep}
+                  style={{ ...primaryBtn(!canLeaveAccessStep), flex: 1 }}
+                >
+                  Next: Farm <ChevronRight size={15} />
+                </button>
+              </div>
             </>
           )}
 
-          {orgSubStep === 1 && (
+          {orgSubStep === 2 && (
             <>
               <p style={{ color: '#64748b', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
                 {isParent
                   ? `Add sub-farm #${subFarms.length + 1} for ${company.company_name || 'this company'} (parent: ${effectiveParentFarmId()}).`
                   : `Now add the first farm or estate for ${company.company_name || 'this company'}.`}
               </p>
+              <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#334155' }}>
+                  <input type="checkbox" checked={isParent} onChange={e => setIsParent(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: '#16a34a' }} />
+                  This organization has multiple farms run separately and merged into one parent (e.g. several estates)
+                </label>
+                {isParent && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={labelStyle}>Parent Farm ID</label>
+                      <input style={inputStyle} placeholder={`${companySlug}_farm`} value={parentFarmId} onChange={e => setParentFarmId(e.target.value)} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Parent Farm Name</label>
+                      <input style={inputStyle} placeholder={`${company.company_name || 'Company'} (Combined)`} value={parentFarmName} onChange={e => setParentFarmName(e.target.value)} />
+                    </div>
+                  </div>
+                )}
+                {isParent && <p style={{ ...helpTextStyle, margin: 0 }}>You'll add each sub-farm and its own boundary file one at a time on the next steps — they'll all be tagged with this shared parent so the pipeline merges them automatically.</p>}
+              </div>
               <div>
                 <label style={labelStyle}>Farm / Estate Name *</label>
                 <input style={inputStyle} placeholder="Farm or estate name" value={farm.farm_name} onChange={e => setFarm(f => ({ ...f, farm_name: e.target.value }))} />
@@ -500,15 +529,15 @@ const Onboarding = () => {
                 pick a start date in the past (or use a button above).
               </p>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setOrgSubStep(0)} style={secondaryBtn}>Back</button>
-                <button onClick={() => setOrgSubStep(2)} disabled={!canLeaveFarmStep} style={{ ...primaryBtn(!canLeaveFarmStep), flex: 1 }}>
+                <button onClick={() => setOrgSubStep(1)} style={secondaryBtn}>Back</button>
+                <button onClick={() => setOrgSubStep(3)} disabled={!canLeaveFarmStep} style={{ ...primaryBtn(!canLeaveFarmStep), flex: 1 }}>
                   Next: Boundary <ChevronRight size={15} />
                 </button>
               </div>
             </>
           )}
 
-          {orgSubStep === 2 && (
+          {orgSubStep === 3 && (
             <>
               <p style={{ color: '#64748b', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>Last step — upload the farm's boundary as a GeoJSON file.</p>
               <div>
@@ -529,7 +558,7 @@ const Onboarding = () => {
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setOrgSubStep(1)} style={secondaryBtn}>Back</button>
+                <button onClick={() => setOrgSubStep(2)} style={secondaryBtn}>Back</button>
                 {isParent && (
                   <button
                     type="button"
@@ -537,7 +566,7 @@ const Onboarding = () => {
                       setSubFarms(sf => [...sf, { ...farm, boundaryFile }]);
                       setFarm(f => ({ ...f, farm_name: '', farm_id: '' }));
                       setBoundaryFile(null);
-                      setOrgSubStep(1);
+                      setOrgSubStep(2);
                     }}
                     disabled={!boundaryFile}
                     style={{ ...secondaryBtn, opacity: !boundaryFile ? 0.5 : 1 }}

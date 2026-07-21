@@ -25,32 +25,32 @@ import { fetchTenants, fetchCropMonitoringConfig } from '../services/organizatio
 const ModuleCard = ({ title, crop, id, icon, active, onSelect, logoUrl }) => (
   <button
     onClick={() => active && onSelect(id)}
-    className={`group relative p-8 rounded-2xl transition-all duration-300 flex flex-col text-left border border-gray-100 ${
+    className={`group relative p-8 rounded-2xl transition-all duration-300 flex flex-col text-left border border-slate-200 shadow-sm ${
       active
-        ? 'bg-white hover:bg-gray-50 hover:shadow-md hover:-translate-y-0.5'
+        ? 'bg-white hover:bg-slate-50 hover:shadow-md hover:-translate-y-0.5'
         : 'bg-white opacity-40 cursor-not-allowed'
     }`}
   >
-    <div className={`p-4 rounded-xl w-fit mb-6 bg-gray-50 transition-colors overflow-hidden ${
-      active ? 'text-green-600 group-hover:bg-green-600 group-hover:text-white' : 'text-gray-400'
+    <div className={`p-4 rounded-xl w-fit mb-6 bg-slate-100 transition-colors overflow-hidden ${
+      active ? 'text-green-700 group-hover:bg-green-600 group-hover:text-white' : 'text-slate-500'
     }`}>
       {logoUrl ? <img src={logoUrl} alt="" className="w-8 h-8 object-contain" /> : React.cloneElement(icon, { size: 32 })}
     </div>
     
     <div className="flex-1">
-      <div className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 ${active ? 'text-green-600' : 'text-gray-400'}`}>
+      <div className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 ${active ? 'text-green-700' : 'text-slate-500'}`}>
         {crop}
       </div>
-      <h3 className={`text-xl font-black tracking-tight leading-tight ${active ? 'text-gray-900' : 'text-gray-400'}`}>
+      <h3 className={`text-xl font-black tracking-tight leading-tight ${active ? 'text-slate-900' : 'text-slate-500'}`}>
         {title}
       </h3>
     </div>
 
     <div className="mt-8 flex items-center justify-between">
-       <span className={`text-[11px] font-black uppercase tracking-widest ${active ? 'text-gray-900' : 'text-gray-300'}`}>
+       <span className={`text-[11px] font-black uppercase tracking-widest ${active ? 'text-slate-900' : 'text-slate-500'}`}>
          {active ? 'Launch Portal' : 'Locked'}
        </span>
-       {active && <ArrowRight size={18} className="text-gray-300 group-hover:text-green-600 transform group-hover:translate-x-2 transition-all" />}
+       {active && <ArrowRight size={18} className="text-slate-400 group-hover:text-green-600 transform group-hover:translate-x-2 transition-all" />}
     </div>
   </button>
 );
@@ -111,14 +111,14 @@ const PortalHub = ({ onSelectModule }) => {
       title: 'Geospatial Intelligence',
       description: 'Multispectral satellite imagery and drone-level field surveillance for high-precision monitoring.',
       modules: filterModules([
-        { id: 'rs-ffb',       title: 'Oil Palm',    crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
-        { id: 'rs-maize',     title: 'Maize Hub',    crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
-        { id: 'rs-cassava',   title: 'Cassava',     crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
-        { id: 'rs-rice',      title: 'Rice Monitor', crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
-        { id: 'rs-cocoa',     title: 'Cocoa Core',  crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
-        { id: 'rs-sugarcane', title: 'SugarCane',   crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
-        { id: 'rs-cashew',    title: 'Cashew',      crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
-        { id: 'rs-rubber',    title: 'Rubber',      crop: 'Geospatial Intelligence', icon: <Globe />, active: true  },
+        { id: 'rs-ffb',       title: 'Oil Palm',    crop: 'Oil Palm',  icon: <Sprout />,    active: true  },
+        { id: 'rs-maize',     title: 'Maize Hub',    crop: 'Maize',     icon: <Wheat />,     active: true  },
+        { id: 'rs-cassava',   title: 'Cassava',     crop: 'Cassava',   icon: <Container />, active: true  },
+        { id: 'rs-rice',      title: 'Rice Monitor', crop: 'Rice',      icon: <Leaf />,      active: true  },
+        { id: 'rs-cocoa',     title: 'Cocoa Core',  crop: 'Cocoa',     icon: <Coffee />,    active: true  },
+        { id: 'rs-sugarcane', title: 'SugarCane',   crop: 'SugarCane', icon: <Zap />,       active: true  },
+        { id: 'rs-cashew',    title: 'Cashew',      crop: 'Cashew',    icon: <Activity />,  active: true  },
+        { id: 'rs-rubber',    title: 'Rubber',      crop: 'Rubber',    icon: <Droplets />,  active: true  },
         { id: 'rs-drone',     title: 'Drone Intel',  crop: 'Aerial',    icon: <Plane />, active: true  },
         { id: 'group-monitoring', title: 'Smallholder', crop: 'Fusion',    icon: <Satellite />, active: true  },
       ])
@@ -182,31 +182,31 @@ const PortalHub = ({ onSelectModule }) => {
         </header>
 
         <div className="mb-24">
-           <h2 className="text-6xl font-black text-gray-900 tracking-tighter leading-none mb-8">
+           <h2 className="text-6xl font-black text-slate-900 tracking-tighter leading-none mb-8">
              Operational <br />
              <span className="text-green-600">Intelligence Hub.</span>
            </h2>
-           <p className="text-lg text-gray-500 font-medium max-w-3xl leading-relaxed">
+           <p className="text-lg text-slate-800 font-bold max-w-3xl leading-relaxed">
              A unified enterprise gateway for large-scale agricultural management. Orchestrate your entire multi-crop operation from real-time monitoring to automated logistics.
            </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-12 mb-10 border-b border-gray-100">
+        <div className="flex flex-wrap items-center gap-12 mb-10 border-b border-slate-200">
+          {/* Management, Sustainability, Finance, and Field Advisory are
+              defined in `sections` below (real module cards, ready to show
+              once those areas are built) but intentionally have no tab here
+              — only Crop Monitoring and Organization are live right now. */}
           {[
-            { id: 'management', label: 'Management' },
             { id: 'monitoring', label: 'Crop Monitoring' },
-            { id: 'sustainability', label: 'Sustainability' },
-            { id: 'payments', label: 'Finance' },
-            { id: 'field-advisory', label: 'Field Advisory' },
             { id: 'custom', label: 'Organization' }
           ].map(tab => (
-            <button 
+            <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`text-[14px] font-black uppercase tracking-widest transition-all pb-4 border-b-4 ${
-                activeTab === tab.id 
-                  ? 'text-green-600 border-green-600' 
-                  : 'text-gray-400 border-transparent hover:text-gray-900'
+                activeTab === tab.id
+                  ? 'text-green-600 border-green-600'
+                  : 'text-slate-700 border-transparent hover:text-slate-900 font-bold'
               }`}
             >
               {tab.label}
@@ -216,8 +216,8 @@ const PortalHub = ({ onSelectModule }) => {
 
         <div className="space-y-12">
           <div className="max-w-2xl">
-            <h3 className="text-[12px] font-black uppercase tracking-[0.4em] text-gray-900 mb-4">{currentSection.title}</h3>
-            <p className="text-[13px] text-gray-400 font-bold leading-relaxed uppercase tracking-wider">
+            <h3 className="text-[12px] font-black uppercase tracking-[0.4em] text-slate-900 mb-4">{currentSection.title}</h3>
+            <p className="text-[13px] text-slate-800 font-bold leading-relaxed uppercase tracking-wider">
               {currentSection.description}
             </p>
           </div>
@@ -232,16 +232,16 @@ const PortalHub = ({ onSelectModule }) => {
           </div>
         </div>
 
-        <footer className="mt-48 pt-12 flex flex-col lg:flex-row justify-between items-center gap-12 pb-12 border-t border-gray-100">
+        <footer className="mt-48 pt-12 flex flex-col lg:flex-row justify-between items-center gap-12 pb-12 border-t border-slate-200">
             <div className="flex items-center gap-12">
-               <div className="text-[11px] font-bold uppercase tracking-widest text-gray-400">© 2026 FarmIntelytics.</div>
+               <div className="text-[11px] font-bold uppercase tracking-widest text-slate-700">© 2026 FarmIntelytics.</div>
                <div className="flex gap-8">
                   {['Docs', 'Status', 'Support'].map(i => (
-                    <button key={i} className="text-[11px] font-black text-gray-400 hover:text-green-600 transition-colors uppercase tracking-widest">{i}</button>
+                    <button key={i} className="text-[11px] font-black text-slate-800 hover:text-green-600 transition-colors uppercase tracking-widest">{i}</button>
                   ))}
                </div>
             </div>
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-300">Intelligence Layer v1.0</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600">Intelligence Layer v1.0</div>
         </footer>
       </div>
     </div>
