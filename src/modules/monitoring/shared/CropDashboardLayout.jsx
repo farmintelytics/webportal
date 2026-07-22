@@ -3295,6 +3295,11 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                     // a callout right on the clicked cell keeps the choice
                     // and its trigger in the same place.
                     const showCallout = satellitePicker?.date === dateStr;
+                    // Rows near the bottom of the grid have no room for a
+                    // downward callout before the calendar's own overflow
+                    // boundary clips it — flip those upward instead.
+                    const dayRow = Math.floor((calFirstDay + day - 1) / 7);
+                    const openUpward = dayRow >= 3;
                     return (
                       <div key={i} className="relative">
                         <button disabled={!dayClickable}
@@ -3330,10 +3335,14 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                         </button>
                         {showCallout && (
                           <div
-                            className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 flex flex-col gap-1 w-max"
+                            className={`absolute z-50 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 flex flex-col gap-1 w-max ${
+                              openUpward ? 'bottom-full mb-1' : 'top-full mt-1'
+                            }`}
                             onClick={e => e.stopPropagation()}
                           >
-                            <div className="w-2 h-2 bg-white border-l border-t border-gray-200 rotate-45 absolute -top-1 left-1/2 -translate-x-1/2" />
+                            <div className={`w-2 h-2 bg-white border-gray-200 rotate-45 absolute left-1/2 -translate-x-1/2 ${
+                              openUpward ? 'border-r border-b -bottom-1' : 'border-l border-t -top-1'
+                            }`} />
                             <span className="text-[8px] font-bold text-gray-600 whitespace-nowrap">Choose satellite</span>
                             <div className="flex gap-1">
                               {satellitePicker.sensors.map(s => (
