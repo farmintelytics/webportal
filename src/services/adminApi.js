@@ -11,6 +11,19 @@ const ADMIN_API_BASE =
   import.meta.env.VITE_ADMIN_API_BASE_URL ??
   'http://127.0.0.1:8000/farmintelytics-engine/admin';
 
+// A 401 here always means the stored superadmin token is missing/expired/
+// invalid (see _require_admin on the backend) — every admin page used to
+// just surface the raw "Invalid or expired token" JSON as a generic error
+// banner, leaving a signed-out user stuck staring at a broken page instead
+// of being sent back to log in.
+function handleAdminAuthFailure() {
+  localStorage.removeItem('fi_admin_token');
+  localStorage.removeItem('fi_admin_email');
+  if (!window.location.pathname.startsWith('/admin/login')) {
+    window.location.href = '/admin/login';
+  }
+}
+
 /** Generic fetch helper for the admin API */
 async function adminFetch(path, options = {}) {
   const url = `${ADMIN_API_BASE}${path}`;
@@ -19,6 +32,7 @@ async function adminFetch(path, options = {}) {
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(url, { cache: 'no-store', ...options, headers });
+  if (res.status === 401) handleAdminAuthFailure();
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Admin API ${res.status} – ${path}: ${text}`);
@@ -33,6 +47,7 @@ async function adminUpload(path, formData) {
   const headers = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(url, { method: 'POST', headers, body: formData });
+  if (res.status === 401) handleAdminAuthFailure();
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Admin Upload ${res.status} – ${path}: ${text}`);
