@@ -3288,38 +3288,67 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
 
                     const dayClickable = isCompareMode ? isHL : (isHL || !!dayCoverage);
 
+                    // Multi-sensor days used to only surface the satellite
+                    // choice in a separate panel elsewhere on screen — you'd
+                    // click a date up here, then have to look away to find
+                    // where to actually pick the satellite. Anchoring it as
+                    // a callout right on the clicked cell keeps the choice
+                    // and its trigger in the same place.
+                    const showCallout = satellitePicker?.date === dateStr;
                     return (
-                      <button key={i} disabled={!dayClickable}
-                        title={dayCoverage ? `Imagery from: ${dayCoverage.sensors.map(s => s === 'sentinel-2' ? 'Sentinel-2' : s === 'landsat' ? 'Landsat' : 'Sentinel-1').join(', ')}` : undefined}
-                        onClick={() => {
-                          if (isCompareMode) {
-                            // Compare mode keeps the simpler current-sensor-only
-                            // behavior — picking a satellite for slot A vs B
-                            // independently gets confusing fast.
-                            if (isHL) {
-                              if (activeDateSlot === 'A') setSelectedTimelineIndex(matchIdx);
-                              else setCompareTimelineIndex(matchIdx);
+                      <div key={i} className="relative">
+                        <button disabled={!dayClickable}
+                          title={dayCoverage ? `Imagery from: ${dayCoverage.sensors.map(s => s === 'sentinel-2' ? 'Sentinel-2' : s === 'landsat' ? 'Landsat' : 'Sentinel-1').join(', ')}` : undefined}
+                          onClick={() => {
+                            if (isCompareMode) {
+                              // Compare mode keeps the simpler current-sensor-only
+                              // behavior — picking a satellite for slot A vs B
+                              // independently gets confusing fast.
+                              if (isHL) {
+                                if (activeDateSlot === 'A') setSelectedTimelineIndex(matchIdx);
+                                else setCompareTimelineIndex(matchIdx);
+                              }
+                              return;
                             }
-                            return;
-                          }
-                          if (!dayCoverage) return;
-                          if (dayCoverage.sensors.length > 1) {
-                            setSatellitePicker({ date: dateStr, sensors: dayCoverage.sensors });
-                          } else {
-                            selectDateWithSensor(dateStr, dayCoverage.sensors[0]);
-                          }
-                        }}
-                        className={`h-6 w-full rounded-md text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-all ${btnClass}`}
-                        style={btnStyle}>
-                        <span>{day}</span>
-                        {dayCoverage && (
-                          <span className="flex items-center gap-0.5 leading-none">
-                            {dayCoverage.sensors.map(s => (
-                              <span key={s} className="w-1 h-1 rounded-full" style={{ backgroundColor: (isSelA || isSelB) ? '#FFFFFF' : SENSOR_DOT_COLOR[s] }} />
-                            ))}
-                          </span>
+                            if (!dayCoverage) return;
+                            if (dayCoverage.sensors.length > 1) {
+                              setSatellitePicker(showCallout ? null : { date: dateStr, sensors: dayCoverage.sensors });
+                            } else {
+                              selectDateWithSensor(dateStr, dayCoverage.sensors[0]);
+                            }
+                          }}
+                          className={`h-6 w-full rounded-md text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-all ${btnClass}`}
+                          style={btnStyle}>
+                          <span>{day}</span>
+                          {dayCoverage && (
+                            <span className="flex items-center gap-0.5 leading-none">
+                              {dayCoverage.sensors.map(s => (
+                                <span key={s} className="w-1 h-1 rounded-full" style={{ backgroundColor: (isSelA || isSelB) ? '#FFFFFF' : SENSOR_DOT_COLOR[s] }} />
+                              ))}
+                            </span>
+                          )}
+                        </button>
+                        {showCallout && (
+                          <div
+                            className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 flex flex-col gap-1 w-max"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <div className="w-2 h-2 bg-white border-l border-t border-gray-200 rotate-45 absolute -top-1 left-1/2 -translate-x-1/2" />
+                            <span className="text-[8px] font-bold text-gray-600 whitespace-nowrap">Choose satellite</span>
+                            <div className="flex gap-1">
+                              {satellitePicker.sensors.map(s => (
+                                <button
+                                  key={s}
+                                  onClick={() => { selectDateWithSensor(dateStr, s); setSatellitePicker(null); }}
+                                  className="text-[9px] font-bold px-2 py-1 rounded-full text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200 whitespace-nowrap"
+                                >
+                                  {s === 'sentinel-2' ? 'Sentinel-2' : s === 'landsat' ? 'Landsat' : 'Sentinel-1'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                   {Array.from({ length: calTrailing < 0 ? 0 : calTrailing }).map((_, i) => (
@@ -3352,7 +3381,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
           )}
 
           {centerContent ? centerContent : (
-            <div className="flex-1 bg-white p-4 flex items-start overflow-hidden border-l border-r border-gray-100">
+            <div className="bg-white p-4 flex items-start overflow-hidden border-l border-r border-gray-100">
               {/* Everything about the current selection — which pass is
                   active, how many passes exist this month, and (if a day
                   with more than one sensor was just clicked) the satellite
@@ -3431,36 +3460,6 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                     </div>
                   );
                 })()}
-
-                {/* Satellite picker — shown here (rather than floating under
-                    the calendar) once a day with more than one sensor is
-                    clicked, so the choice and its result appear together. */}
-                {satellitePicker && (
-                  <>
-                    <div className="h-px bg-gray-100" />
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[8px] font-bold text-gray-600">
-                          {new Date(satellitePicker.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} — choose satellite
-                        </span>
-                        <button onClick={() => setSatellitePicker(null)} className="text-gray-600 hover:text-gray-800">
-                          <X size={9} />
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {satellitePicker.sensors.map(s => (
-                          <button
-                            key={s}
-                            onClick={() => { selectDateWithSensor(satellitePicker.date, s); setSatellitePicker(null); }}
-                            className="text-[8px] font-bold px-1.5 py-0.5 rounded-full text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200"
-                          >
-                            {s === 'sentinel-2' ? 'Sentinel-2' : s === 'landsat' ? 'Landsat' : 'Sentinel-1'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
 
                 {/* Recent passes — the calendar already has every real
                     acquisition date; surfacing the last few here lets you
