@@ -3461,6 +3461,44 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                     </div>
                   </>
                 )}
+
+                {/* Recent passes — the calendar already has every real
+                    acquisition date; surfacing the last few here lets you
+                    jump between them without opening it. */}
+                {calendarDates.length > 0 && (
+                  <>
+                    <div className="h-px bg-gray-100" />
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[8px] font-extrabold uppercase text-gray-600 tracking-wider">Recent Passes</span>
+                      <div className="flex flex-col gap-1">
+                        {calendarDates.slice(-5).reverse().map(d => {
+                          const isActive = currentTimeline?.date === d.date;
+                          return (
+                            <button
+                              key={d.date}
+                              onClick={() => {
+                                if (d.sensors.length > 1) setSatellitePicker({ date: d.date, sensors: d.sensors });
+                                else selectDateWithSensor(d.date, d.sensors[0]);
+                              }}
+                              className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-left transition-colors ${
+                                isActive ? 'bg-green-50' : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              <span className="flex items-center gap-0.5 shrink-0">
+                                {d.sensors.map(s => (
+                                  <span key={s} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: SENSOR_DOT_COLOR[s] }} />
+                                ))}
+                              </span>
+                              <span className={`text-[9px] font-semibold ${isActive ? 'text-green-700' : 'text-gray-700'}`}>
+                                {new Date(d.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -3712,7 +3750,13 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   // Static fallback (ESRI World Imagery) shown while a composite's own tiles
   // are still loading, so the basemap never goes blank mid-fetch.
   const STATIC_BASEMAP_FALLBACK = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-  const TERRAIN_BASEMAP_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}';
+  // ESRI's World_Terrain_Base has real global satellite coverage but
+  // genuinely sparse terrain-relief coverage over much of Africa — at the
+  // farm's actual location and zoom level it returned a literal "Map data
+  // not yet available" placeholder tile instead of a 404, so it looked
+  // broken rather than missing. OpenTopoMap (OSM + SRTM-derived, no API
+  // key) has real, complete tiles at the same coordinates and zoom.
+  const TERRAIN_BASEMAP_URL = 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png';
   const basemapUrl = useMemo(() => {
     if (activeComposite) return compositeTileUrl || STATIC_BASEMAP_FALLBACK;
     if (selectedBasemap === 'terrain') return TERRAIN_BASEMAP_URL;
@@ -3722,6 +3766,10 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     }
     return STATIC_BASEMAP_FALLBACK;
   }, [selectedBasemap, activeComposite, compositeTileUrl, showGoogleLabels]);
+  // OpenTopoMap's real (non-upscaled) tiles top out at z17 — the shared
+  // maxNativeZoom={18} that worked fine for satellite sources requested
+  // tiles one level past what terrain actually has.
+  const basemapMaxNativeZoom = selectedBasemap === 'terrain' && !activeComposite ? 17 : 18;
 
   const triggerReportGeneration = async (overridePlot, overrideIndex) => {
     const targetPlot = overridePlot !== undefined ? overridePlot : reportPlot;
@@ -4864,7 +4912,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={basemapMaxNativeZoom} />
           {!isCompareMode && showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}
@@ -5086,7 +5134,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={basemapMaxNativeZoom} />
           {!isCompareMode && showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}
@@ -5295,7 +5343,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={basemapMaxNativeZoom} />
           {!isCompareMode && showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}
@@ -5567,7 +5615,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={basemapMaxNativeZoom} />
                     {!isCompareMode && showRasterLayer && currentTileUrl && (
                       <TileLayer
                         key={currentTileUrl}
@@ -5748,7 +5796,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={basemapMaxNativeZoom} />
           {!isCompareMode && showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}
@@ -6503,7 +6551,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                   )}
                   <MapContainer center={defaultMapCenter} zoom={13} maxZoom={22}
                     style={{ height: '100%', width: '100%', zIndex: 1, position: 'relative', background: 'transparent' }} zoomControl={false}>
-                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={18} />
+                    <TileLayer key={basemapUrl} url={basemapUrl} attribution="&copy; ESRI & Google Satellite Imagery" maxZoom={22} maxNativeZoom={basemapMaxNativeZoom} />
           {!isCompareMode && showRasterLayer && currentTileUrl && (
             <TileLayer
               key={currentTileUrl}
