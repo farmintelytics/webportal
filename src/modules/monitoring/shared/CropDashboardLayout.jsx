@@ -1,4 +1,5 @@
 import { CROP_META } from '../../../services/cropMonitoringApi';
+import { getCropEmoji } from '../../../constants/crops';
 import PlotDetailPanel from './PlotDetailPanel';
 import PlotSearchSelector from './PlotSearchSelector';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -2008,12 +2009,21 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   // Org mode has no crop context, so indices are grouped from their
   // crop-agnostic INDEX_REGISTRY tags rather than the crop-specific
   // crop_group the backend computes for crop mode (see below).
-  const groupFromTags = (tags = []) => {
+  const groupFromTags = (tags = [], key = '') => {
     const t = tags.map(x => String(x).toLowerCase());
-    if (t.some(x => ['sar', 'radar'].includes(x))) return 'Structure & Moisture';
-    if (t.some(x => ['water', 'moisture', 'water-stress', 'canopy-water', 'flood', 'paddy',
-      'irrigation', 'drought', 'evapotranspiration', 'soil-water', 'soil-moisture'].includes(x))) return 'Water & Moisture';
-    if (t.some(x => ['chlorophyll', 'nitrogen', 'nutrient', 'phenology'].includes(x))) return 'Nutrient & Chlorophyll';
+    const k = String(key).toLowerCase();
+    
+    // Ground Moisture: Soil moisture, SAR SMI, thermal soil moisture, NDTI
+    if (k === 'smi' || k === 'smi_landsat' || k === 'ndti' || t.some(x => ['soil-water', 'soil-moisture', 'ground-moisture', 'thermal-moisture'].includes(x))) {
+      return 'Ground Moisture';
+    }
+    // Vegetation Moisture: Optical canopy moisture & water status (NDMI, NDWI, LSWI, MSI, WDI)
+    if (k === 'ndmi' || k === 'ndwi' || k === 'lswi' || k === 'msi' || k === 'wdi' || t.some(x => ['water', 'moisture', 'water-stress', 'canopy-water', 'flood', 'paddy', 'irrigation', 'drought', 'evapotranspiration', 'canopy-moisture'].includes(x))) {
+      return 'Vegetation Moisture';
+    }
+    if (t.some(x => ['chlorophyll', 'nitrogen', 'nutrient', 'phenology'].includes(x))) {
+      return 'Nutrient & Chlorophyll';
+    }
     return 'Vegetation Health';
   };
 
@@ -2031,7 +2041,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
           notes: '',
           hasData: true,
           ramp: [ix.lo, ix.hi],
-          group: groupFromTags(ix.tags),
+          group: groupFromTags(ix.tags, key),
         };
       });
     }
@@ -2044,7 +2054,7 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
       notes: entry.notes || '',
       hasData: availableIndices.some(i => String(i.index).toLowerCase() === entry.key),
       ramp: null,
-      group: entry.crop_group || 'General',
+      group: groupFromTags(entry.tags || [], entry.key),
     }));
   }, [isOrg, availableIndices, cropProfileEntries]);
 
@@ -2638,6 +2648,29 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
     });
   };
 
+  const renderMoisturePolygons = (plots, suffix = '') => {
+    return plots.map(plot => {
+      const keyPrefix = `${plot.id}${suffix ? '-' + suffix : ''}`;
+      return (
+        <React.Fragment key={keyPrefix}>
+          {moistureShowBoundaries && (
+            <Polygon
+              positions={plot.coords}
+              pathOptions={{
+                color: '#000000',
+                weight: 1.5,
+                opacity: (moistureBoundariesOpacity / 100) * 0.9,
+                fillColor: plot.color || '#3b82f6',
+                fillOpacity: showRasterLayer ? 0.05 : 0.35
+              }}
+              eventHandlers={{ click: (e) => handlePlotClick(plot, e.latlng.lat, e.latlng.lng) }}
+            />
+          )}
+        </React.Fragment>
+      );
+    });
+  };
+
   const renderYieldPolygons = (plots, suffix = '') => {
     return plots.map(plot => {
       const keyPrefix = `${plot.id}`;
@@ -2858,6 +2891,106 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
   }, [plots, currentTimelineB]);
 
   const healthPlotsData = healthPlotsDataA;
+
+  const moisturePlotsDataA = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
+        }
+        const ndmiVal = p.indices?.ndmi ?? null;
+        const ndwiVal = p.indices?.ndwi ?? null;
+        const lswiVal = p.indices?.lswi ?? null;
+        const smiVal = p.indices?.smi ?? null;
+        const msiVal = p.indices?.msi ?? null;
+
+        let activeVal = ndmiVal;
+        if (selectedIndex === 'ndwi') activeVal = ndwiVal;
+        else if (selectedIndex === 'lswi') activeVal = lswiVal;
+        else if (selectedIndex === 'smi') activeVal = smiVal;
+        else if (selectedIndex === 'msi') activeVal = msiVal;
+
+        let status = 'Adequate';
+        let color = '#60a5fa';
+        if (activeVal != null) {
+          if (selectedIndex === 'smi') {
+            status = activeVal > 5 ? 'Wet Soil' : activeVal > 2 ? 'Adequate' : 'Dry Soil';
+            color = activeVal > 5 ? '#1d4ed8' : activeVal > 2 ? '#60a5fa' : '#dc2626';
+          } else {
+            status = activeVal > 0.35 ? 'Well-Hydrated' : activeVal > 0.15 ? 'Adequate' : activeVal > -0.05 ? 'Mild Deficit' : 'Severe Deficit';
+            color = activeVal > 0.35 ? '#1d4ed8' : activeVal > 0.15 ? '#60a5fa' : activeVal > -0.05 ? '#fbbf24' : '#dc2626';
+          }
+        }
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          ndmi: ndmiVal,
+          ndwi: ndwiVal,
+          lswi: lswiVal,
+          smi: smiVal,
+          msi: msiVal,
+          activeVal,
+          moistureStatus: status,
+          color,
+          coords
+        };
+      });
+    }
+    return [];
+  }, [plots, currentTimelineA, selectedIndex]);
+
+  const moisturePlotsDataB = useMemo(() => {
+    if (plots && plots.length > 0) {
+      return plots.map(p => {
+        let coords = [];
+        if (p.boundary && p.boundary.coordinates && p.boundary.coordinates[0]) {
+          coords = api.geoJsonToLeaflet(p.boundary.coordinates[0]);
+        }
+        const ndmiVal = p.indices?.ndmi ?? null;
+        const ndwiVal = p.indices?.ndwi ?? null;
+        const lswiVal = p.indices?.lswi ?? null;
+        const smiVal = p.indices?.smi ?? null;
+        const msiVal = p.indices?.msi ?? null;
+
+        let activeVal = ndmiVal;
+        if (selectedIndex === 'ndwi') activeVal = ndwiVal;
+        else if (selectedIndex === 'lswi') activeVal = lswiVal;
+        else if (selectedIndex === 'smi') activeVal = smiVal;
+        else if (selectedIndex === 'msi') activeVal = msiVal;
+
+        let status = 'Adequate';
+        let color = '#60a5fa';
+        if (activeVal != null) {
+          if (selectedIndex === 'smi') {
+            status = activeVal > 5 ? 'Wet Soil' : activeVal > 2 ? 'Adequate' : 'Dry Soil';
+            color = activeVal > 5 ? '#1d4ed8' : activeVal > 2 ? '#60a5fa' : '#dc2626';
+          } else {
+            status = activeVal > 0.35 ? 'Well-Hydrated' : activeVal > 0.15 ? 'Adequate' : activeVal > -0.05 ? 'Mild Deficit' : 'Severe Deficit';
+            color = activeVal > 0.35 ? '#1d4ed8' : activeVal > 0.15 ? '#60a5fa' : activeVal > -0.05 ? '#fbbf24' : '#dc2626';
+          }
+        }
+        return {
+          id: p.plot_id,
+          name: p.name || p.plot_id,
+          area: `${p.area_ha || 10.0} HA`,
+          ndmi: ndmiVal,
+          ndwi: ndwiVal,
+          lswi: lswiVal,
+          smi: smiVal,
+          msi: msiVal,
+          activeVal,
+          moistureStatus: status,
+          color,
+          coords
+        };
+      });
+    }
+    return [];
+  }, [plots, currentTimelineB, selectedIndex]);
+
+  const moisturePlotsData = moisturePlotsDataA;
 
   const yieldPlotsDataA = useMemo(() => {
     if (plots && plots.length > 0) {
@@ -4051,10 +4184,10 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
               <Satellite className="text-white" size={21} />
             </div>
             <div>
-              <h1 className="text-base font-bold tracking-tight text-gray-900 leading-none">
+              <h1 className="text-base font-bold tracking-tight text-gray-900 leading-none flex items-center gap-1.5">
                 {tenantDisplayName} {isOrg
                   ? (brandingMode === 'AM' ? 'Agro Monitoring' : 'Farm Tools')
-                  : `${cropLabel} ${brandingMode === 'AM' ? 'Monitoring' : 'Farm Tools'}`}
+                  : <><span className="text-lg leading-none">{getCropEmoji(cropType)}</span> {cropLabel} {brandingMode === 'AM' ? 'Monitoring' : 'Farm Tools'}</>}
               </h1>
               <p className={`text-[11px] font-semibold uppercase tracking-widest mt-1 leading-none ${brandingMode === 'AM' ? 'text-green-600' : 'text-green-600'}`}>
                 {brandingMode === 'AM' ? 'Enterprise Satellite Node' : 'Agricultural Operations Hub'}
@@ -5647,17 +5780,17 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
                           {showRasterLayer && currentTileUrl && (
                             <TileLayer key={`a-${currentTileUrl}`} url={currentTileUrl} opacity={mapOpacity / 100} bounds={rasterOverlayBounds || undefined} maxZoom={22} maxNativeZoom={18} />
                           )}
-                          {renderHealthPolygons(healthPlotsDataA, 'left')}
+                          {renderMoisturePolygons(moisturePlotsDataA, 'left')}
                         </Pane>
                         <Pane name="right-pane-moisture" style={{ zIndex: 501 }}>
                           {showRasterLayer && currentTileUrlB && (
                             <TileLayer key={`b-${currentTileUrlB}`} url={currentTileUrlB} opacity={mapOpacity / 100} bounds={rasterOverlayBounds || undefined} maxZoom={22} maxNativeZoom={18} />
                           )}
-                          {renderHealthPolygons(healthPlotsDataB, 'right')}
+                          {renderMoisturePolygons(moisturePlotsDataB, 'right')}
                         </Pane>
                       </>
                     ) : (
-                      renderHealthPolygons(healthPlotsData)
+                      renderMoisturePolygons(moisturePlotsData)
                     )}
                     <FitBoundsToPlots plotsData={plotsData} farmBoundary={farmBoundary} />
                     <FitToZarrBounds zarrBounds={zarrBounds} />
@@ -5769,15 +5902,8 @@ const CropDashboardLayout = ({ mode = 'crop', cropType, cropSummary, cropBlocks,
 
                       {/* No outer "SMI Radar Metrics" wrapper — see comment
                           on the crop-health / intelligence-layers sections. */}
-                      {/* Was a hardcoded static legend (Saturated/Wet/
-                          Optimal/Stress, 0-1 scale) that never reflected
-                          the real backend classification and went stale
-                          the moment the SMI range was corrected (it's a
-                          VV(dB)-VV_reference(dB) delta, not [0,1] — see
-                          indices.py). Reusing the same live legend cards
-                          as every other page means this can't drift out
-                          of sync again. */}
-                      {renderLegendCards(['Structure & Moisture'])}
+                      {/* Moisture Content live legend cards grouped into Vegetation Moisture and Ground Moisture */}
+                      {renderLegendCards(['Vegetation Moisture', 'Ground Moisture'])}
                     </div>
                   </div>
                 )}

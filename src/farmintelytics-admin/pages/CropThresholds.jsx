@@ -5,14 +5,14 @@ import { useConfirm } from '../components/ConfirmProvider';
 import ErrorBanner from '../components/ErrorBanner';
 
 const CROPS = [
-  { id: 'ffb', label: 'Oil Palm (FFB)' },
-  { id: 'rice', label: 'Rice' },
-  { id: 'maize', label: 'Maize' },
-  { id: 'cocoa', label: 'Cocoa' },
-  { id: 'cassava', label: 'Cassava' },
-  { id: 'sugarcane', label: 'Sugarcane' },
-  { id: 'rubber', label: 'Rubber' },
-  { id: 'cashew', label: 'Cashew' },
+  { id: 'ffb', label: '🌴 Oil Palm (FFB)' },
+  { id: 'rice', label: '🌾 Rice' },
+  { id: 'maize', label: '🌽 Maize' },
+  { id: 'cocoa', label: '🍫 Cocoa' },
+  { id: 'cassava', label: '🌿 Cassava' },
+  { id: 'sugarcane', label: '🎋 Sugarcane' },
+  { id: 'rubber', label: '🌳 Rubber' },
+  { id: 'cashew', label: '🥜 Cashew' },
 ];
 
 const inputStyle = {

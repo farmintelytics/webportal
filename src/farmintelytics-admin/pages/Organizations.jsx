@@ -8,11 +8,15 @@ import { useConfirm } from '../components/ConfirmProvider';
 import ErrorBanner from '../components/ErrorBanner';
 import OrgDetailPanel from './OrganizationFarms';
 
-const ALL_CROPS = ['ffb', 'maize', 'rice', 'cocoa', 'rubber', 'cassava', 'sugarcane', 'cashew'];
-
-const CROP_LABELS = {
-  ffb: 'Oil Palm (FFB)', maize: 'Maize', rice: 'Rice', cocoa: 'Cocoa',
-  rubber: 'Rubber', cassava: 'Cassava', sugarcane: 'Sugarcane', cashew: 'Cashew',
+export const CROP_LABELS = {
+  ffb: '🌴 Oil Palm (FFB)',
+  sugarcane: '🎋 Sugarcane',
+  rice: '🌾 Rice',
+  cocoa: '🍫 Cocoa',
+  cassava: '🌿 Cassava',
+  maize: '🌽 Maize',
+  rubber: '🌳 Rubber',
+  cashew: '🥜 Cashew',
 };
 
 const ALL_MODULES = [

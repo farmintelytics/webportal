@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Key, Settings, Check, ChevronRight, AlertCircle, X, Copy, Rocket, UploadCloud, Filter, Plus } from 'lucide-react';
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Building2, Key, Settings, Check, ChevronRight, AlertCircle, X, Copy, Rocket, UploadCloud, Filter, Plus, MapPin } from 'lucide-react';
 import {
   createOrganization, createCredential, createFarm, uploadBoundary, generateFarmConfig, generateParentConfig,
   createSchedulerJob, uploadOrganizationLogo, getBoundaryProperties, updateOrganization,
@@ -45,6 +48,18 @@ const primaryBtn = (disabled) => ({
 });
 const secondaryBtn = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '13px 22px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '12px', color: '#334155', cursor: 'pointer', fontWeight: 700, fontSize: '14px', fontFamily: "'Roboto', sans-serif" };
 
+const FitToBounds = ({ data }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!data) return;
+    try {
+      const bounds = L.geoJSON(data).getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] });
+    } catch { /* malformed geometry */ }
+  }, [data, map]);
+  return null;
+};
+
 // The "Organization Setup" step covers company + first farm + its boundary —
 // too much for one long scroll, so it's split into its own mini flow with
 // Back/Next instead of dumping every field on screen at once.
@@ -72,6 +87,25 @@ const Onboarding = () => {
     processing_level: 'plot_level', cloud_cover_threshold: 10, start_date: '', end_date: '',
   });
   const [boundaryFile, setBoundaryFile] = useState(null);
+  const [previewGeoJSON, setPreviewGeoJSON] = useState(null);
+
+  useEffect(() => {
+    if (!boundaryFile) {
+      setPreviewGeoJSON(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        setPreviewGeoJSON(parsed);
+      } catch {
+        setPreviewGeoJSON(null);
+      }
+    };
+    reader.readAsText(boundaryFile);
+  }, [boundaryFile]);
+
   // Okomu-style setups: several farms/estates run separately then merged by
   // ParentSyncManager. When on, Farm+Boundary repeat for each sub-farm
   // instead of advancing straight to Credentials.
@@ -556,6 +590,18 @@ const Onboarding = () => {
                 <p style={helpTextStyle}>
                   This is exactly the file the pipeline will read for <strong>{farm.farm_name || 'this farm'}</strong>.
                 </p>
+                {previewGeoJSON && (
+                  <div style={{ marginTop: '14px', borderRadius: '14px', overflow: 'hidden', border: '1px solid #cbd5e1', height: '240px', position: 'relative' }}>
+                    <MapContainer center={[6.43, 5.27]} zoom={11} style={{ width: '100%', height: '100%' }} zoomControl={false}>
+                      <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution="Esri" maxZoom={19} />
+                      <GeoJSON data={previewGeoJSON} style={{ color: '#16a34a', weight: 2.5, fillColor: '#22c55e', fillOpacity: 0.25 }} />
+                      <FitToBounds data={previewGeoJSON} />
+                    </MapContainer>
+                    <div style={{ position: 'absolute', bottom: '10px', right: '10px', zIndex: 1000, background: 'rgba(15,23,42,0.85)', color: '#ffffff', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: '#22c55e' }}>✓</span> GeoJSON Boundary Preview
+                    </div>
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setOrgSubStep(2)} style={secondaryBtn}>Back</button>

@@ -18,6 +18,26 @@ import {
   Globe
 } from 'lucide-react';
 
+export const CROP_EMOJIS = {
+  ffb: '🌴',
+  oil_palm: '🌴',
+  sugarcane: '🎋',
+  rice: '🌾',
+  cocoa: '🍫',
+  cassava: '🌿',
+  maize: '🌽',
+  rubber: '🌳',
+  cashew: '🥜',
+  smallholder: '👨‍🌾',
+  default: '🌱',
+};
+
+export const getCropEmoji = (cropType = '') => {
+  if (!cropType) return '🌱';
+  const k = String(cropType).toLowerCase().replace('-', '_').replace(' ', '_');
+  return CROP_EMOJIS[k] || '🌱';
+};
+
 export const crops = [
   {
     id: 'management-ffb',

@@ -20,14 +20,17 @@ import {
   Trees
 } from 'lucide-react';
 import { fetchTenants, fetchCropMonitoringConfig } from '../services/organizationMonitorApi';
+import { getCropEmoji } from '../constants/crops';
 
 
-const ModuleCard = ({ title, crop, id, icon, active, onSelect, logoUrl }) => (
-  <button
-    onClick={() => active && onSelect(id)}
-    className={`group relative p-8 rounded-2xl transition-all duration-300 flex flex-col text-left border border-slate-200 shadow-sm ${
-      active
-        ? 'bg-white hover:bg-slate-50 hover:shadow-md hover:-translate-y-0.5'
+const ModuleCard = ({ title, crop, id, icon, active, onSelect, logoUrl }) => {
+  const emoji = getCropEmoji(crop || id);
+  return (
+    <button
+      onClick={() => active && onSelect(id)}
+      className={`group relative p-8 rounded-2xl transition-all duration-300 flex flex-col text-left border border-slate-200 shadow-sm ${
+        active
+          ? 'bg-white hover:bg-slate-50 hover:shadow-md hover:-translate-y-0.5'
         : 'bg-white opacity-40 cursor-not-allowed'
     }`}
   >
@@ -38,8 +41,9 @@ const ModuleCard = ({ title, crop, id, icon, active, onSelect, logoUrl }) => (
     </div>
     
     <div className="flex-1">
-      <div className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 ${active ? 'text-green-700' : 'text-slate-500'}`}>
-        {crop}
+      <div className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 flex items-center gap-1.5 ${active ? 'text-green-700' : 'text-slate-500'}`}>
+        <span className="text-base leading-none">{emoji}</span>
+        <span>{crop}</span>
       </div>
       <h3 className={`text-xl font-black tracking-tight leading-tight ${active ? 'text-slate-900' : 'text-slate-500'}`}>
         {title}
@@ -53,7 +57,8 @@ const ModuleCard = ({ title, crop, id, icon, active, onSelect, logoUrl }) => (
        {active && <ArrowRight size={18} className="text-slate-400 group-hover:text-green-600 transform group-hover:translate-x-2 transition-all" />}
     </div>
   </button>
-);
+  );
+};
 
 const PortalHub = ({ onSelectModule }) => {
   const [activeTab, setActiveTab] = React.useState('monitoring');
